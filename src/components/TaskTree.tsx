@@ -144,6 +144,10 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
     emptyMessage: 'No tasks yet. Add one above.',
     columns: [
       {
+        field: 'assignee', header: 'Assigned to', width: 160, editable: true, editor: 'select',
+        editorOptions: [UNASSIGNED, ...people.map((p) => p.name)],
+      },
+      {
         field: 'category', header: 'Category', width: 140, editable: true, editor: 'select',
         editorOptions: [NO_CATEGORY, ...categories.map((c) => c.name)],
       },
@@ -156,10 +160,6 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
         field: 'priority', header: 'Priority', width: 100, editable: true, editor: 'select',
         editorOptions: TASK_PRIORITIES.map((s) => s.label),
         render: ({ value }: { value: string }) => pill(value, valueOf(TASK_PRIORITIES, value) ?? 'medium'),
-      },
-      {
-        field: 'assignee', header: 'Assigned to', width: 160, editable: true, editor: 'select',
-        editorOptions: [UNASSIGNED, ...people.map((p) => p.name)],
       },
       {
         field: 'due', header: 'Due', type: 'date', width: 120, editable: true,
@@ -224,7 +224,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
       <h2>Tasks</h2>
       <p className="hint mt-1">
         {tasks.length ? `${done} of ${tasks.length} done. ` : ''}
-        Double-click (or tap twice) a category, status, priority, person, due date or time to change it. Select a task to edit its description, tags and notes, add sub-tasks, or move it.
+        Double-click (or tap twice) a person, category, status, priority, due date or time to change it. Select a task to edit its description, tags and notes, add sub-tasks, or move it.
       </p>
       <form className="form-row my-2" onSubmit={addTask}>
         <input className="field" placeholder="New task, e.g. Scout locations" value={newTitle} maxLength={200}
@@ -253,6 +253,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
             tasks={tasks}
             kids={kids}
             canManage={canManage}
+            people={people}
             companyId={companyId}
             categories={categories}
             tags={tags}
@@ -270,9 +271,9 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
   );
 }
 
-function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, canManage, run, onDeleted, onAdded }: {
+function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, people, canManage, run, onDeleted, onAdded }: {
   task: Task; projectId: string; companyId: string; tasks: Task[]; kids: Map<string, Task[]>;
-  categories: TaskCategory[]; tags: TaskTag[]; canManage: boolean;
+  categories: TaskCategory[]; tags: TaskTag[]; people: { id: string; name: string }[]; canManage: boolean;
   run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
   onDeleted: () => void; onAdded: (id: string) => void;
 }) {
@@ -357,6 +358,18 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, 
         )}
         <button type="submit" className="btn" disabled={!changed}>Save</button>
       </form>
+
+      <label className="label">Assigned to
+        <select className="field" value={task.assignee_id ?? ''}
+          onChange={(e) => run(() => api.updateTask(task.id, { assignee_id: e.target.value || null }), 'Task assigned.')}>
+          <option value="">{UNASSIGNED}</option>
+          {task.assignee_id && !people.some((p) => p.id === task.assignee_id) && <option value={task.assignee_id}>Left the project</option>}
+          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        {people.length <= 1 && (
+          <span className="hint">Only people on the project team can be assigned. Add more people in the Team section above.</span>
+        )}
+      </label>
 
       <label className="label">Category
         <select className="field" value={task.category_id ?? ''}
