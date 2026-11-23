@@ -23,7 +23,7 @@ export function App() {
   if (!session) return <SignIn />;
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
       <header className="topbar">
         <Link to="/" className="brand">Movie Production</Link>
         <span className="spacer" />

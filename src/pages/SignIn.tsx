@@ -17,7 +17,11 @@ export function SignIn() {
     const { data, error } =
       mode === 'sign-in'
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName.trim(), phone: phone.trim() } } });
+        : await supabase.auth.signUp({ email, password, options: {
+              data: { full_name: fullName.trim(), phone: phone.trim() },
+              // Send the confirmation link back to wherever the app is running.
+              emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
+            } });
     setBusy(false);
     if (error) setMessage({ kind: 'error', text: error.message });
     else if (mode === 'sign-up' && !data.session)

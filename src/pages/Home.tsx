@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { LatticeGrid, gridLink } from '../components/LatticeGrid';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -63,7 +63,7 @@ export function Home() {
       <LatticeGrid options={options} rows={companies} height={Math.min(80 + companies.length * 34, 400)} />
       <p className="muted small">
         Waiting to be added to a company? Ask its admin to add you with the email you signed up with.
-        You can add your phone number on <a href="/profile" onClick={(e) => { e.preventDefault(); navigate('/profile'); }}>your profile</a>.
+        You can add your phone number on <Link to="/profile" >your profile</Link>.
       </p>
     </section>
   );

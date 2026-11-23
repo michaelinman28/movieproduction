@@ -16,6 +16,14 @@ Built with React (Vite), Supabase (database, sign-in, row-level security) and
    The live project already has every migration in this folder applied.
 4. **Run:** `npm run dev` and open http://localhost:5173
 
+## Preview site
+
+Every push to `main` builds the app and publishes it to GitHub Pages at
+https://michaelinman28.github.io/movieproduction/ (see `.github/workflows/pages.yml`).
+One-time setup: repository Settings > Pages > Source: **GitHub Actions**, and in Supabase,
+Authentication > URL Configuration: set the Site URL to that address and add it
+(plus `http://localhost:5173/**`) to the Redirect URLs.
+
 ## Scripts
 
 | Command | What it does |

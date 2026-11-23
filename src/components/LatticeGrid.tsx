@@ -95,7 +95,7 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
 /** A cell link for a column's render option: { render: ({ data }) => gridLink(data.name, `/x/${data.id}`) }. */
 export function gridLink(text: string, to: string): HTMLAnchorElement {
   const a = document.createElement('a');
-  a.href = to;
+  a.href = import.meta.env.BASE_URL.replace(/\/$/, '') + to;
   a.dataset.to = to;
   a.textContent = text;
   a.className = 'grid-link';
