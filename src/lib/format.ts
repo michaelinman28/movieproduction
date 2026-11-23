@@ -23,6 +23,18 @@ export function roleNames(ids: Set<string> | string[], roles: Role[]) {
   return roles.filter((r) => set.has(r.id)).map((r) => r.name).join(', ');
 }
 
+/** Comma-separated role names (any case) to role ids, with the names that match no role. */
+export function roleIdsFor(text: string, roles: Role[]) {
+  const names = [...new Set(text.split(',').map((n) => n.trim()).filter(Boolean))];
+  const ids: string[] = [];
+  const unknown: string[] = [];
+  for (const n of names) {
+    const r = roles.find((x) => x.name.toLowerCase() === n.toLowerCase());
+    if (r) ids.push(r.id); else unknown.push(n);
+  }
+  return { ids, unknown };
+}
+
 export const errorText = (e: unknown) =>
   e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : String(e);
 

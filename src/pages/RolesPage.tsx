@@ -21,7 +21,7 @@ export function RolesPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [draft, setDraft] = useState({ name: '', department: '' });
+  const [draft, setDraft] = useState({ name: '', department: '', description: '' });
   // The department is picked from a list of the ones already in use, or typed in
   // when "New department…" is chosen.
   const [newDept, setNewDept] = useState(false);
@@ -47,9 +47,11 @@ export function RolesPage() {
     setError(null);
     setNotice(null);
     try {
-      const r = await api.createRole(companyId, { name: draft.name.trim(), department: draft.department.trim() || null });
+      const r = await api.createRole(companyId, {
+        name: draft.name.trim(), department: draft.department.trim() || null, description: draft.description.trim() || null,
+      });
       setNotice(`Added ${r.name}. Assign it to people from the company or project pages.`);
-      setDraft({ name: '', department: '' });
+      setDraft({ name: '', department: '', description: '' });
       setNewDept(false);
       await load();
     } catch (err) { setError(errorText(err)); }
@@ -69,6 +71,24 @@ export function RolesPage() {
   }
 
   const selected = custom.find((r) => r.id === selectedId) ?? null;
+  const [form, setForm] = useState({ name: '', department: '', description: '' });
+  useEffect(() => {
+    if (selected) setForm({ name: selected.name, department: selected.department, description: selected.description });
+    // Reset the form only when a different role is selected, or after a save reloads it.
+  }, [selected?.id, selected?.name, selected?.department, selected?.description]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function saveForm(e: FormEvent) {
+    e.preventDefault();
+    if (!selected) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await api.updateRole(selected.id, {
+        name: form.name.trim(), department: form.department.trim() || null, description: form.description.trim() || null,
+      });
+      setNotice(`Saved ${form.name.trim()}.`);
+    } catch (err) { setError(errorText(err)); }
+    await load();
+  }
   async function deleteRole() {
     if (!selected) return;
     const who = selected.people === 1 ? '1 person' : `${selected.people} people`;
@@ -93,7 +113,7 @@ export function RolesPage() {
     columns: [
       { field: 'name', header: 'Role', width: 220, editable: true },
       { field: 'department', header: 'Department', width: 160, editable: true },
-      { field: 'description', header: 'Description', width: 320, editable: true },
+      { field: 'description', header: 'Description', width: 320, editable: true, editor: 'textarea' },
       { field: 'people', header: 'People', type: 'number', width: 90 },
     ],
   }), [isAdmin]);
@@ -132,6 +152,8 @@ export function RolesPage() {
           <form className="form-row mb-2" onSubmit={addRole}>
             <input className="field" placeholder="Role name, e.g. Drone Pilot" value={draft.name} maxLength={80}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
+            <input className="field" placeholder="Description (optional)" aria-label="Description" value={draft.description} maxLength={500}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
             {newDept ? (
               <div className="flex gap-2">
                 <input className="field" placeholder="New department name" value={draft.department} maxLength={60} autoFocus
@@ -168,11 +190,26 @@ export function RolesPage() {
               <p className="hint">
                 {selected.people ? `${selected.people === 1 ? '1 person holds' : `${selected.people} people hold`} this role.` : 'Nobody holds this role yet.'}
               </p>
+              <form className="flex flex-col gap-2" onSubmit={saveForm}>
+                <label className="label">Name
+                  <input className="field" value={form.name} maxLength={80} required onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                </label>
+                <label className="label">Department
+                  <input className="field" value={form.department} maxLength={60} list="role-departments"
+                    onChange={(e) => setForm({ ...form, department: e.target.value })} />
+                  <datalist id="role-departments">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+                </label>
+                <label className="label">Description
+                  <textarea className="field" rows={3} value={form.description} maxLength={500}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                </label>
+                <button type="submit" className="btn">Save</button>
+              </form>
               <button className="btn btn-danger" onClick={deleteRole}>Delete role</button>
             </aside>
           ) : custom.length > 0 && (
             <aside className="card hidden gap-2 lg:flex">
-              <p className="hint">Select a role to see who holds it or delete it.</p>
+              <p className="hint">Select a role to edit it in a form, see who holds it, or delete it.</p>
             </aside>
           ))}
         </div>
