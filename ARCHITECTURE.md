@@ -197,8 +197,8 @@ Every screen is designed for a phone first, then enhanced for larger screens.
 - **One pinned action button (standard).** While scrolling, the main action of the
   section on screen (Add task, Add location, Create project…) pins under the header
   once it scrolls past the top, so it's always one tap away on a phone. An open
-  form's Save (`data-pin="2"`) takes the spot as soon as there's something to save,
-  even if the Save itself is further down. Only one button is pinned at a time
+  form's Save (`data-pin="2"`) takes the spot the moment there's something to save,
+  wherever the Save itself is on the page. Only one button is pinned at a time
   (`src/components/PinnedAction.tsx`). Mark buttons with `data-pin`; the section or
   panel they belong to has `data-pin-scope`.
 - **Forms wait for Save; tables save as you go (standard).** In a form or side panel,

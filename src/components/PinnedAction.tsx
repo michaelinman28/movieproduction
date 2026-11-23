@@ -7,9 +7,9 @@ import { useLocation } from 'react-router-dom';
  * Mark a button with `data-pin` (or `data-pin="2"` to take priority, like a form's
  * Save over the section's Add). When a marked button scrolls up past the top while
  * the section or panel it belongs to (`data-pin-scope`) is still on screen, a copy of
- * it is pinned under the header. A priority button is also pinned while it is out of
- * view further down, so an open form's Save replaces the section's Add. Only one button is pinned at a time: the highest
- * priority, then the one nearest the top. The copy clicks the real button, and
+ * it is pinned under the header. A priority button (an open form's Save) is pinned as
+ * soon as it is enabled, wherever it is, so it replaces the section's Add right away.
+ * Only one button is pinned at a time: the highest priority, then the one nearest the top. The copy clicks the real button, and
  * mirrors its label and whether it is disabled.
  */
 export function PinnedAction() {
@@ -32,16 +32,17 @@ export function PinnedAction() {
         const s = scope?.getBoundingClientRect();
         // The section must still fill some of the screen below the header.
         if (s && (s.bottom < top + 48 || s.top > bottom - 48)) continue;
-        // The button is out of view: off the screen, or scrolled away inside its panel.
-        const r = el.getBoundingClientRect();
-        const box = scope && scope.scrollHeight > scope.clientHeight + 1 ? s! : null;
-        const visTop = Math.max(top, box ? box.top : top);
-        const visBottom = Math.min(bottom, box ? box.bottom : bottom);
-        if (r.top >= visTop && r.bottom <= visBottom) continue;
         const prio = Number(el.dataset.pin) || 1;
-        // An ordinary button pins once it has scrolled up past the top. A priority one
-        // (an open form's Save) also stands in while it is still further down.
-        if (prio < 2 && r.top > visTop) continue;
+        const r = el.getBoundingClientRect();
+        // An open form's Save (priority 2) takes the spot as soon as there's something to
+        // save, wherever it is, so the pinned button always says Save while changes wait.
+        if (prio < 2) {
+          // An ordinary button pins once it has scrolled up past the top of the screen
+          // (or of its scrolling panel).
+          const box = scope && scope.scrollHeight > scope.clientHeight + 1 ? s! : null;
+          const visTop = Math.max(top, box ? box.top : top);
+          if (r.top >= visTop) continue;
+        }
         const dist = Math.abs(r.top - top);
         if (!best || prio > best.prio || (prio === best.prio && dist < best.dist)) best = { el, prio, dist };
       }
@@ -56,6 +57,7 @@ export function PinnedAction() {
     window.addEventListener('resize', schedule);
     document.addEventListener('click', schedule, true);
     document.addEventListener('input', schedule, true);
+    document.addEventListener('change', schedule, true);
     const observer = new MutationObserver(schedule);
     const main = document.querySelector('main');
     if (main) observer.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
@@ -65,6 +67,7 @@ export function PinnedAction() {
       window.removeEventListener('resize', schedule);
       document.removeEventListener('click', schedule, true);
       document.removeEventListener('input', schedule, true);
+      document.removeEventListener('change', schedule, true);
       observer.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
