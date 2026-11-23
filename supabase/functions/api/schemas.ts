@@ -144,3 +144,65 @@ export const ProjectMember = z.object({
 }).openapi('ProjectMember');
 
 export const ProjectMemberAdd = z.object({ user_id: Uuid }).openapi('ProjectMemberAdd');
+
+// ---- Tasks ------------------------------------------------------------------
+
+export const TaskStatus = z.enum(['todo', 'in_progress', 'blocked', 'done']).openapi('TaskStatus');
+export const TaskPriority = z.enum(['low', 'medium', 'high', 'urgent']).openapi('TaskPriority');
+export const DayPart = z.enum(['morning', 'afternoon', 'evening']).openapi('DayPart');
+const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'Use a 24-hour time like 14:30').openapi({ example: '14:30' });
+
+export const Task = z.object({
+  id: Uuid,
+  project_id: Uuid,
+  parent_id: Uuid.nullable().openapi({ description: 'The parent task when this is a sub-task' }),
+  title: z.string().openapi({ example: 'Scout locations' }),
+  description: nullableText,
+  status: TaskStatus,
+  priority: TaskPriority,
+  assignee_id: Uuid.nullable().openapi({ description: 'Someone on the project' }),
+  due_date: date.nullable(),
+  due_part: DayPart.nullable().openapi({ description: 'Due in the morning, afternoon or evening of the due date' }),
+  due_time: time.nullable().openapi({ description: 'Due at this time on the due date (local time, HH:MM:SS)', example: '14:30:00' }),
+  sort_order: z.number().int(),
+  created_by: Uuid,
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('Task');
+
+const taskFields = {
+  title: z.string().trim().min(1).max(200).openapi({ example: 'Scout locations' }),
+  description: z.string().trim().max(5000).nullable().optional(),
+  status: TaskStatus.optional(),
+  priority: TaskPriority.optional(),
+  assignee_id: Uuid.nullable().optional(),
+  due_date: date.nullable().optional(),
+  due_part: DayPart.nullable().optional().openapi({ description: 'Morning, afternoon or evening. Needs a due date; send due_time null with it' }),
+  due_time: time.nullable().optional().openapi({ description: 'Exact time (24-hour). Needs a due date; send due_part null with it' }),
+  sort_order: z.number().int().optional(),
+};
+
+export const TaskCreate = z.object({
+  ...taskFields,
+  parent_id: Uuid.nullable().optional().openapi({ description: 'Set to make this a sub-task of another task in the project' }),
+}).openapi('TaskCreate');
+
+export const TaskUpdate = z.object({
+  ...taskFields,
+  title: taskFields.title.optional(),
+  parent_id: Uuid.nullable().optional().openapi({ description: 'Move under another task, or null to make it a top-level task' }),
+}).openapi('TaskUpdate');
+
+export const TaskNote = z.object({
+  id: Uuid,
+  task_id: Uuid,
+  author_id: Uuid,
+  author: Profile,
+  body: z.string().openapi({ example: 'Called the venue; load-in moved to 7 AM.' }),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('TaskNote');
+
+export const TaskNoteInput = z.object({
+  body: z.string().trim().min(1).max(5000).openapi({ example: 'Called the venue; load-in moved to 7 AM.' }),
+}).openapi('TaskNoteInput');

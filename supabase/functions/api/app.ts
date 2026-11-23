@@ -6,6 +6,7 @@ import type { ApiConfig, Env } from './context.ts';
 import { auth } from './routes/auth.ts';
 import { companies } from './routes/companies.ts';
 import { projects } from './routes/projects.ts';
+import { tasks } from './routes/tasks.ts';
 
 export const API_VERSION = '0.1.0';
 
@@ -34,6 +35,7 @@ export function createApp(config: ApiConfig) {
   api.route('/', auth);
   api.route('/', companies);
   api.route('/', projects);
+  api.route('/', tasks);
 
   api.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http', scheme: 'bearer', bearerFormat: 'JWT',
@@ -58,6 +60,8 @@ export function createApp(config: ApiConfig) {
       { name: 'Account', description: 'Sign up, sign in and your profile' },
       { name: 'Companies' }, { name: 'Company people' }, { name: 'Roles' },
       { name: 'Projects' }, { name: 'Project team' },
+      { name: 'Tasks', description: 'Tasks and sub-tasks in a project' },
+      { name: 'Task notes', description: 'Any number of notes on a task' },
     ],
   }));
   const docsUrl = config.publicUrl ? `${config.publicUrl}/openapi.json` : `${base}/openapi.json`;

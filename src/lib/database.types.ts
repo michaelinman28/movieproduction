@@ -7,6 +7,7 @@ export type ProjectStatus =
   | 'released' | 'on_hold' | 'cancelled';
 export type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type DayPart = 'morning' | 'afternoon' | 'evening';
 export type JournalVisibility = 'private' | 'public';
 
 export type Profile = {
@@ -34,6 +35,7 @@ export type ProjectMemberRole = { project_id: string; user_id: string; role_id: 
 export type Task = {
   id: string; project_id: string; parent_id: string | null; title: string; description: string | null;
   status: TaskStatus; priority: TaskPriority; assignee_id: string | null; due_date: string | null;
+  due_part: DayPart | null; due_time: string | null;
   sort_order: number; created_by: string; created_at: string; updated_at: string;
 };
 export type JournalEntry = {

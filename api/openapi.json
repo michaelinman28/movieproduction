@@ -34,6 +34,14 @@
     },
     {
       "name": "Project team"
+    },
+    {
+      "name": "Tasks",
+      "description": "Tasks and sub-tasks in a project"
+    },
+    {
+      "name": "Task notes",
+      "description": "Any number of notes on a task"
     }
   ],
   "components": {
@@ -756,6 +764,344 @@
         },
         "required": [
           "user_id"
+        ]
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "The parent task when this is a sub-task"
+          },
+          "title": {
+            "type": "string",
+            "example": "Scout locations"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "assignee_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "Someone on the project"
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "example": "2027-01-10"
+          },
+          "due_part": {
+            "$ref": "#/components/schemas/DayPart"
+          },
+          "due_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+            "example": "14:30:00",
+            "description": "Due at this time on the due date (local time, HH:MM:SS)"
+          },
+          "sort_order": {
+            "type": "integer"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "parent_id",
+          "title",
+          "description",
+          "status",
+          "priority",
+          "assignee_id",
+          "due_date",
+          "due_part",
+          "due_time",
+          "sort_order",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "todo",
+          "in_progress",
+          "blocked",
+          "done"
+        ]
+      },
+      "TaskPriority": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high",
+          "urgent"
+        ]
+      },
+      "DayPart": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "enum": [
+          "morning",
+          "afternoon",
+          "evening",
+          null
+        ],
+        "description": "Due in the morning, afternoon or evening of the due date"
+      },
+      "TaskCreate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "example": "Scout locations"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 5000
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "assignee_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "example": "2027-01-10"
+          },
+          "due_part": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "morning",
+              "afternoon",
+              "evening",
+              null
+            ],
+            "description": "Morning, afternoon or evening. Needs a due date; send due_time null with it"
+          },
+          "due_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+            "example": "14:30",
+            "description": "Exact time (24-hour). Needs a due date; send due_part null with it"
+          },
+          "sort_order": {
+            "type": "integer"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "Set to make this a sub-task of another task in the project"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "TaskUpdate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "example": "Scout locations"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 5000
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "assignee_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "example": "2027-01-10"
+          },
+          "due_part": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "morning",
+              "afternoon",
+              "evening",
+              null
+            ],
+            "description": "Morning, afternoon or evening. Needs a due date; send due_time null with it"
+          },
+          "due_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+            "example": "14:30",
+            "description": "Exact time (24-hour). Needs a due date; send due_part null with it"
+          },
+          "sort_order": {
+            "type": "integer"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "Move under another task, or null to make it a top-level task"
+          }
+        }
+      },
+      "TaskNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "author": {
+            "$ref": "#/components/schemas/Profile"
+          },
+          "body": {
+            "type": "string",
+            "example": "Called the venue; load-in moved to 7 AM."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "task_id",
+          "author_id",
+          "author",
+          "body",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "TaskNoteInput": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "example": "Called the venue; load-in moved to 7 AM."
+          }
+        },
+        "required": [
+          "body"
         ]
       }
     },
@@ -2489,6 +2835,565 @@
           },
           "403": {
             "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/tasks": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Tasks and sub-tasks in a project",
+        "description": "A flat list. Sub-tasks point at their parent through `parent_id`. Anyone on the project, and admins of its company, can see and work on its tasks.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a task or sub-task",
+        "description": "Give `parent_id` to add a sub-task. A sub-task stays in its parent's project, and tasks can only be assigned to people on the project.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{id}": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "One task",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a task",
+        "description": "Send only the fields to change. Setting `parent_id` moves the task, and a task can't be moved under its own sub-tasks.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a task and its sub-tasks",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{id}/notes": {
+      "get": {
+        "tags": [
+          "Task notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Notes on a task, oldest first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskNote"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Task notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a note to a task",
+        "description": "Anyone who can work on the task can add notes. The note is signed by the caller.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskNoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-notes/{id}": {
+      "patch": {
+        "tags": [
+          "Task notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Edit your own note",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskNoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Task notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a note (its author, or a company admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
             "content": {
               "application/json": {
                 "schema": {

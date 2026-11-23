@@ -78,6 +78,8 @@ await expect('b sees both', () => as(U.b, `select * from journal_entries`), len(
 // admin rules
 await expect('last admin cannot be demoted', () => as(U.a, `update company_members set is_admin=false where user_id=$1`, [U.a]), isErr);
 await expect('removing c from company removes from project', async () => { await as(U.a, `delete from company_members where user_id=$1`, [U.c]); return as(U.a, `select * from project_members where user_id=$1`, [U.c]); }, len(0));
+await expect("c's task became unassigned", () => as(U.a, `select assignee_id from tasks where id=$1`, [t1.id]), r => r[0]?.assignee_id === null);
+await expect('unassigned task can still be edited', () => as(U.b, `update tasks set status='done' where id=$1 returning id`, [t1.id]), len(1));
 await expect('c lost shared entry', () => as(U.c, `select * from journal_entries`), len(0));
 await expect('company delete cascades', async () => { await as(U.a, `delete from companies where id=$1`, [cid]); return as(U.a, `select * from projects`); }, len(0));
 // step 2: adding people by email
@@ -119,5 +121,42 @@ await expect('role usage counts people', () => as(U.b, `select people from role_
 await expect('outsider sees no usage', () => as(U.d, `select * from role_usage($1)`, [c3]), len(0));
 await expect('non-admin cannot delete custom role', () => as(U.b, `delete from roles where id=$1 returning id`, [ic.id]), len(0));
 await expect('admin deletes custom role, assignments go too', async () => { await as(U.a, `delete from roles where id=$1`, [ic.id]); return as(U.a, `select * from company_member_roles where company_id=$1`, [c3]); }, len(0));
+// step 4: tasks
+const [co4] = await as(U.a, `insert into companies (name) values ('Task Co') returning id`);
+await as(U.a, `insert into company_members (company_id,user_id) values ($1,$2),($1,$3)`, [co4.id,U.b,U.d]);
+const [p4] = await as(U.a, `insert into projects (company_id,name) values ($1,'Tasks Film') returning id`, [co4.id]);
+await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2)`, [p4.id,U.b]);
+const [p4b] = await as(U.a, `insert into projects (company_id,name) values ($1,'Other Film') returning id`, [co4.id]);
+const [tk] = await as(U.b, `insert into tasks (project_id,title,description) values ($1,'  Book crew  ','  ') returning *`, [p4.id]);
+await expect('title trimmed, blank description is null', () => Promise.resolve([tk]), r => r[0].title === 'Book crew' && r[0].description === null);
+await expect('blank title refused', () => as(U.b, `insert into tasks (project_id,title) values ($1,'   ')`, [p4.id]), isErr);
+await expect('project member creates sub-task', () => as(U.b, `insert into tasks (project_id,parent_id,title) values ($1,$2,'Call gaffer') returning id`, [p4.id,tk.id]), len(1));
+await expect('sub-task must stay in the parent project', () => as(U.a, `insert into tasks (project_id,parent_id,title) values ($1,$2,'Wrong')`, [p4b.id,tk.id]), isErr);
+await expect('company member off the project cannot add tasks', () => as(U.d, `insert into tasks (project_id,title) values ($1,'Sneaky')`, [p4.id]), isErr);
+await expect('company member off the project cannot edit tasks', () => as(U.d, `update tasks set title='X' where id=$1 returning id`, [tk.id]), len(0));
+await expect('admin off the project can edit tasks', () => as(U.a, `update tasks set priority='high' where id=$1 returning id`, [tk.id]), len(1));
+await expect('assign to project member', () => as(U.b, `update tasks set assignee_id=$1 where id=$2 returning id`, [U.b,tk.id]), len(1));
+await expect('deleting a task deletes its sub-tasks', async () => { await as(U.b, `delete from tasks where id=$1`, [tk.id]); return as(U.b, `select * from tasks where project_id=$1`, [p4.id]); }, len(0));
+// due times
+const [dt] = await as(U.b, `insert into tasks (project_id,title,due_date,due_part) values ($1,'Load in','2027-01-10','morning') returning *`, [p4.id]);
+await expect('task due in the morning', () => Promise.resolve([dt]), r => r[0].due_part === 'morning' && r[0].due_time === null);
+await expect('exact due time', () => as(U.b, `update tasks set due_part=null, due_time='14:30' where id=$1 returning due_time`, [dt.id]), r => r[0]?.due_time === '14:30:00');
+await expect('not both a part of day and a time', () => as(U.b, `update tasks set due_part='evening' where id=$1`, [dt.id]), isErr);
+await expect('a time needs a date', () => as(U.b, `update tasks set due_date=null where id=$1`, [dt.id]), isErr);
+await expect('bad part of day refused', () => as(U.b, `update tasks set due_time=null, due_part='night' where id=$1`, [dt.id]), isErr);
+// task notes
+const [nt] = await as(U.b, `insert into tasks (project_id,title) values ($1,'Noted task') returning id`, [p4.id]);
+const [note] = await as(U.b, `insert into task_notes (task_id,body) values ($1,'  Called the venue  ') returning *`, [nt.id]);
+await expect('note stored trimmed with author', () => Promise.resolve([note]), r => r[0].body === 'Called the venue' && r[0].author_id === U.b);
+await expect('many notes per task', () => as(U.b, `insert into task_notes (task_id,body) values ($1,'Second note') returning id`, [nt.id]), len(1));
+await expect('blank note refused', () => as(U.b, `insert into task_notes (task_id,body) values ($1,'  ')`, [nt.id]), isErr);
+await expect('cannot post as someone else', () => as(U.b, `insert into task_notes (task_id,body,author_id) values ($1,'x',$2)`, [nt.id,U.a]), isErr);
+await expect('off-project member cannot read notes', () => as(U.d, `select * from task_notes`), len(0));
+await expect('off-project member cannot add notes', () => as(U.d, `insert into task_notes (task_id,body) values ($1,'x')`, [nt.id]), isErr);
+await expect('admin reads notes', () => as(U.a, `select * from task_notes where task_id=$1`, [nt.id]), len(2));
+await expect('only the author edits a note', () => as(U.a, `update task_notes set body='hack' where id=$1 returning id`, [note.id]), len(0));
+await expect('author edits own note', () => as(U.b, `update task_notes set body='Venue confirmed' where id=$1 returning body`, [note.id]), r => r[0]?.body === 'Venue confirmed');
+await expect('admin can delete a note', () => as(U.a, `delete from task_notes where id=$1 returning id`, [note.id]), len(1));
+await expect('deleting the task deletes its notes', async () => { await as(U.b, `delete from tasks where id=$1`, [nt.id]); return as(U.a, `select * from task_notes`); }, len(0));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
