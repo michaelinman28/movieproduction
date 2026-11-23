@@ -13,3 +13,7 @@ Patched here (marked `movieproduction patch` in `lattice-grid.js`); worth upstre
 
 - `treeColumnField` option: with `treeData`, makes the tree column editable as that
   field of each row (used for task titles).
+
+- **`filterSplit`** (column option, with `filter: 'set'`): for a column whose value is a
+  list such as `"Director, Gaffer"`, give the separator (`','`). The dropdown filter then
+  lists each item on its own, and a row matches when any of its items is ticked.

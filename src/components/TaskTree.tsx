@@ -230,7 +230,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       },
       {
         // Comma-separated; new names become new company tags.
-        field: 'tags', header: 'Tags', width: 200, editable: true,
+        field: 'tags', header: 'Tags', width: 200, editable: true, filter: 'set', filterSplit: ',',
         tooltip: () => 'Separate tags with commas. New names are added as tags.',
       },
       { field: 'description', header: 'Description', width: 260, editable: true, editor: 'textarea' },

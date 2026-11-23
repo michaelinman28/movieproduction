@@ -115,7 +115,7 @@ export function ProjectPage() {
     columns: [
       { field: 'name', header: 'Name', width: 200 },
       {
-        field: 'roles', header: 'Project roles', width: 280, editable: true,
+        field: 'roles', header: 'Project roles', width: 280, editable: true, filter: 'set', filterSplit: ',',
         tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
       },
       { field: 'email', header: 'Email', width: 220 },

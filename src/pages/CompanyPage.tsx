@@ -158,7 +158,7 @@ export function CompanyPage() {
       { field: 'name', header: 'Name', width: 200 },
       { field: 'title', header: 'Title', width: 170, editable: true },
       {
-        field: 'roles', header: 'Company roles', width: 240, editable: true,
+        field: 'roles', header: 'Company roles', width: 240, editable: true, filter: 'set', filterSplit: ',',
         tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
       },
       { field: 'email', header: 'Email', width: 220 },
