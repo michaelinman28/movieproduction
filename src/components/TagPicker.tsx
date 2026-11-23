@@ -1,9 +1,14 @@
-import { useId, useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { TaskTag } from '../lib/api';
 
 /**
  * Pick tags from the company's list, or type a new one and press Enter to create it.
- * Suggestions show as soon as the field is focused, in every browser.
+ * Suggestions show as soon as the field is focused, in every browser, and narrow as you
+ * type, with a "Create" choice when no tag has that exact name.
+ *
+ * The list is placed against the screen (position: fixed) rather than the field's box,
+ * so a side panel that scrolls can't clip it, and it opens upwards when there's more
+ * room above the field than below.
  */
 export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
   tags: TaskTag[];
@@ -16,6 +21,8 @@ export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const listId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [place, setPlace] = useState<CSSProperties | null>(null);
 
   const chosen = selected.map((id) => tags.find((t) => t.id === id)).filter(Boolean) as TaskTag[];
   const q = text.trim().toLowerCase();
@@ -29,6 +36,29 @@ export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
     ...suggestions.map((t) => ({ label: t.name, tag: t })),
     ...(q && !exact ? [{ label: `Create "${text.trim()}"` }] : []),
   ];
+
+  const showing = open && options.length > 0;
+  // Keep the list next to the field while it's open, through scrolling and resizing.
+  useEffect(() => {
+    if (!showing) return;
+    const update = () => {
+      const r = inputRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const gap = 4;
+      const below = window.innerHeight - r.bottom - gap * 2;
+      const above = r.top - gap * 2;
+      const up = below < 160 && above > below;
+      setPlace({
+        position: 'fixed', left: r.left, width: r.width,
+        ...(up ? { bottom: window.innerHeight - r.top + gap } : { top: r.bottom + gap }),
+        maxHeight: Math.min(256, Math.max(up ? above : below, 96)),
+      });
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => { window.removeEventListener('scroll', update, true); window.removeEventListener('resize', update); };
+  }, [showing]);
 
   async function pick(i: number) {
     const o = options[i];
@@ -71,6 +101,7 @@ export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
       {!disabled && (
         <div className="relative">
           <input
+            ref={inputRef}
             className="field" placeholder="Add a tag…" value={text} maxLength={40}
             role="combobox" aria-expanded={open && options.length > 0} aria-controls={listId} aria-label="Add a tag"
             onChange={(e) => { setText(e.target.value); setOpen(true); setActive(0); }}
@@ -78,8 +109,8 @@ export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
             onBlur={() => setTimeout(() => setOpen(false), 150)}
             onKeyDown={onKey}
           />
-          {open && options.length > 0 && (
-            <ul id={listId} role="listbox" className="tag-menu">
+          {showing && place && (
+            <ul id={listId} role="listbox" className="tag-menu" style={place}>
               {options.map((o, i) => (
                 <li key={o.label} role="option" aria-selected={i === active}
                   className={i === active ? 'tag-option tag-option-active' : 'tag-option'}
