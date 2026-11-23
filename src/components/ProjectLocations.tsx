@@ -104,7 +104,7 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
     const name = newName.trim();
     if (!name || !confirmDiscard()) return;
     let id = '';
-    if (await run(async () => { id = (await api.createLocation(projectId, { name })).id; }, `Added ${name}. Fill in its address and contact on the right.`)) {
+    if (await run(async () => { id = (await api.createLocation(projectId, { name })).id; }, `Added ${name}. Fill in its address and contact in the form below the table.`)) {
       setNewName('');
       setSelectedId(id);
       setReveal({ id, n: Date.now() });
@@ -130,21 +130,17 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
       )}
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
-      {/* The panel's space stays put so selecting a row doesn't resize the grid mid double-click. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* The form opens under the table, which keeps the full width. */}
+      <div className="flex flex-col gap-4">
         <LatticeGrid options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)} reveal={reveal}
           on={{ cellValueChanged: saveCell, selectionChanged: (r: LocationRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); } }} />
-        {selected ? (
+        {selected && (
           <LocationPanel key={selected.id} location={selected} run={run}
             canDelete={canManage || selected.created_by === me} onDeleted={() => setSelectedId(null)} />
-        ) : (
-          <aside data-pin-scope className="card hidden lg:flex">
-            <p className="hint">Select a location to see and edit all of its details.</p>
-          </aside>
         )}
       </div>
       {rows.length > 0 && (
-        <p className="hint mt-2">Double-click a cell to change it, or select a location to edit it in a form. Assign tasks to a location in the Tasks section.</p>
+        <p className="hint mt-2">Double-click a cell to change it, or select a location to edit it in a form. Assign tasks to a location on the Tasks page.</p>
       )}
     </Section>
   );
@@ -182,10 +178,10 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
   }
 
   return (
-    <aside data-pin-scope data-form-for={location.id} className="card gap-2 lg:max-h-[640px] lg:overflow-auto">
+    <aside data-pin-scope data-form-for={location.id} className="card gap-2">
       <h3>{location.address ? <a {...mapsLinkProps(location.address)} title="Open the address in maps">{location.name}</a> : location.name}</h3>
       <p className="hint">{location.tasks ? `${location.tasks === 1 ? '1 task is' : `${location.tasks} tasks are`} here.` : 'No tasks here yet.'}</p>
-      <form className="flex flex-col gap-2" onSubmit={save}>
+      <form className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-x-4" onSubmit={save}>
         <label className="label">Name
           <input className="field" value={draft.name} maxLength={120} required onChange={set('name')} />
         </label>
@@ -194,10 +190,10 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
             {LOCATION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </label>
-        <label className="label">Description
+        <label className="label md:col-span-2">Description
           <textarea className="field" rows={3} value={draft.description} maxLength={2000} onChange={set('description')} />
         </label>
-        <label className="label">Address
+        <label className="label md:col-span-2">Address
           <textarea className="field" rows={2} value={draft.address} maxLength={500} autoComplete="street-address" onChange={set('address')} />
           {initial.address && <a className="text-sm" {...mapsLinkProps(initial.address)}>Open in maps</a>}
         </label>
@@ -210,11 +206,11 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
         <label className="label">Contact phone
           <input className="field" type="tel" value={draft.contact_phone} maxLength={40} onChange={set('contact_phone')} />
         </label>
-        <div className="flex gap-2">
-          <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>
+        <div className="flex gap-2 md:col-span-2">
+          <button type="submit" className="btn flex-1 md:flex-none" disabled={!changed} data-pin="2">Save</button>
           <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
         </div>
-        {changed && <p className="hint">Unsaved changes.</p>}
+        {changed && <p className="hint md:col-span-2">Unsaved changes.</p>}
       </form>
       {(initial.contact_email || initial.contact_phone) && (
         <p className="flex flex-wrap gap-3 text-sm">
@@ -222,7 +218,7 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
           {initial.contact_email && <a href={`mailto:${initial.contact_email}`}>Email {initial.contact_name || 'contact'}</a>}
         </p>
       )}
-      {canDelete && <button className="btn btn-danger" onClick={remove}>Delete location</button>}
+      {canDelete && <button className="btn btn-danger sm:w-auto sm:self-start" onClick={remove}>Delete location</button>}
     </aside>
   );
 }

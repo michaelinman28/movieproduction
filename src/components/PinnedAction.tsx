@@ -88,7 +88,7 @@ export function PinnedAction() {
   if (!pin) return null;
   return (
     <div className="pinned-action" style={{ top: pin.top }}>
-      <div className="mx-auto flex w-full max-w-6xl justify-end px-4">
+      <div className="mx-auto flex w-full max-w-screen-2xl justify-end px-4">
         <button type="button" className={`${pin.className} w-full sm:w-auto`} disabled={pin.disabled} onClick={click}>
           {pin.label}
         </button>

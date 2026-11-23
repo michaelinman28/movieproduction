@@ -16,14 +16,14 @@ day to day.
 | Projects | Admins create several projects per company, each with a status (development to released), dates and a logline | Done |
 | Project teams | Admins assign company members to projects and give them project roles | Done |
 | Roles | 32 standard film roles (Producer, Director, DP, Gaffer…) are shared by every company. Company admins add, rename and delete their own custom roles on the Roles page; a custom role can't reuse a standard role's name | Done |
-| Tasks | A tree of tasks and sub-tasks (any depth) on each project page. See [Tasks](#tasks) below | Done |
+| Tasks | A tree of tasks and sub-tasks (any depth) on each project's Tasks page. See [Tasks](#tasks) below | Done |
 | Task categories and tags | Each company has its own task categories (12 starter ones) that admins add, rename, reorder and delete, and its own tags, which anyone in the company can add and admins can rename or delete | Done |
 | Locations | Each project's locations, with a status (Considering, Confirmed, Not using; Not using ones are hidden unless you ask, and aren't offered for tasks), a description, an address (the Map column, the panel and the task panel open it in the device's own maps app: Apple Maps on iPhone, iPad and Mac, the default maps app on Android, Google Maps in the browser elsewhere; `src/lib/maps.ts`) and an on-site contact name, email and phone. Anyone on the project adds and edits them; whoever added one or an admin deletes it. A task can be assigned to a location | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
 
 ### Tasks
 
-- **Where:** the Tasks section of a project page. A lattice-grid tree shows each task
+- **Where:** a project's Tasks page (`/projects/:id/tasks`). A lattice-grid tree shows each task
   with its category, status, priority, person assigned, due date and time, tags and
   sub-task progress. Quick filter, column filters and expand/collapse are in the grid.
 - **Who:** everyone on the project, plus admins of its company.
@@ -174,9 +174,16 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   styles. Add `sm:` (640px), `md:` (768px) and `lg:` (1024px) only to adapt
   for bigger screens. For example, `flex flex-col gap-3 md:flex-row` stacks on a
   phone and sits side by side on a laptop.
+- **Project pages have a left nav.** A project's areas (Overview, Tasks, Locations,
+  Team, Journal) are separate pages under `/projects/:id`, framed by
+  `src/pages/project/ProjectLayout.tsx`: the project's name, and a nav that is a left
+  column from `md:` up and a row of tabs (scrolling sideways inside itself) on phones,
+  plus links to the company's pages. The layout loads the project, team, roles and
+  locations once and hands them to each page (`useProject()`).
 - **One column by default.** Forms stack vertically and buttons go full width on
-  phones. Side panels (such as a person's roles) sit below the table on phones
-  and beside it from `lg:` up.
+  phones. A row's form or side panel (such as a person's roles) opens under
+  its table on every screen size, so the table keeps the full width. Wide panels lay
+  their fields out in two columns from `md:`/`lg:` up.
 - **Touch-friendly.** Buttons, checkboxes and links have tap targets of at least
   44px. Nothing depends on hover.
 - **No sideways page scrolling.** The page fits a 360px-wide screen. Wide data
@@ -231,8 +238,7 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   typed comma-separated in the table and ticked or picked in the panel. A row that is
   also a link gets a separate Open link column when its name is editable. Fields that
   belong to someone else's record, such as a person's name, email and phone (their own
-  profile), stay read-only there. Panels that sit beside an editable grid keep their
-  space so a double-click doesn't resize the grid mid-click.
+  profile), stay read-only there.
 
 ## Repository layout
 

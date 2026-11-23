@@ -267,9 +267,8 @@ export function CompanyPage() {
           </form>
         )}
         {isAdmin && <p className="hint mt-2">People need to create their own account first. Then add them here with the email they signed up with.</p>}
-        {/* Admins edit cells in place, so the panel's space stays put: opening it mid double-click
-            would resize the grid and stop the cell from opening. */}
-        <div className={`grid grid-cols-1 gap-4 ${selected || isAdmin ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
+        {/* The form opens under the table, which keeps the full width. */}
+        <div className="flex flex-col gap-4">
           <LatticeGrid
             options={peopleOptions}
             rows={peopleRows}
@@ -289,7 +288,6 @@ export function CompanyPage() {
               onRemoved={() => { setSelectedId(null); if (selected.user_id === me) navigate('/'); }}
             />
           )}
-          {!selected && isAdmin && <aside data-pin-scope className="card hidden lg:flex"><p className="hint">Select a person to see their details and pick their roles from the list.</p></aside>}
         </div>
         {!selected && peopleRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and change their roles, or double-click a title or roles cell to type a change' : ''}.</p>}
       </Section>
@@ -332,7 +330,7 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
   }
 
   return (
-    <aside data-pin-scope data-form-for={member.user_id} className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
+    <aside data-pin-scope data-form-for={member.user_id} className="card gap-2">
       <h3>{name}</h3>
       <p className="hint mt-2">
         {member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}
