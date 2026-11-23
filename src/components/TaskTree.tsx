@@ -3,6 +3,7 @@ import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
 import { Section } from './Section';
 import { TagPicker } from './TagPicker';
 import { TaskNotes } from './TaskNotes';
+import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 import {
   api, type DayPart, type Location, type ProjectMember, type Task, type TaskCategory, type TaskInput, type TaskPriority, type TaskStatus, type TaskTag,
 } from '../lib/api';
@@ -324,7 +325,8 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
     // `display` is a lattice-grid internal that isn't in its type declarations.
     const g = gridRef.current as unknown as { display?: { node?: { data?: TaskRow } }[] } | null;
     const id: string | undefined = g?.display?.[r.r1]?.node?.data?.id;
-    if (id) setSelectedId(id);
+    // Moving to another task with unsaved changes in the panel asks first.
+    if (id && id !== selectedId && confirmDiscard()) setSelectedId(id);
   }
 
   async function addTask(e: FormEvent) {
@@ -387,7 +389,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
             tags={tags}
             run={run}
             onDeleted={() => setSelectedId(null)}
-            onAdded={(id) => setSelectedId(id)}
+            onAdded={(id) => { if (confirmDiscard()) setSelectedId(id); }}
           />
         ) : (
           <aside data-pin-scope className="card hidden lg:flex">
@@ -405,31 +407,64 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
   run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
   onDeleted: () => void; onAdded: (id: string) => void;
 }) {
-  const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description ?? '');
-  const [dueDate, setDueDate] = useState(task.due_date ?? '');
-  // 'any', a part of the day, or 'time' for an exact time.
-  const [when, setWhen] = useState<string>(task.due_part ?? (task.due_time ? 'time' : 'any'));
-  const [dueTime, setDueTime] = useState(task.due_time?.slice(0, 5) ?? '');
+  // Every field here is held until Save (the table saves each cell as it changes).
+  const fromTask = (t: Task) => ({
+    title: t.title, description: t.description ?? '', dueDate: t.due_date ?? '',
+    // 'any', a part of the day, or 'time' for an exact time.
+    when: t.due_part ?? (t.due_time ? 'time' : 'any'), dueTime: t.due_time?.slice(0, 5) ?? '',
+    status: t.status, priority: t.priority, assignee: t.assignee_id ?? '', location: t.location_id ?? '',
+    category: t.category_id ?? '', tags: t.tag_ids, parent: t.parent_id ?? '',
+  });
+  type Draft = ReturnType<typeof fromTask>;
+  // `base` is what the form started from; Save sends only the fields that differ from it,
+  // so a change made meanwhile in the table to another field isn't overwritten.
+  const [base, setBase] = useState<Draft>(() => fromTask(task));
+  const [draft, setDraft] = useState<Draft>(base);
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
   const [subTitle, setSubTitle] = useState('');
   const below = useMemo(() => subtree(task.id, kids), [task.id, kids]);
   const children = kids.get(task.id) ?? [];
   const parents = tasks.filter((t) => !below.has(t.id)).sort((a, b) => a.title.localeCompare(b.title));
-  const due: Pick<TaskInput, 'due_date' | 'due_part' | 'due_time'> = !dueDate
+
+  const dueOf = (d: Draft): Pick<TaskInput, 'due_date' | 'due_part' | 'due_time'> => !d.dueDate
     ? { due_date: null, due_part: null, due_time: null }
-    : {
-      due_date: dueDate,
-      due_part: when === 'any' || when === 'time' ? null : when as DayPart,
-      due_time: when === 'time' && dueTime ? dueTime : null,
-    };
-  const changed = title.trim() !== task.title || (description.trim() || null) !== task.description
-    || due.due_date !== task.due_date || due.due_part !== task.due_part
-    || (due.due_time ?? null) !== (task.due_time?.slice(0, 5) ?? null);
+    : { due_date: d.dueDate, due_part: d.when === 'any' || d.when === 'time' ? null : d.when as DayPart, due_time: d.when === 'time' && d.dueTime ? d.dueTime : null };
+  const sameTags = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+  function patchOf(d: Draft): TaskInput {
+    const p: TaskInput = {};
+    if (d.title.trim() !== base.title) p.title = d.title.trim();
+    if (d.description.trim() !== base.description) p.description = d.description.trim() || null;
+    if (d.dueDate !== base.dueDate || d.when !== base.when || d.dueTime !== base.dueTime) Object.assign(p, dueOf(d));
+    if (d.status !== base.status) p.status = d.status;
+    if (d.priority !== base.priority) p.priority = d.priority;
+    if (d.assignee !== base.assignee) p.assignee_id = d.assignee || null;
+    if (d.location !== base.location) p.location_id = d.location || null;
+    if (d.category !== base.category) p.category_id = d.category || null;
+    if (!sameTags(d.tags, base.tags)) p.tag_ids = d.tags;
+    if (d.parent !== base.parent) p.parent_id = d.parent || null;
+    return p;
+  }
+  const changes = patchOf(draft);
+  const changed = Object.keys(changes).length > 0;
+  useUnsaved(changed);
+
+  // When the task changes elsewhere (the table, a reload) and nothing here is unsaved,
+  // show the new values.
+  useEffect(() => {
+    if (!changed) { const f = fromTask(task); setBase(f); setDraft(f); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    await run(() => api.updateTask(task.id, { title: title.trim(), description: description.trim() || null, ...due }), 'Task saved.');
+    if (!changed) return;
+    if (await run(() => api.updateTask(task.id, changes), 'Task saved.')) {
+      const f = { ...draft, title: draft.title.trim(), description: draft.description.trim() };
+      setBase(f);
+      setDraft(f);
+    }
   }
+  function discard() { setDraft(base); }
 
   async function addSub(e: FormEvent) {
     e.preventDefault();
@@ -441,20 +476,11 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
       if (id) onAdded(id);
     }
   }
-
-  async function setTags(ids: string[]) {
-    await run(() => api.updateTask(task.id, { tag_ids: ids }));
-  }
-
   async function createTag(name: string) {
+    // A new tag is added to the company's list straight away; it goes on this task when you save.
     let made: TaskTag | null = null;
     await run(async () => { made = await api.createTaskTag(companyId, name); });
     return made;
-  }
-
-  async function move(parentId: string) {
-    await run(() => api.updateTask(task.id, { parent_id: parentId || null }),
-      parentId ? 'Task moved.' : 'Task moved to the top level.');
   }
 
   async function remove() {
@@ -463,78 +489,78 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
     if (!window.confirm(msg)) return;
     if (await run(() => api.deleteTask(task.id), `Deleted "${task.title}".`)) onDeleted();
   }
-
   return (
     <aside data-pin-scope className="card gap-3 lg:max-h-[720px] lg:overflow-auto">
       <form className="flex flex-col gap-2" onSubmit={save}>
-        <label className="label">Task<input className="field" value={title} maxLength={200} required onChange={(e) => setTitle(e.target.value)} /></label>
-        <label className="label">Description<textarea className="field" rows={3} value={description} maxLength={5000} onChange={(e) => setDescription(e.target.value)} /></label>
-        <label className="label">Due date<input className="field" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></label>
-        {dueDate && (
+        <label className="label">Task<input className="field" value={draft.title} maxLength={200} required onChange={(e) => set('title', e.target.value)} /></label>
+        <label className="label">Description<textarea className="field" rows={3} value={draft.description} maxLength={5000} onChange={(e) => set('description', e.target.value)} /></label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="label">Status
+            <select className="field" value={draft.status} onChange={(e) => set('status', e.target.value as TaskStatus)}>
+              {TASK_STATUSES.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+            </select>
+          </label>
+          <label className="label">Priority
+            <select className="field" value={draft.priority} onChange={(e) => set('priority', e.target.value as TaskPriority)}>
+              {TASK_PRIORITIES.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="label">Due date<input className="field" type="date" value={draft.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></label>
+        {draft.dueDate && (
           <div className="grid grid-cols-2 gap-2">
             <label className="label">Time of day
-              <select className="field" value={when} onChange={(e) => setWhen(e.target.value)}>
+              <select className="field" value={draft.when} onChange={(e) => set('when', e.target.value)}>
                 <option value="any">{ANY_TIME}</option>
                 {DAY_PARTS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                 <option value="time">Exact time</option>
               </select>
             </label>
-            {when === 'time' && (
-              <label className="label">Time<input className="field" type="time" value={dueTime} required onChange={(e) => setDueTime(e.target.value)} /></label>
+            {draft.when === 'time' && (
+              <label className="label">Time<input className="field" type="time" value={draft.dueTime} required onChange={(e) => set('dueTime', e.target.value)} /></label>
             )}
           </div>
         )}
-        <button type="submit" className="btn" disabled={!changed} data-pin="2">Save</button>
+        <label className="label">Assigned to
+          <select className="field" value={draft.assignee} onChange={(e) => set('assignee', e.target.value)}>
+            <option value="">{UNASSIGNED}</option>
+            {draft.assignee && !people.some((p) => p.id === draft.assignee) && <option value={draft.assignee}>Left the project</option>}
+            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {people.length <= 1 && (
+            <span className="hint">Only people on the project team can be assigned. Add more people in the Team section above.</span>
+          )}
+        </label>
+        <label className="label">Location
+          <select className="field" value={draft.location} onChange={(e) => set('location', e.target.value)}>
+            <option value="">{NO_LOCATION}</option>
+            {locations.filter((l) => l.status !== 'not_using' || l.id === draft.location).map((l) => (
+              <option key={l.id} value={l.id}>{l.name}{l.status === 'not_using' ? ' (not using)' : ''}</option>
+            ))}
+          </select>
+          {!locations.length && <span className="hint">Add the project's locations in the Locations section above.</span>}
+        </label>
+        <label className="label">Category
+          <select className="field" value={draft.category} onChange={(e) => set('category', e.target.value)}>
+            <option value="">{NO_CATEGORY}</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+        <div className="label">Tags
+          <TagPicker tags={tags} selected={draft.tags} onChange={(ids) => set('tags', ids)} onCreate={createTag} />
+        </div>
+        <label className="label">Sub-task of
+          <select className="field" value={draft.parent} onChange={(e) => set('parent', e.target.value)}>
+            <option value="">Nothing (top-level task)</option>
+            {parents.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+          </select>
+        </label>
+        <div className="flex gap-2">
+          <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>
+          <button type="button" className="btn btn-secondary" disabled={!changed} onClick={discard}>Undo changes</button>
+        </div>
+        {changed && <p className="hint">Unsaved changes.</p>}
       </form>
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="label">Status
-          <select className="field" value={task.status}
-            onChange={(e) => run(() => api.updateTask(task.id, { status: e.target.value as TaskStatus }))}>
-            {TASK_STATUSES.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
-          </select>
-        </label>
-        <label className="label">Priority
-          <select className="field" value={task.priority}
-            onChange={(e) => run(() => api.updateTask(task.id, { priority: e.target.value as TaskPriority }))}>
-            {TASK_PRIORITIES.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
-          </select>
-        </label>
-      </div>
-
-      <label className="label">Assigned to
-        <select className="field" value={task.assignee_id ?? ''}
-          onChange={(e) => run(() => api.updateTask(task.id, { assignee_id: e.target.value || null }), 'Task assigned.')}>
-          <option value="">{UNASSIGNED}</option>
-          {task.assignee_id && !people.some((p) => p.id === task.assignee_id) && <option value={task.assignee_id}>Left the project</option>}
-          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-        {people.length <= 1 && (
-          <span className="hint">Only people on the project team can be assigned. Add more people in the Team section above.</span>
-        )}
-      </label>
-
-      <label className="label">Location
-        <select className="field" value={task.location_id ?? ''}
-          onChange={(e) => run(() => api.updateTask(task.id, { location_id: e.target.value || null }))}>
-          <option value="">{NO_LOCATION}</option>
-          {locations.filter((l) => l.status !== 'not_using' || l.id === task.location_id).map((l) => (
-            <option key={l.id} value={l.id}>{l.name}{l.status === 'not_using' ? ' (not using)' : ''}</option>
-          ))}
-        </select>
-        {!locations.length && <span className="hint">Add the project's locations in the Locations section above.</span>}
-      </label>
-
-      <label className="label">Category
-        <select className="field" value={task.category_id ?? ''}
-          onChange={(e) => run(() => api.updateTask(task.id, { category_id: e.target.value || null }))}>
-          <option value="">{NO_CATEGORY}</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      </label>
-      <div className="label">Tags
-        <TagPicker tags={tags} selected={task.tag_ids} onChange={setTags} onCreate={createTag} />
-      </div>
 
       <TaskNotes taskId={task.id} canManage={canManage} />
 
@@ -563,13 +589,6 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
         </label>
         <button type="submit" className="btn btn-secondary">Add sub-task</button>
       </form>
-
-      <label className="label">Sub-task of
-        <select className="field" value={task.parent_id ?? ''} onChange={(e) => move(e.target.value)}>
-          <option value="">Nothing (top-level task)</option>
-          {parents.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
-        </select>
-      </label>
 
       <button type="button" className="btn btn-danger" onClick={remove}>Delete task</button>
     </aside>

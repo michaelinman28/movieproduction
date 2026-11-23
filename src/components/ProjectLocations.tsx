@@ -3,6 +3,7 @@ import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
 import { Section } from './Section';
 import { api, type Location, type LocationInput, type LocationStatus } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 import { LOCATION_STATUSES, errorText, labelOf, valueOf } from '../lib/format';
 
 interface LocationRow {
@@ -123,7 +124,7 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
       {/* The panel's space stays put so selecting a row doesn't resize the grid mid double-click. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <LatticeGrid options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)}
-          on={{ cellValueChanged: saveCell, selectionChanged: (r: LocationRow[]) => setSelectedId(r[0]?.id ?? null) }} />
+          on={{ cellValueChanged: saveCell, selectionChanged: (r: LocationRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); } }} />
         {selected ? (
           <LocationPanel key={selected.id} location={selected} run={run}
             canDelete={canManage || selected.created_by === me} onDeleted={() => setSelectedId(null)} />
@@ -145,17 +146,23 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
   run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
   canDelete: boolean; onDeleted: () => void;
 }) {
-  const initial = useMemo(() => toRow(location), [location]);
+  // Every field here, status included, is held until Save.
+  const initial = useMemo(() => ({ ...toRow(location), status: location.status as string }), [location]);
   const [draft, setDraft] = useState(initial);
-  useEffect(() => setDraft(initial), [initial]);
-  const changed = FIELDS.some((f) => draft[f].trim() !== initial[f]);
-  const set = (f: Field) => (e: { target: { value: string } }) => setDraft({ ...draft, [f]: e.target.value });
+  const changed = FIELDS.some((f) => draft[f].trim() !== initial[f]) || draft.status !== initial.status;
+  useUnsaved(changed);
+  // Show changes made elsewhere (the table) unless something here is unsaved.
+  useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (f: Field | 'status') => (e: { target: { value: string } }) => setDraft({ ...draft, [f]: e.target.value });
 
   async function save(e: FormEvent) {
     e.preventDefault();
     const patch: LocationInput = {};
     for (const f of FIELDS) if (draft[f].trim() !== initial[f]) patch[f] = draft[f].trim() || (f === 'name' ? undefined : null) as never;
-    await run(() => api.updateLocation(location.id, patch), `Saved ${draft.name.trim()}.`);
+    if (draft.status !== initial.status) patch.status = draft.status as LocationStatus;
+    if (await run(() => api.updateLocation(location.id, patch), `Saved ${draft.name.trim()}.`)) {
+      setDraft((d) => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])) as typeof d);
+    }
   }
 
   async function remove() {
@@ -174,8 +181,7 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
           <input className="field" value={draft.name} maxLength={120} required onChange={set('name')} />
         </label>
         <label className="label">Status
-          <select className="field" value={location.status}
-            onChange={(e) => run(() => api.updateLocation(location.id, { status: e.target.value as LocationStatus }))}>
+          <select className="field" value={draft.status} onChange={set('status')}>
             {LOCATION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </label>
@@ -195,7 +201,11 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
         <label className="label">Contact phone
           <input className="field" type="tel" value={draft.contact_phone} maxLength={40} onChange={set('contact_phone')} />
         </label>
-        <button type="submit" className="btn" disabled={!changed} data-pin="2">Save</button>
+        <div className="flex gap-2">
+          <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>
+          <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
+        </div>
+        {changed && <p className="hint">Unsaved changes.</p>}
       </form>
       {(initial.contact_email || initial.contact_phone) && (
         <p className="flex flex-wrap gap-3 text-sm">

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { useUnsaved } from '../lib/unsaved';
 
 /** A one-field form for renaming the selected item (a category, a tag…). */
 export function RenameForm({ label, value, maxLength, onSave }: {
@@ -6,6 +7,7 @@ export function RenameForm({ label, value, maxLength, onSave }: {
 }) {
   const [name, setName] = useState(value);
   useEffect(() => setName(value), [value]);
+  useUnsaved(name.trim() !== value);
   function submit(e: FormEvent) {
     e.preventDefault();
     const v = name.trim();

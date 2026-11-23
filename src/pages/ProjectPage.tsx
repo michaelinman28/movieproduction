@@ -9,6 +9,7 @@ import { api, type CompanyMember, type Location, type ProjectDetail, type Projec
 import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, statusLabel } from '../lib/format';
 import type { ProjectStatus, Role } from '../lib/database.types';
 import type { Run } from './CompanyPage';
+import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 
 interface TeamRow { id: string; name: string; roles: string; email: string; phone: string; joined: string }
 
@@ -207,7 +208,7 @@ export function ProjectPage() {
             options={teamOptions}
             rows={teamRows}
             height={Math.min(80 + teamRows.length * 34, 420)}
-            on={{ selectionChanged: (rows: TeamRow[]) => setSelectedId(rows[0]?.id ?? null), cellValueChanged: saveTeamCell }}
+            on={{ selectionChanged: (rows: TeamRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); }, cellValueChanged: saveTeamCell }}
           />
           {selected && (
             <TeamPanel
@@ -239,11 +240,18 @@ function TeamPanel({ projectId, member, roles, isAdmin, run, onRemoved }: {
 }) {
   const name = displayName(member.profile);
   const roleIds = new Set(member.role_ids);
-  const toggleRole = (roleId: string, on: boolean) => {
-    const next = new Set(roleIds);
-    if (on) next.add(roleId); else next.delete(roleId);
-    return run(() => api.setTeamRoles(projectId, member.user_id, [...next]));
-  };
+  // Project roles are held until Save.
+  const initial = useMemo(() => [...member.role_ids].sort(), [member]);
+  const [draft, setDraft] = useState(initial);
+  const changed = draft.join() !== initial.join();
+  useUnsaved(changed);
+  useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleRole = (roleId: string, on: boolean) =>
+    setDraft((d) => (on ? [...d, roleId] : d.filter((r) => r !== roleId)).sort());
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    await run(() => api.setTeamRoles(projectId, member.user_id, draft), `Saved ${name}'s project roles.`);
+  }
 
   async function remove() {
     if (!window.confirm(`Remove ${name} from this project? They stay in the company.`)) return;
@@ -256,8 +264,15 @@ function TeamPanel({ projectId, member, roles, isAdmin, run, onRemoved }: {
       <p className="hint mt-2">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
       {isAdmin ? (
         <>
-          <h4>Project roles</h4>
-          <RolePicker roles={roles} selected={roleIds} onToggle={toggleRole} />
+          <form className="flex flex-col gap-2" onSubmit={save}>
+            <h4>Project roles</h4>
+            <RolePicker roles={roles} selected={new Set(draft)} onToggle={toggleRole} />
+            <div className="flex gap-2">
+              <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>
+              <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
+            </div>
+            {changed && <p className="hint">Unsaved changes.</p>}
+          </form>
           <button className="btn btn-danger" onClick={remove}>Remove from project</button>
         </>
       ) : (

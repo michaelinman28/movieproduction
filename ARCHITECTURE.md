@@ -34,7 +34,7 @@ day to day.
   and "Sub-task of" cells look like dropdowns and open their list with one click.
   Double-click the task name, due date, description or tags to type a change (tags are
   comma-separated, and new names become company tags).
-- **The task panel** (select a task): title, description, status, priority, person
+- **The task panel** (select a task; changes wait for Save): title, description, status, priority, person
   assigned, due date with a time of day
   (Any time, Morning, Afternoon, Evening) or an exact time, category, tags, notes,
   the list of sub-tasks (tick to mark done, click to open), adding a sub-task, moving
@@ -201,6 +201,12 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   even if the Save itself is further down. Only one button is pinned at a time
   (`src/components/PinnedAction.tsx`). Mark buttons with `data-pin`; the section or
   panel they belong to has `data-pin-scope`.
+- **Forms wait for Save; tables save as you go (standard).** In a form or side panel,
+  every change (typed text and picks alike) is held until Save, which sits next to
+  Undo changes and pins to the top while there's something to save. Selecting another
+  row, following a link or closing the tab with unsaved changes asks first
+  (`src/lib/unsaved.ts`, `UnsavedGuard`). Editing a table cell saves when the edit
+  ends. One-off actions (add a sub-task or note, tick a sub-task done) happen at once.
 - **Every field is editable in both the table and the form (standard).** If someone
   may change a field, they can change it in the table (in place) and in the page's
   form or side panel. Pick-list fields use a `select` editor shown as a dropdown
