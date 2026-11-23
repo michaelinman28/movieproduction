@@ -166,6 +166,7 @@ export function CompanyPage() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Link to={`/companies/${companyId}/roles`} className="btn btn-secondary no-underline">{isAdmin ? 'Manage roles' : 'Roles'}</Link>
+            <Link to={`/companies/${companyId}/task-settings`} className="btn btn-secondary no-underline">Task categories and tags</Link>
             {isAdmin && <button className="btn btn-secondary" onClick={startEdit}>Edit company</button>}
           </div>
         </header>
