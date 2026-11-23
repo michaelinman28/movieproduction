@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 export function SignIn() {
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -16,7 +17,7 @@ export function SignIn() {
     const { data, error } =
       mode === 'sign-in'
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
+        : await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName.trim(), phone: phone.trim() } } });
     setBusy(false);
     if (error) setMessage({ kind: 'error', text: error.message });
     else if (mode === 'sign-up' && !data.session)
@@ -32,6 +33,12 @@ export function SignIn() {
           <label>
             Full name
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" />
+          </label>
+        )}
+        {mode === 'sign-up' && (
+          <label>
+            Phone number <span className="muted">(optional)</span>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
           </label>
         )}
         <label>

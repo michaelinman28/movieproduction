@@ -11,9 +11,9 @@ Built with React (Vite), Supabase (database, sign-in, row-level security) and
 1. **Install:** `npm install`
 2. **Configure Supabase:** copy `.env.example` to `.env.local` and fill in your
    project URL and publishable key (Supabase dashboard > Project Settings > API).
-3. **Create the database:** in the Supabase dashboard, open **SQL Editor**, paste
-   the contents of `supabase/migrations/20261123000000_initial_schema.sql` and run it.
-   (Or, with the Supabase CLI: `npx supabase link` then `npx supabase db push`.)
+3. **Create the database:** run each file in `supabase/migrations` in order, in the
+   Supabase dashboard's **SQL Editor** (or `npx supabase link` then `npx supabase db push`).
+   The live project already has every migration in this folder applied.
 4. **Run:** `npm run dev` and open http://localhost:5173
 
 ## Scripts
@@ -36,6 +36,18 @@ Built with React (Vite), Supabase (database, sign-in, row-level security) and
 - **journal_entries**: project journal. `private` entries are visible only to the
   author and the people in **journal_entry_shares**; `public` entries are visible to
   everyone on the project.
+
+## Pages
+
+- **Companies** (`/`): your companies; create a new one (you become its admin).
+- **Company** (`/companies/:id`): projects and people. Admins create projects, add
+  people by the email they signed up with, set titles, admin rights and company roles.
+- **Project** (`/projects/:id`): details, status and dates, and the team. Admins assign
+  company members to the project and pick their project roles.
+- **Profile** (`/profile`): your name and phone number.
+
+People create their own account first (name, email, optional phone, password).
+A company admin then adds them to the company and assigns them to projects.
 
 ## Who can see what
 
