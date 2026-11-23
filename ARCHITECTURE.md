@@ -16,9 +16,28 @@ day to day.
 | Projects | Admins create several projects per company, each with a status (development to released), dates and a logline | Done |
 | Project teams | Admins assign company members to projects and give them project roles | Done |
 | Roles | 32 standard film roles (Producer, Director, DP, Gaffer…) are shared by every company. Company admins add, rename and delete their own custom roles on the Roles page; a custom role can't reuse a standard role's name | Done |
-| Tasks | Tasks and sub-tasks per project, shown as a tree on the project page. Anyone on the project (and company admins) can add tasks, nest sub-tasks to any depth, move them, and set status, priority, the person assigned and a due date. A due date can also have a time of day (Morning, Afternoon or Evening) or an exact time. Overdue tasks show in red. Each task has a description plus any number of notes, signed with the author and time; authors edit their own notes. Tasks have one category from the company's list and any number of company tags (picked from existing tags or created on the fly). The task panel lists a task's sub-tasks, which can be ticked off or opened | Done |
-| Task categories and tags | Each company has its own task categories (12 starter ones) that admins add, rename, reorder and delete, and its own tags, which admins can rename or delete | Done |
+| Tasks | A tree of tasks and sub-tasks (any depth) on each project page. See [Tasks](#tasks) below | Done |
+| Task categories and tags | Each company has its own task categories (12 starter ones) that admins add, rename, reorder and delete, and its own tags, which anyone in the company can add and admins can rename or delete | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
+
+### Tasks
+
+- **Where:** the Tasks section of a project page. A lattice-grid tree shows each task
+  with its category, status, priority, person assigned, due date and time, tags and
+  sub-task progress. Quick filter, column filters and expand/collapse are in the grid.
+- **Who:** everyone on the project, plus admins of its company.
+- **Editing in the grid:** double-click (or tap twice) a category, status, priority,
+  person, due date or time to change it.
+- **The task panel** (select a task): title, description, due date with a time of day
+  (Any time, Morning, Afternoon, Evening) or an exact time, category, tags, notes,
+  the list of sub-tasks (tick to mark done, click to open), adding a sub-task, moving
+  the task under another one, and deleting it with its sub-tasks.
+- **Overdue:** a task that isn't done turns red once its due time passes (noon for
+  Morning, 5 PM for Afternoon, midnight for Evening or no time).
+- **Notes:** any number per task, oldest first, signed with the author and time.
+  Only the author edits a note; the author or a company admin deletes it.
+- **Tags:** start typing in the panel's tag box to pick an existing company tag, or
+  press Enter on a new name to create it.
 
 ### How people join
 
@@ -94,13 +113,17 @@ There are three layers, and each one can be run and tested by itself.
   - Only company admins manage people, projects and custom roles.
   - Everyone on a project, and admins of its company, can work on its tasks and
     add notes. Only a note's author edits it; the author or an admin can delete it.
+  - Company members see the company's task categories and tags. Admins manage
+    categories; anyone in the company can create tags; admins rename or delete them.
   - Private journal entries are visible only to the author and the people they
     share them with. Only the author can edit them.
 - Integrity rules live in the database too. A company always keeps at least one
   admin. Only company members can join its projects. Removing someone from a
   company removes them from its projects, and leaving a project unassigns their
   tasks there. Tasks can only be assigned to people on the project. Sub-tasks stay
-  in their parent's project and can't form loops.
+  in their parent's project and can't form loops. A task's category and tags must
+  belong to its company. A due time needs a due date, and a task has either a part
+  of the day or an exact time, not both.
 
 | Table | Purpose |
 |---|---|
@@ -162,14 +185,17 @@ Every screen is designed for a phone first, then enhanced for larger screens.
 
 ```
 src/                         React app
-  components/                LatticeGrid wrapper, RolePicker, shared UI
+  components/                LatticeGrid wrapper, TaskTree (grid + panel), TaskNotes,
+                             TagPicker, RolePicker, ThemeSwitch
   lib/api.ts                 API client used by every page
   lib/supabase.ts, auth.tsx  Sign-in session only
   pages/                     Companies, Company, Roles, Task settings, Project, Profile, Sign in
   styles.css                 Tailwind entry and theme tokens
   vendor/lattice-grid/       Michael's grid library
 supabase/
-  migrations/                Database schema, security rules, seed roles
+  migrations/                Database schema and security rules, one file per change:
+                             initial schema, add people, profile phone, custom roles,
+                             tasks, task due times, task notes, task categories and tags
   functions/api/             The API (app.ts, routes/, schemas.ts, index.ts for Edge Functions)
 api/
   server.ts                  Runs the API on Node for local development
@@ -188,6 +214,16 @@ tests/schema.test.mjs        Security rule tests on in-memory Postgres
 
 Checks: `npm run typecheck` (app and API), `npm run test:db` (security rules), `npm run build`.
 
+## Making a change
+
+1. **Database:** add a new numbered file in `supabase/migrations` (never edit an
+   applied one), add tests for its rules to `tests/schema.test.mjs`, and apply it to
+   the live project.
+2. **API:** add the zod schemas in `schemas.ts` and the routes in `routes/`, run
+   `npm run api:spec`, and redeploy the `api` Edge Function (see the README).
+3. **App:** add the client call in `src/lib/api.ts` and build the screen, phone
+   layout first.
+
 ## Environments
 
 | What | Where |
@@ -201,5 +237,5 @@ Checks: `npm run typecheck` (app and API), `npm run test:db` (security rules), `
 1. Foundation: schema, security rules, sign-in (done)
 2. Companies, projects and people (done)
 3. Roles: manage custom roles per company (done)
-4. Tasks and sub-tasks in a lattice-grid tree (done)
+4. Tasks and sub-tasks in a lattice-grid tree, with due times, notes, categories and tags (done)
 5. Project journal with private, shared and public entries
