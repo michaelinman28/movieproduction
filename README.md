@@ -35,6 +35,14 @@ One-time setup: repository Settings > Pages > Source: **GitHub Actions**, and in
 Authentication > URL Configuration: set the Site URL to that address and add it
 (plus `http://localhost:5173/**`) to the Redirect URLs.
 
+## Preview site
+
+Every push to `main` builds the app and publishes it to GitHub Pages at
+https://michaelinman28.github.io/movieproduction/ (see `.github/workflows/pages.yml`).
+One-time setup: repository Settings > Pages > Source: **GitHub Actions**, and in Supabase,
+Authentication > URL Configuration: set the Site URL to that address and add it
+(plus `http://localhost:5173/**`) to the Redirect URLs.
+
 ## Scripts
 
 | Command | What it does |
