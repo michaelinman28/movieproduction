@@ -204,7 +204,12 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
   const flat = !!groupBy || overdue;
   // The calendar's chosen day; tasks added while the calendar shows are due on it.
   const [day, setDay] = useState(() => isoDate(new Date()));
+  /** Switching views closes the open task form (asking first if it has unsaved changes). */
   function changeView(v: string) {
+    if (selectedId) {
+      if (!confirmDiscard()) return;
+      setSelectedId(null);
+    }
     setView(v);
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* storage unavailable */ }
   }
