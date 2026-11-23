@@ -185,5 +185,23 @@ await expect('non-admin cannot rename a tag', () => as(U.b, `update task_tags se
 await expect('usage counts', () => as(U.b, `select * from task_label_usage($1) where tasks > 0`, [cc.id]), r => r.length === 2);
 await expect('deleting a category clears it from tasks', async () => { await as(U.a, `delete from task_categories where id=$1`, [cat.id]); return as(U.b, `select category_id from tasks where id=$1`, [ct.id]); }, r => r[0]?.category_id === null);
 await expect('deleting a tag removes it from tasks', async () => { await as(U.a, `delete from task_tags where id=$1`, [tag.id]); return as(U.b, `select * from task_tag_links where task_id=$1`, [ct.id]); }, len(0));
+// project locations
+const [lp] = await as(U.a, `insert into projects (company_id,name) values ($1,'Location Film') returning id`, [cc.id]);
+await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2)`, [lp.id,U.b]);
+const [loc] = await as(U.b, `insert into project_locations (project_id,name,address,contact_name,contact_email,contact_phone) values ($1,' Old Mill ',' 1 Mill Rd ','Sam','  SAM@Mill.com ','') returning *`, [lp.id]);
+await expect('member adds a location, tidied', () => Promise.resolve([loc]), r => r[0].name === 'Old Mill' && r[0].address === '1 Mill Rd' && r[0].contact_email === 'sam@mill.com' && r[0].contact_phone === null && r[0].created_by === U.b);
+await expect('blank location name refused', () => as(U.b, `insert into project_locations (project_id,name) values ($1,'  ')`, [lp.id]), isErr);
+await expect('duplicate location name refused', () => as(U.b, `insert into project_locations (project_id,name) values ($1,'old mill')`, [lp.id]), isErr);
+await expect('bad contact email refused', () => as(U.b, `update project_locations set contact_email='nope' where id=$1`, [loc.id]), isErr);
+await expect('off-project member cannot see locations', () => as(U.d, `select * from project_locations where project_id=$1`, [lp.id]), len(0));
+await expect('off-project member cannot add locations', () => as(U.d, `insert into project_locations (project_id,name) values ($1,'Sneaky')`, [lp.id]), isErr);
+await expect('outsider cannot see locations', () => as(U.c, `select * from project_locations`), len(0));
+await expect('member edits a location', () => as(U.b, `update project_locations set description='Two floors' where id=$1 returning description`, [loc.id]), r => r[0]?.description === 'Two floors');
+const [lt] = await as(U.b, `insert into tasks (project_id,title,location_id) values ($1,'Light the mill',$2) returning *`, [lp.id,loc.id]);
+await expect('task assigned to a location', () => Promise.resolve([lt]), r => r[0].location_id === loc.id);
+await expect('location from another project refused', () => as(U.b, `insert into tasks (project_id,title,location_id) values ($1,'Wrong place',$2)`, [pc.id,loc.id]), isErr);
+const [loc2] = await as(U.a, `insert into project_locations (project_id,name) values ($1,'Studio B') returning id`, [lp.id]);
+await expect('only the creator or an admin deletes a location', () => as(U.b, `delete from project_locations where id=$1 returning id`, [loc2.id]), len(0));
+await expect('deleting a location clears it from tasks', async () => { await as(U.b, `delete from project_locations where id=$1`, [loc.id]); return as(U.b, `select location_id from tasks where id=$1`, [lt.id]); }, r => r[0]?.location_id === null);
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

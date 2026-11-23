@@ -24,7 +24,7 @@ export function Section({ id, title, summary, children, level = 'h2', bodyClassN
   const toggle = () => { setCollapsed(!collapsed); write(key, !collapsed); };
 
   return (
-    <section className="flex flex-col">
+    <section className="flex flex-col" data-pin-scope>
       <Heading className="m-0">
         <button type="button" className={`section-toggle ${level === 'h4' ? 'section-toggle-sm' : ''}`} aria-expanded={!collapsed} aria-controls={bodyId} onClick={toggle}>
           <span className={`section-chevron ${collapsed ? '' : 'section-chevron-open'}`} aria-hidden="true">▸</span>

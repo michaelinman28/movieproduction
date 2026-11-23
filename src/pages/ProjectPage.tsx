@@ -4,7 +4,8 @@ import { LatticeGrid } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { RolePicker } from '../components/RolePicker';
 import { TaskTree } from '../components/TaskTree';
-import { api, type CompanyMember, type ProjectDetail, type ProjectMember } from '../lib/api';
+import { ProjectLocations } from '../components/ProjectLocations';
+import { api, type CompanyMember, type Location, type ProjectDetail, type ProjectMember } from '../lib/api';
 import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, statusLabel } from '../lib/format';
 import type { ProjectStatus, Role } from '../lib/database.types';
 import type { Run } from './CompanyPage';
@@ -19,6 +20,7 @@ export function ProjectPage() {
   const [companyMembers, setCompanyMembers] = useState<CompanyMember[]>([]);
   const [team, setTeam] = useState<ProjectMember[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -27,11 +29,12 @@ export function ProjectPage() {
   const load = useCallback(async () => {
     try {
       const p = await api.project(projectId);
-      const [cm, t, r] = await Promise.all([api.members(p.company_id), api.team(projectId), api.roles(p.company_id)]);
+      const [cm, t, r, l] = await Promise.all([api.members(p.company_id), api.team(projectId), api.roles(p.company_id), api.locations(projectId)]);
       setProject(p);
       setCompanyMembers(cm);
       setTeam(t);
       setRoles(r);
+      setLocations(l);
     } catch (e) {
       setError(errorText(e));
     }
@@ -39,6 +42,11 @@ export function ProjectPage() {
   }, [projectId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Locations change on their own (and their task counts change with tasks), without reloading the page.
+  const loadLocations = useCallback(async () => {
+    try { setLocations(await api.locations(projectId)); } catch (e) { setError(errorText(e)); }
+  }, [projectId]);
 
   const isAdmin = Boolean(project?.can_manage);
 
@@ -183,7 +191,7 @@ export function ProjectPage() {
                 <option value="">Choose someone from the company…</option>
                 {available.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
-              <button type="submit" className="btn">Assign to project</button>
+              <button type="submit" className="btn" data-pin>Assign to project</button>
             </form>
           ) : (
             <p className="hint mt-2">
@@ -212,12 +220,14 @@ export function ProjectPage() {
               onRemoved={() => setSelectedId(null)}
             />
           )}
-          {!selected && isAdmin && <aside className="card hidden lg:flex"><p className="hint">Select a person to see their details and pick their roles from the list.</p></aside>}
+          {!selected && isAdmin && <aside data-pin-scope className="card hidden lg:flex"><p className="hint">Select a person to see their details and pick their roles from the list.</p></aside>}
         </div>
         {!selected && teamRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and set their project roles' : ''}.</p>}
       </Section>
 
-      <TaskTree projectId={projectId} companyId={project.company_id} team={team} canManage={isAdmin} />
+      <ProjectLocations projectId={projectId} locations={locations} canManage={isAdmin} onChanged={loadLocations} />
+
+      <TaskTree projectId={projectId} companyId={project.company_id} team={team} locations={locations} canManage={isAdmin} onTasksChanged={loadLocations} />
 
       <p className="hint mt-2">The project journal is coming in the next step.</p>
     </section>
@@ -241,7 +251,7 @@ function TeamPanel({ projectId, member, roles, isAdmin, run, onRemoved }: {
   }
 
   return (
-    <aside className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
+    <aside data-pin-scope className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
       <h3>{name}</h3>
       <p className="hint mt-2">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
       {isAdmin ? (

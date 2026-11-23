@@ -134,7 +134,7 @@ export function TaskSettingsPage() {
             <form className="form-row" onSubmit={addCategory}>
               <input className="field" placeholder="New category, e.g. Stunts" value={newCategory} maxLength={60}
                 onChange={(e) => setNewCategory(e.target.value)} required />
-              <button type="submit" className="btn">Add category</button>
+              <button type="submit" className="btn" data-pin>Add category</button>
             </form>
           )}
           <LatticeGrid options={catOptions} rows={catRows} height={Math.min(80 + catRows.length * 34, 480)}
@@ -162,7 +162,7 @@ export function TaskSettingsPage() {
           <form className="form-row" onSubmit={addTag}>
             <input className="field" placeholder="New tag, e.g. night shoot" value={newTag} maxLength={40}
               onChange={(e) => setNewTag(e.target.value)} required />
-            <button type="submit" className="btn btn-secondary">Add tag</button>
+            <button type="submit" className="btn btn-secondary" data-pin>Add tag</button>
           </form>
           <LatticeGrid options={tagOptions} rows={tagRows} height={Math.min(80 + tagRows.length * 34, 480)}
             on={{

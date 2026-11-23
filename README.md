@@ -20,6 +20,7 @@ tasks, sub-tasks and (next) a project journal.
 | Project teams | Admins assign company members to projects and pick their project roles |
 | Tasks | A tree of tasks and sub-tasks per project, with category, tags, status, priority, assignee, and a due date with an optional time of day (Morning, Afternoon, Evening) or exact time. Each task has a description and any number of notes |
 | Task categories and tags | Each company has its own category list (admins set it up) and its own tags (anyone can add them while tagging a task) |
+| Locations | Each project's locations with description, address and contact (name, email, phone); tasks can be assigned to one |
 | Journal | Coming next: private, shared and public entries per project |
 
 People create their own account first. A company admin then adds them to the company
@@ -87,7 +88,7 @@ confirmation emails link back to the app.
 | Company | `/companies/:id` | Projects and people. Admins create projects, add people by email, and edit both tables in place |
 | Roles | `/companies/:id/roles` | Standard roles and the company's custom roles |
 | Task categories and tags | `/companies/:id/task-settings` | The company's category list (admins add, rename, reorder, delete) and its tags |
-| Project | `/projects/:id` | Details, the team, and the task tree with its side panel |
+| Project | `/projects/:id` | Details, the team, locations, and the task tree with its side panel |
 | Profile | `/profile` | Your name and phone number |
 
 ## Who can see and change what
@@ -98,6 +99,8 @@ confirmation emails link back to the app.
 - Everyone on a project (and company admins) can add and edit its tasks and add notes.
   Only a note's author can edit it; the author or an admin can delete it.
 - Anyone in a company can create task tags; admins can rename or delete them.
+- Everyone on a project can add and edit its locations; whoever added one, or an admin,
+  can delete it.
 - Journal entries: private ones are seen only by the author and the people they share
   them with; public ones by everyone on the project.
 

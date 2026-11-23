@@ -9,6 +9,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
 import { TaskSettingsPage } from './pages/TaskSettingsPage';
 import { ThemeSwitch } from './components/ThemeSwitch';
+import { PinnedAction } from './components/PinnedAction';
 
 export function App() {
   const { session, loading } = useAuth();
@@ -36,6 +37,7 @@ export function App() {
         <ThemeSwitch />
         <button className="btn-link text-sm" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </header>
+      <PinnedAction />
       <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">
         <Routes>
           <Route path="/companies/:companyId" element={<CompanyPage />} />
