@@ -18,7 +18,7 @@ day to day.
 | Roles | 32 standard film roles (Producer, Director, DP, Gaffer…) are shared by every company. Company admins add, rename and delete their own custom roles on the Roles page; a custom role can't reuse a standard role's name | Done |
 | Tasks | A tree of tasks and sub-tasks (any depth) on each project page. See [Tasks](#tasks) below | Done |
 | Task categories and tags | Each company has its own task categories (12 starter ones) that admins add, rename, reorder and delete, and its own tags, which anyone in the company can add and admins can rename or delete | Done |
-| Locations | Each project's locations, with a status (Considering, Confirmed, Not using; Not using ones are hidden unless you ask, and aren't offered for tasks), a description, an address (opens in maps) and an on-site contact name, email and phone. Anyone on the project adds and edits them; whoever added one or an admin deletes it. A task can be assigned to a location | Done |
+| Locations | Each project's locations, with a status (Considering, Confirmed, Not using; Not using ones are hidden unless you ask, and aren't offered for tasks), a description, an address (the Map column, the panel and the task panel open it in the device's own maps app: Apple Maps on iPhone, iPad and Mac, the default maps app on Android, Google Maps in the browser elsewhere; `src/lib/maps.ts`) and an on-site contact name, email and phone. Anyone on the project adds and edits them; whoever added one or an admin deletes it. A task can be assigned to a location | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
 
 ### Tasks
@@ -27,9 +27,15 @@ day to day.
   with its category, status, priority, person assigned, due date and time, tags and
   sub-task progress. Quick filter, column filters and expand/collapse are in the grid.
 - **Who:** everyone on the project, plus admins of its company.
-- **Views:** a "Show" menu switches between the sub-task tree and a flat list grouped
-  by person, category, status, priority, due date or tags (more columns can be dragged
-  into the grouping bar). The choice is remembered on the device.
+- **Views:** a "Show" menu switches between the sub-task tree, a calendar, and a flat
+  list grouped by person, category, location, status, priority, due date or tags (more
+  columns can be dragged into the grouping bar). The choice is remembered on the device.
+- **Calendar** (`src/components/TaskCalendar.tsx`): a month of tasks by due date, in
+  order of the day. Click a day to list its tasks below the month (phones show a count
+  per day instead of names); click a task to open its panel. Tasks added while the
+  calendar shows are due on the chosen day. On a computer, drag a task to another day
+  to move its due date (saved at once, like a table cell). Tasks without a due date are
+  counted under the month.
 - **Editing in the grid:** every task field. Person, category, status, priority, time
   and "Sub-task of" cells look like dropdowns and open their list with one click.
   Double-click the task name, due date, description or tags to type a change (tags are
@@ -231,7 +237,7 @@ Every screen is designed for a phone first, then enhanced for larger screens.
 
 ```
 src/                         React app
-  components/                LatticeGrid wrapper, TaskTree (grid + panel), TaskNotes,
+  components/                LatticeGrid wrapper, TaskTree (grid + panel), TaskCalendar, TaskNotes,
                              TagPicker, RolePicker, ThemeSwitch
   lib/api.ts                 API client used by every page
   lib/supabase.ts, auth.tsx  Sign-in session only
