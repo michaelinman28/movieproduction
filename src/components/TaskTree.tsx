@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { LatticeGrid } from './LatticeGrid';
+import { TaskNotes } from './TaskNotes';
 import { api, type DayPart, type ProjectMember, type Task, type TaskInput, type TaskPriority, type TaskStatus } from '../lib/api';
 import {
   DAY_PARTS, HALF_HOURS, TASK_PRIORITIES, TASK_STATUSES, displayName, dueWhen, errorText, isOverdue, labelOf, timeLabel, valueOf,
@@ -55,7 +56,7 @@ function subtree(id: string, kids: Map<string, Task[]>): Set<string> {
 
 const pill = (text: string, tone: string) => `<span class="task-pill task-pill-${tone}">${text}</span>`;
 
-export function TaskTree({ projectId, team }: { projectId: string; team: ProjectMember[] }) {
+export function TaskTree({ projectId, team, canManage }: { projectId: string; team: ProjectMember[]; canManage: boolean }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -198,7 +199,7 @@ export function TaskTree({ projectId, team }: { projectId: string; team: Project
       <h2>Tasks</h2>
       <p className="hint mt-1">
         {tasks.length ? `${done} of ${tasks.length} done. ` : ''}
-        Double-click (or tap twice) a status, priority, person, due date or time to change it. Select a task to rename it, add sub-tasks or move it.
+        Double-click (or tap twice) a status, priority, person, due date or time to change it. Select a task to edit its description, add notes or sub-tasks, or move it.
       </p>
       <form className="form-row my-2" onSubmit={addTask}>
         <input className="field" placeholder="New task, e.g. Scout locations" value={newTitle} maxLength={200}
@@ -226,6 +227,7 @@ export function TaskTree({ projectId, team }: { projectId: string; team: Project
             projectId={projectId}
             tasks={tasks}
             kids={kids}
+            canManage={canManage}
             run={run}
             onDeleted={() => setSelectedId(null)}
             onAdded={(id) => setSelectedId(id)}
@@ -240,8 +242,8 @@ export function TaskTree({ projectId, team }: { projectId: string; team: Project
   );
 }
 
-function TaskPanel({ task, projectId, tasks, kids, run, onDeleted, onAdded }: {
-  task: Task; projectId: string; tasks: Task[]; kids: Map<string, Task[]>;
+function TaskPanel({ task, projectId, tasks, kids, canManage, run, onDeleted, onAdded }: {
+  task: Task; projectId: string; tasks: Task[]; kids: Map<string, Task[]>; canManage: boolean;
   run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
   onDeleted: () => void; onAdded: (id: string) => void;
 }) {
@@ -294,10 +296,10 @@ function TaskPanel({ task, projectId, tasks, kids, run, onDeleted, onAdded }: {
   }
 
   return (
-    <aside className="card gap-3 lg:max-h-[560px] lg:overflow-auto">
+    <aside className="card gap-3 lg:max-h-[720px] lg:overflow-auto">
       <form className="flex flex-col gap-2" onSubmit={save}>
         <label className="label">Task<input className="field" value={title} maxLength={200} required onChange={(e) => setTitle(e.target.value)} /></label>
-        <label className="label">Notes<textarea className="field" rows={3} value={description} maxLength={5000} onChange={(e) => setDescription(e.target.value)} /></label>
+        <label className="label">Description<textarea className="field" rows={3} value={description} maxLength={5000} onChange={(e) => setDescription(e.target.value)} /></label>
         <label className="label">Due date<input className="field" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></label>
         {dueDate && (
           <div className="grid grid-cols-2 gap-2">
@@ -315,6 +317,8 @@ function TaskPanel({ task, projectId, tasks, kids, run, onDeleted, onAdded }: {
         )}
         <button type="submit" className="btn" disabled={!changed}>Save</button>
       </form>
+
+      <TaskNotes taskId={task.id} canManage={canManage} />
 
       <form className="flex flex-col gap-2" onSubmit={addSub}>
         <label className="label">Add a sub-task

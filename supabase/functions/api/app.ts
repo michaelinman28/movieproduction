@@ -61,6 +61,7 @@ export function createApp(config: ApiConfig) {
       { name: 'Companies' }, { name: 'Company people' }, { name: 'Roles' },
       { name: 'Projects' }, { name: 'Project team' },
       { name: 'Tasks', description: 'Tasks and sub-tasks in a project' },
+      { name: 'Task notes', description: 'Any number of notes on a task' },
     ],
   }));
   const docsUrl = config.publicUrl ? `${config.publicUrl}/openapi.json` : `${base}/openapi.json`;

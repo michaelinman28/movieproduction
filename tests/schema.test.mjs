@@ -144,5 +144,19 @@ await expect('exact due time', () => as(U.b, `update tasks set due_part=null, du
 await expect('not both a part of day and a time', () => as(U.b, `update tasks set due_part='evening' where id=$1`, [dt.id]), isErr);
 await expect('a time needs a date', () => as(U.b, `update tasks set due_date=null where id=$1`, [dt.id]), isErr);
 await expect('bad part of day refused', () => as(U.b, `update tasks set due_time=null, due_part='night' where id=$1`, [dt.id]), isErr);
+// task notes
+const [nt] = await as(U.b, `insert into tasks (project_id,title) values ($1,'Noted task') returning id`, [p4.id]);
+const [note] = await as(U.b, `insert into task_notes (task_id,body) values ($1,'  Called the venue  ') returning *`, [nt.id]);
+await expect('note stored trimmed with author', () => Promise.resolve([note]), r => r[0].body === 'Called the venue' && r[0].author_id === U.b);
+await expect('many notes per task', () => as(U.b, `insert into task_notes (task_id,body) values ($1,'Second note') returning id`, [nt.id]), len(1));
+await expect('blank note refused', () => as(U.b, `insert into task_notes (task_id,body) values ($1,'  ')`, [nt.id]), isErr);
+await expect('cannot post as someone else', () => as(U.b, `insert into task_notes (task_id,body,author_id) values ($1,'x',$2)`, [nt.id,U.a]), isErr);
+await expect('off-project member cannot read notes', () => as(U.d, `select * from task_notes`), len(0));
+await expect('off-project member cannot add notes', () => as(U.d, `insert into task_notes (task_id,body) values ($1,'x')`, [nt.id]), isErr);
+await expect('admin reads notes', () => as(U.a, `select * from task_notes where task_id=$1`, [nt.id]), len(2));
+await expect('only the author edits a note', () => as(U.a, `update task_notes set body='hack' where id=$1 returning id`, [note.id]), len(0));
+await expect('author edits own note', () => as(U.b, `update task_notes set body='Venue confirmed' where id=$1 returning body`, [note.id]), r => r[0]?.body === 'Venue confirmed');
+await expect('admin can delete a note', () => as(U.a, `delete from task_notes where id=$1 returning id`, [note.id]), len(1));
+await expect('deleting the task deletes its notes', async () => { await as(U.b, `delete from tasks where id=$1`, [nt.id]); return as(U.a, `select * from task_notes`); }, len(0));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

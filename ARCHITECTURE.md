@@ -16,7 +16,7 @@ day to day.
 | Projects | Admins create several projects per company, each with a status (development to released), dates and a logline | Done |
 | Project teams | Admins assign company members to projects and give them project roles | Done |
 | Roles | 32 standard film roles (Producer, Director, DP, Gaffer…) are shared by every company. Company admins add, rename and delete their own custom roles on the Roles page; a custom role can't reuse a standard role's name | Done |
-| Tasks | Tasks and sub-tasks per project, shown as a tree on the project page. Anyone on the project (and company admins) can add tasks, nest sub-tasks to any depth, move them, and set status, priority, the person assigned and a due date. A due date can also have a time of day (Morning, Afternoon or Evening) or an exact time. Overdue tasks show in red | Done |
+| Tasks | Tasks and sub-tasks per project, shown as a tree on the project page. Anyone on the project (and company admins) can add tasks, nest sub-tasks to any depth, move them, and set status, priority, the person assigned and a due date. A due date can also have a time of day (Morning, Afternoon or Evening) or an exact time. Overdue tasks show in red. Each task has a description plus any number of notes, signed with the author and time; authors edit their own notes | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
 
 ### How people join
@@ -80,6 +80,7 @@ There are three layers, and each one can be run and tested by itself.
 | Projects | `GET/POST /companies/{id}/projects`, `GET/PATCH/DELETE /projects/{id}` |
 | Project team | `GET/POST /projects/{id}/members`, `DELETE /projects/{id}/members/{userId}`, `PUT …/roles` |
 | Tasks | `GET/POST /projects/{id}/tasks`, `GET/PATCH/DELETE /tasks/{id}` (deleting a task deletes its sub-tasks) |
+| Task notes | `GET/POST /tasks/{id}/notes`, `PATCH/DELETE /task-notes/{id}` |
 
 ### 3. Database (`supabase/migrations`)
 
@@ -88,7 +89,8 @@ There are three layers, and each one can be run and tested by itself.
   - You see only the companies you belong to, and the profiles of people in them.
   - You see a project if you're assigned to it, or if you're an admin of its company.
   - Only company admins manage people, projects and custom roles.
-  - Everyone on a project, and admins of its company, can work on its tasks.
+  - Everyone on a project, and admins of its company, can work on its tasks and
+    add notes. Only a note's author edits it; the author or an admin can delete it.
   - Private journal entries are visible only to the author and the people they
     share them with. Only the author can edit them.
 - Integrity rules live in the database too. A company always keeps at least one
@@ -106,7 +108,8 @@ There are three layers, and each one can be run and tested by itself.
 | `company_member_roles`, `project_member_roles` | Roles a person holds in the company or on a project |
 | `projects` | Films under a company: status, dates, logline |
 | `project_members` | People assigned to a project |
-| `tasks` | Project tasks. `parent_id` makes a sub-task |
+| `tasks` | Project tasks. `parent_id` makes a sub-task; due date with optional part of day or time |
+| `task_notes` | Notes on a task, with author and time |
 | `journal_entries`, `journal_entry_shares` | The project journal and who private entries are shared with |
 
 ## Technologies

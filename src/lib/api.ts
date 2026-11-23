@@ -43,6 +43,8 @@ export type ProjectInput = Partial<Pick<Project, 'name' | 'logline' | 'descripti
 export type { DayPart, Task, TaskPriority, TaskStatus };
 export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'assignee_id' | 'due_date' | 'due_part' | 'due_time' | 'parent_id' | 'sort_order'>>;
 
+export interface TaskNote { id: string; task_id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
+
 const enc = encodeURIComponent;
 
 export const api = {
@@ -84,6 +86,10 @@ export const api = {
   createTask: (projectId: string, b: TaskInput & { title: string }) => call<Task>('POST', `/projects/${enc(projectId)}/tasks`, b),
   updateTask: (id: string, b: TaskInput) => call<Task>('PATCH', `/tasks/${enc(id)}`, b),
   deleteTask: (id: string) => call<void>('DELETE', `/tasks/${enc(id)}`),
+  taskNotes: (taskId: string) => call<TaskNote[]>('GET', `/tasks/${enc(taskId)}/notes`),
+  addTaskNote: (taskId: string, body: string) => call<TaskNote>('POST', `/tasks/${enc(taskId)}/notes`, { body }),
+  updateTaskNote: (id: string, body: string) => call<TaskNote>('PATCH', `/task-notes/${enc(id)}`, { body }),
+  deleteTaskNote: (id: string) => call<void>('DELETE', `/task-notes/${enc(id)}`),
 };
 
 export const API_BASE = BASE;

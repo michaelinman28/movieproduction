@@ -192,3 +192,17 @@ export const TaskUpdate = z.object({
   title: taskFields.title.optional(),
   parent_id: Uuid.nullable().optional().openapi({ description: 'Move under another task, or null to make it a top-level task' }),
 }).openapi('TaskUpdate');
+
+export const TaskNote = z.object({
+  id: Uuid,
+  task_id: Uuid,
+  author_id: Uuid,
+  author: Profile,
+  body: z.string().openapi({ example: 'Called the venue; load-in moved to 7 AM.' }),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('TaskNote');
+
+export const TaskNoteInput = z.object({
+  body: z.string().trim().min(1).max(5000).openapi({ example: 'Called the venue; load-in moved to 7 AM.' }),
+}).openapi('TaskNoteInput');
