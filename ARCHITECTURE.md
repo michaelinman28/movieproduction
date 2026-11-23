@@ -16,7 +16,7 @@ day to day.
 | Projects | Admins create several projects per company, each with a status (development to released), dates and a logline | Done |
 | Project teams | Admins assign company members to projects and give them project roles | Done |
 | Roles | 32 standard film roles (Producer, Director, DP, Gaffer…) are shared by every company. Company admins add, rename and delete their own custom roles on the Roles page; a custom role can't reuse a standard role's name | Done |
-| Tasks | Tasks and sub-tasks per project, shown as a tree on the project page. Anyone on the project (and company admins) can add tasks, nest sub-tasks to any depth, move them, and set status, priority, the person assigned and a due date. Overdue dates show in red | Done |
+| Tasks | Tasks and sub-tasks per project, shown as a tree on the project page. Anyone on the project (and company admins) can add tasks, nest sub-tasks to any depth, move them, and set status, priority, the person assigned and a due date. A due date can also have a time of day (Morning, Afternoon or Evening) or an exact time. Overdue tasks show in red | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
 
 ### How people join

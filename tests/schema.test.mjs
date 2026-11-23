@@ -137,5 +137,12 @@ await expect('company member off the project cannot edit tasks', () => as(U.d, `
 await expect('admin off the project can edit tasks', () => as(U.a, `update tasks set priority='high' where id=$1 returning id`, [tk.id]), len(1));
 await expect('assign to project member', () => as(U.b, `update tasks set assignee_id=$1 where id=$2 returning id`, [U.b,tk.id]), len(1));
 await expect('deleting a task deletes its sub-tasks', async () => { await as(U.b, `delete from tasks where id=$1`, [tk.id]); return as(U.b, `select * from tasks where project_id=$1`, [p4.id]); }, len(0));
+// due times
+const [dt] = await as(U.b, `insert into tasks (project_id,title,due_date,due_part) values ($1,'Load in','2027-01-10','morning') returning *`, [p4.id]);
+await expect('task due in the morning', () => Promise.resolve([dt]), r => r[0].due_part === 'morning' && r[0].due_time === null);
+await expect('exact due time', () => as(U.b, `update tasks set due_part=null, due_time='14:30' where id=$1 returning due_time`, [dt.id]), r => r[0]?.due_time === '14:30:00');
+await expect('not both a part of day and a time', () => as(U.b, `update tasks set due_part='evening' where id=$1`, [dt.id]), isErr);
+await expect('a time needs a date', () => as(U.b, `update tasks set due_date=null where id=$1`, [dt.id]), isErr);
+await expect('bad part of day refused', () => as(U.b, `update tasks set due_time=null, due_part='night' where id=$1`, [dt.id]), isErr);
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

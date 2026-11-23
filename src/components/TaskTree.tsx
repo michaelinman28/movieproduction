@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { LatticeGrid } from './LatticeGrid';
-import { api, type ProjectMember, type Task, type TaskPriority, type TaskStatus } from '../lib/api';
-import { TASK_PRIORITIES, TASK_STATUSES, displayName, errorText, labelOf, valueOf } from '../lib/format';
+import { api, type DayPart, type ProjectMember, type Task, type TaskInput, type TaskPriority, type TaskStatus } from '../lib/api';
+import {
+  DAY_PARTS, HALF_HOURS, TASK_PRIORITIES, TASK_STATUSES, displayName, dueWhen, errorText, isOverdue, labelOf, timeLabel, valueOf,
+} from '../lib/format';
 import type { LatticeGridInstance } from '../vendor/lattice-grid/lattice-grid';
 
 interface TaskRow {
@@ -11,10 +13,22 @@ interface TaskRow {
   priority: string;
   assignee: string;
   due: string;
+  when: string;
   subtasks: string;
 }
 
 const UNASSIGNED = 'Unassigned';
+const ANY_TIME = 'Any time';
+// Choices for the grid's Time cell: a part of the day, or a half hour.
+const WHEN_OPTIONS = [ANY_TIME, ...DAY_PARTS.map((p) => p.label), ...HALF_HOURS.map(timeLabel)];
+
+/** A Time cell choice back to the task fields. */
+function parseWhen(label: string): Pick<TaskInput, 'due_part' | 'due_time'> {
+  const part = DAY_PARTS.find((p) => p.label === label);
+  if (part) return { due_part: part.value, due_time: null };
+  const time = HALF_HOURS.find((t) => timeLabel(t) === label);
+  return { due_part: null, due_time: time ?? null };
+}
 // Invisible character used to tell apart sibling tasks that share a title, since
 // lattice-grid builds the tree from title paths.
 const ZWSP = '​';
@@ -38,8 +52,6 @@ function subtree(id: string, kids: Map<string, Task[]>): Set<string> {
   walk(id);
   return out;
 }
-
-const overdue = (t: Task) => t.status !== 'done' && !!t.due_date && t.due_date < new Date().toISOString().slice(0, 10);
 
 const pill = (text: string, tone: string) => `<span class="task-pill task-pill-${tone}">${text}</span>`;
 
@@ -89,6 +101,7 @@ export function TaskTree({ projectId, team }: { projectId: string; team: Project
           priority: labelOf(TASK_PRIORITIES, t.priority),
           assignee: t.assignee_id ? nameOf.get(t.assignee_id) ?? 'Left the project' : UNASSIGNED,
           due: t.due_date ?? '',
+          when: dueWhen(t),
           subtasks: sub.length ? `${sub.filter((s) => s.status === 'done').length} of ${sub.length} done` : '',
         });
         walk(t.id, path);
@@ -128,7 +141,16 @@ export function TaskTree({ projectId, team }: { projectId: string; team: Project
         field: 'due', header: 'Due', type: 'date', width: 120, editable: true,
         render: ({ value, data }: { value: string; data: TaskRow }) => {
           const t = byIdRef.current.get(data.id);
-          return value ? (t && overdue(t) ? `<span class="task-overdue">${value}</span>` : value) : '';
+          return value ? (t && isOverdue(t) ? `<span class="task-overdue">${value}</span>` : value) : '';
+        },
+      },
+      {
+        // A part of the day or a time on the due date. More exact times are set in the task panel.
+        field: 'when', header: 'Time', width: 110, editor: 'select', editorOptions: WHEN_OPTIONS,
+        editable: (d: TaskRow) => !!d.due,
+        render: ({ value, data }: { value: string; data: TaskRow }) => {
+          const t = byIdRef.current.get(data.id);
+          return value ? (t && isOverdue(t) ? `<span class="task-overdue">${value}</span>` : value) : '';
         },
       },
       { field: 'subtasks', header: 'Sub-tasks', width: 120 },
@@ -141,13 +163,15 @@ export function TaskTree({ projectId, team }: { projectId: string; team: Project
 
   async function onCellChanged(e: { data: TaskRow; column: string; newValue: unknown }) {
     const v = e.newValue == null ? '' : String(e.newValue);
-    const patch =
+    const patch: TaskInput | null =
       e.column === 'status' ? { status: valueOf(TASK_STATUSES, v) as TaskStatus | undefined }
       : e.column === 'priority' ? { priority: valueOf(TASK_PRIORITIES, v) as TaskPriority | undefined }
       : e.column === 'assignee' ? { assignee_id: v === UNASSIGNED || !v ? null : people.find((p) => p.name === v)?.id ?? null }
-      : e.column === 'due' ? { due_date: v || null }
+      // Clearing the date clears its time too.
+      : e.column === 'due' ? (v ? { due_date: v } : { due_date: null, due_part: null, due_time: null })
+      : e.column === 'when' ? parseWhen(v)
       : null;
-    if (!patch || Object.values(patch)[0] === undefined) { await load(); return; }
+    if (!patch || Object.values(patch).some((x) => x === undefined)) { await load(); return; }
     await run(() => api.updateTask(e.data.id, patch));
   }
 
@@ -174,7 +198,7 @@ export function TaskTree({ projectId, team }: { projectId: string; team: Project
       <h2>Tasks</h2>
       <p className="hint mt-1">
         {tasks.length ? `${done} of ${tasks.length} done. ` : ''}
-        Double-click (or tap twice) a status, priority, person or due date to change it. Select a task to rename it, add sub-tasks or move it.
+        Double-click (or tap twice) a status, priority, person, due date or time to change it. Select a task to rename it, add sub-tasks or move it.
       </p>
       <form className="form-row my-2" onSubmit={addTask}>
         <input className="field" placeholder="New task, e.g. Scout locations" value={newTitle} maxLength={200}
@@ -223,14 +247,27 @@ function TaskPanel({ task, projectId, tasks, kids, run, onDeleted, onAdded }: {
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
+  const [dueDate, setDueDate] = useState(task.due_date ?? '');
+  // 'any', a part of the day, or 'time' for an exact time.
+  const [when, setWhen] = useState<string>(task.due_part ?? (task.due_time ? 'time' : 'any'));
+  const [dueTime, setDueTime] = useState(task.due_time?.slice(0, 5) ?? '');
   const [subTitle, setSubTitle] = useState('');
   const below = useMemo(() => subtree(task.id, kids), [task.id, kids]);
   const parents = tasks.filter((t) => !below.has(t.id)).sort((a, b) => a.title.localeCompare(b.title));
-  const changed = title.trim() !== task.title || (description.trim() || null) !== task.description;
+  const due: Pick<TaskInput, 'due_date' | 'due_part' | 'due_time'> = !dueDate
+    ? { due_date: null, due_part: null, due_time: null }
+    : {
+      due_date: dueDate,
+      due_part: when === 'any' || when === 'time' ? null : when as DayPart,
+      due_time: when === 'time' && dueTime ? dueTime : null,
+    };
+  const changed = title.trim() !== task.title || (description.trim() || null) !== task.description
+    || due.due_date !== task.due_date || due.due_part !== task.due_part
+    || (due.due_time ?? null) !== (task.due_time?.slice(0, 5) ?? null);
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    await run(() => api.updateTask(task.id, { title: title.trim(), description: description.trim() || null }), 'Task saved.');
+    await run(() => api.updateTask(task.id, { title: title.trim(), description: description.trim() || null, ...due }), 'Task saved.');
   }
 
   async function addSub(e: FormEvent) {
@@ -261,6 +298,21 @@ function TaskPanel({ task, projectId, tasks, kids, run, onDeleted, onAdded }: {
       <form className="flex flex-col gap-2" onSubmit={save}>
         <label className="label">Task<input className="field" value={title} maxLength={200} required onChange={(e) => setTitle(e.target.value)} /></label>
         <label className="label">Notes<textarea className="field" rows={3} value={description} maxLength={5000} onChange={(e) => setDescription(e.target.value)} /></label>
+        <label className="label">Due date<input className="field" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></label>
+        {dueDate && (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="label">Time of day
+              <select className="field" value={when} onChange={(e) => setWhen(e.target.value)}>
+                <option value="any">{ANY_TIME}</option>
+                {DAY_PARTS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                <option value="time">Exact time</option>
+              </select>
+            </label>
+            {when === 'time' && (
+              <label className="label">Time<input className="field" type="time" value={dueTime} required onChange={(e) => setDueTime(e.target.value)} /></label>
+            )}
+          </div>
+        )}
         <button type="submit" className="btn" disabled={!changed}>Save</button>
       </form>
 

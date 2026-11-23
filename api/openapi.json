@@ -817,6 +817,18 @@
             "format": "date",
             "example": "2027-01-10"
           },
+          "due_part": {
+            "$ref": "#/components/schemas/DayPart"
+          },
+          "due_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+            "example": "14:30:00",
+            "description": "Due at this time on the due date (local time, HH:MM:SS)"
+          },
           "sort_order": {
             "type": "integer"
           },
@@ -842,6 +854,8 @@
           "priority",
           "assignee_id",
           "due_date",
+          "due_part",
+          "due_time",
           "sort_order",
           "created_by",
           "created_at",
@@ -865,6 +879,19 @@
           "high",
           "urgent"
         ]
+      },
+      "DayPart": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "enum": [
+          "morning",
+          "afternoon",
+          "evening",
+          null
+        ],
+        "description": "Due in the morning, afternoon or evening of the due date"
       },
       "TaskCreate": {
         "type": "object",
@@ -903,6 +930,28 @@
             ],
             "format": "date",
             "example": "2027-01-10"
+          },
+          "due_part": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "morning",
+              "afternoon",
+              "evening",
+              null
+            ],
+            "description": "Morning, afternoon or evening. Needs a due date; send due_time null with it"
+          },
+          "due_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+            "example": "14:30",
+            "description": "Exact time (24-hour). Needs a due date; send due_part null with it"
           },
           "sort_order": {
             "type": "integer"
@@ -958,6 +1007,28 @@
             ],
             "format": "date",
             "example": "2027-01-10"
+          },
+          "due_part": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "morning",
+              "afternoon",
+              "evening",
+              null
+            ],
+            "description": "Morning, afternoon or evening. Needs a due date; send due_time null with it"
+          },
+          "due_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+            "example": "14:30",
+            "description": "Exact time (24-hour). Needs a due date; send due_part null with it"
           },
           "sort_order": {
             "type": "integer"

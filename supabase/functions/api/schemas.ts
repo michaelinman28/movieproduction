@@ -149,6 +149,8 @@ export const ProjectMemberAdd = z.object({ user_id: Uuid }).openapi('ProjectMemb
 
 export const TaskStatus = z.enum(['todo', 'in_progress', 'blocked', 'done']).openapi('TaskStatus');
 export const TaskPriority = z.enum(['low', 'medium', 'high', 'urgent']).openapi('TaskPriority');
+export const DayPart = z.enum(['morning', 'afternoon', 'evening']).openapi('DayPart');
+const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'Use a 24-hour time like 14:30').openapi({ example: '14:30' });
 
 export const Task = z.object({
   id: Uuid,
@@ -160,6 +162,8 @@ export const Task = z.object({
   priority: TaskPriority,
   assignee_id: Uuid.nullable().openapi({ description: 'Someone on the project' }),
   due_date: date.nullable(),
+  due_part: DayPart.nullable().openapi({ description: 'Due in the morning, afternoon or evening of the due date' }),
+  due_time: time.nullable().openapi({ description: 'Due at this time on the due date (local time, HH:MM:SS)', example: '14:30:00' }),
   sort_order: z.number().int(),
   created_by: Uuid,
   created_at: z.string(),
@@ -173,6 +177,8 @@ const taskFields = {
   priority: TaskPriority.optional(),
   assignee_id: Uuid.nullable().optional(),
   due_date: date.nullable().optional(),
+  due_part: DayPart.nullable().optional().openapi({ description: 'Morning, afternoon or evening. Needs a due date; send due_time null with it' }),
+  due_time: time.nullable().optional().openapi({ description: 'Exact time (24-hour). Needs a due date; send due_part null with it' }),
   sort_order: z.number().int().optional(),
 };
 
