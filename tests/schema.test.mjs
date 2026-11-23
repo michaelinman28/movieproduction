@@ -5,9 +5,10 @@ import fs from 'fs';
 const db = new PGlite();
 await db.exec(`
 create schema auth;
-create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
+create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz default now());
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.sub', true), '')::uuid $$;
 create role authenticated;
+create role anon;
 grant usage on schema public, auth to authenticated;
 grant execute on all functions in schema auth to authenticated;
 `);
@@ -79,5 +80,28 @@ await expect('last admin cannot be demoted', () => as(U.a, `update company_membe
 await expect('removing c from company removes from project', async () => { await as(U.a, `delete from company_members where user_id=$1`, [U.c]); return as(U.a, `select * from project_members where user_id=$1`, [U.c]); }, len(0));
 await expect('c lost shared entry', () => as(U.c, `select * from journal_entries`), len(0));
 await expect('company delete cascades', async () => { await as(U.a, `delete from companies where id=$1`, [cid]); return as(U.a, `select * from projects`); }, len(0));
+// step 2: adding people by email
+const [co2] = await as(U.a, `insert into companies (name) values ('Second Unit') returning id`);
+const c2 = co2.id;
+await expect('non-admin cannot add by email', () => as(U.b, `select add_company_member($1,'d@x.com')`, [c2]), isErr);
+await expect('add existing user by email', () => as(U.a, `select add_company_member($1,' B@X.com ', false, 'Line Producer') r`, [c2]), r => r[0].r === 'added');
+await expect('b is member with title', () => as(U.b, `select title from company_members where company_id=$1 and user_id=$2`, [c2,U.b]), r => r[0]?.title === 'Line Producer');
+await expect('adding again says already member', () => as(U.a, `select add_company_member($1,'b@x.com') r`, [c2]), r => r[0].r === 'already_member');
+await expect('unknown email rejected', () => as(U.a, `select add_company_member($1,'nobody@x.com')`, [c2]), e => isErr(e) && /sign up first/.test(e.message));
+await expect('bad email rejected', () => as(U.a, `select add_company_member($1,'nope')`, [c2]), isErr);
+const N='00000000-0000-0000-0000-0000000000ff';
+await db.query(`insert into auth.users (id,email,email_confirmed_at) values ($1,'new@x.com',null)`, [N]);
+await expect('unconfirmed account cannot be added', () => as(U.a, `select add_company_member($1,'new@x.com')`, [c2]), isErr);
+await db.query(`update auth.users set email_confirmed_at=now() where id=$1`, [N]);
+await expect('confirmed account added as admin', () => as(U.a, `select add_company_member($1,'new@x.com', true) r`, [c2]), r => r[0].r === 'added');
+await db.query(`update auth.users set email='renamed@x.com' where id=$1`, [N]);
+await expect('profile email follows sign-in email', () => as(U.a, `select email from profiles where id=$1`, [N]), r => r[0]?.email === 'renamed@x.com');
+// phone numbers
+const P='00000000-0000-0000-0000-0000000000dd';
+await db.query(`insert into auth.users (id,email,raw_user_meta_data) values ($1,'p@x.com',$2)`, [P, {full_name:'P', phone:' 555-0100 '}]);
+await expect('phone from sign-up', () => as(P, `select phone from profiles where id=$1`, [P]), r => r[0]?.phone === '555-0100');
+await expect('edit own phone', () => as(U.b, `update profiles set phone='555-0199' where id=$1 returning phone`, [U.b]), len(1));
+await expect('cannot edit others phone', () => as(U.b, `update profiles set phone='1' where id=$1 returning id`, [U.a]), len(0));
+await expect('co-member sees phone', () => as(U.a, `select phone from profiles where id=$1`, [U.b]), r => r[0]?.phone === '555-0199');
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

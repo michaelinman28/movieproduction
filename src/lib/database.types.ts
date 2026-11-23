@@ -10,7 +10,8 @@ export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type JournalVisibility = 'private' | 'public';
 
 export type Profile = {
-  id: string; full_name: string | null; email: string | null; avatar_url: string | null; created_at: string;
+  id: string; full_name: string | null; email: string | null; phone: string | null; avatar_url: string | null;
+  created_at: string;
 };
 export type Company = {
   id: string; name: string; description: string | null; created_by: string; created_at: string;
@@ -64,7 +65,12 @@ export interface Database {
       journal_entry_shares: Table<JournalEntryShare, 'entry_id' | 'user_id'>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      add_company_member: {
+        Args: { cid: string; member_email: string; make_admin?: boolean; member_title?: string | null };
+        Returns: 'added' | 'already_member';
+      };
+    };
     Enums: {
       project_status: ProjectStatus;
       task_status: TaskStatus;

@@ -1,8 +1,11 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
 import { useAuth } from './lib/auth';
 import { supabase, supabaseConfigured } from './lib/supabase';
 import { SignIn } from './pages/SignIn';
 import { Home } from './pages/Home';
+import { CompanyPage } from './pages/CompanyPage';
+import { ProjectPage } from './pages/ProjectPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 export function App() {
   const { session, loading } = useAuth();
@@ -22,13 +25,16 @@ export function App() {
   return (
     <BrowserRouter>
       <header className="topbar">
-        <strong>Movie Production</strong>
+        <Link to="/" className="brand">Movie Production</Link>
         <span className="spacer" />
-        <span className="muted">{session.user.email}</span>
+        <Link to="/profile" className="muted">{session.user.email}</Link>
         <button className="link" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </header>
       <main className="page">
         <Routes>
+          <Route path="/companies/:companyId" element={<CompanyPage />} />
+          <Route path="/projects/:projectId" element={<ProjectPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </main>
