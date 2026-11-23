@@ -44,6 +44,10 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
     const grid = new window.LatticeGrid<Row>(containerRef.current, {
       theme: themeRef.current,
       ...options,
+      // A pick-list column (editor: 'select') filters by ticking values from a dropdown
+      // list instead of typing, unless the column sets its own filter.
+      columns: (options.columns as { editor?: string; filter?: unknown }[] | undefined)?.map((c) =>
+        c.editor === 'select' && c.filter === undefined ? { ...c, filter: 'set' } : c) as LatticeGridOptions<Row>['columns'],
       rows: rowsRef.current,
     });
     gridRef.current = grid;
