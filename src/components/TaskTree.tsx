@@ -36,10 +36,11 @@ const UNASSIGNED = 'Unassigned';
 /** 'YYYY-MM-DD' to e.g. 'Mon, Nov 23'. */
 const dayName = (iso: string) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
 
-// How tasks are shown: the sub-task tree, a month calendar by due date, or a flat list grouped by a column.
+// How tasks are shown: the sub-task tree, a month calendar by due date, only the overdue tasks, or a flat list grouped by a column.
 const VIEWS = [
   { value: '', label: 'Sub-task tree' },
   { value: 'calendar', label: 'Calendar' },
+  { value: 'overdue', label: 'Overdue' },
   { value: 'assignee', label: 'Grouped by person' },
   { value: 'category', label: 'Grouped by category' },
   { value: 'location', label: 'Grouped by location' },
@@ -195,8 +196,12 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
 
   const [view, setView] = useState<string>(readView);
   const calendar = view === 'calendar';
-  // The column the grid groups by ('' for the sub-task tree).
-  const groupBy = calendar ? '' : view;
+  // Overdue: a flat list of only the tasks past their due time, oldest first.
+  const overdue = view === 'overdue';
+  // The column the grid groups by ('' for none).
+  const groupBy = calendar || overdue ? '' : view;
+  // A flat list (grouped, or the overdue list) rather than the sub-task tree.
+  const flat = !!groupBy || overdue;
   // The calendar's chosen day; tasks added while the calendar shows are due on it.
   const [day, setDay] = useState(() => isoDate(new Date()));
   function changeView(v: string) {
@@ -211,7 +216,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
     };
     const columns = [
       // In the tree the task's name is the tree column; a flat list needs its own.
-      ...(groupBy ? [{ field: 'title', header: 'Task', width: window.innerWidth < 640 ? 170 : 240, editable: true }] : []),
+      ...(flat ? [{ field: 'title', header: 'Task', width: window.innerWidth < 640 ? 170 : 240, editable: true }] : []),
       {
         field: 'assignee', header: 'Assigned to', width: 170, editable: true, editor: 'select',
         editorOptions: [UNASSIGNED, ...people.map((p) => p.name)],
@@ -240,7 +245,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
         },
         render: ({ value }: { value: string }) => dropdown(value ? esc(value) : '<span class="text-muted">None</span>'),
       },
-      { field: 'due', header: 'Due', type: 'date', width: 120, editable: true, render: overdueText },
+      { field: 'due', header: 'Due', type: 'date', width: 120, editable: true, render: overdueText, ...(overdue ? { sort: 'asc' } : {}) },
       {
         // A part of the day or a time on the due date. More exact times are set in the task panel.
         field: 'when', header: 'Time', width: 120, editor: 'select', editorOptions: WHEN_OPTIONS,
@@ -269,15 +274,15 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       groupDefaultExpanded: -1,
       toolbar: { quickFilter: true, expandCollapse: true },
       statusBar: false,
-      emptyMessage: 'No tasks yet. Add one above.',
+      emptyMessage: overdue ? 'Nothing is overdue.' : 'No tasks yet. Add one above.',
       columns,
     };
-    return groupBy
+    return flat
       ? {
         ...common,
         // Grouped list: one group per value of the chosen column. More columns can be
-        // dragged into the bar above the grid to group further.
-        groupBy: [groupBy],
+        // dragged into the bar above the grid to group further (the overdue list too).
+        groupBy: groupBy ? [groupBy] : [],
         groupPanel: true,
         groupColumnHeader: 'Group',
         groupColumnWidth: window.innerWidth < 640 ? 160 : 200,
@@ -293,7 +298,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
         groupColumnWidth: window.innerWidth < 640 ? 190 : 260,
         groupPanel: false,
       };
-  }, [people, categories, locationList, groupBy]);
+  }, [people, categories, locationList, groupBy, flat, overdue]);
 
   // The due-date renderer reads the latest tasks without rebuilding the grid.
   const byIdRef = useRef(byId);
@@ -355,7 +360,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
     if (!confirmDiscard()) return;
     let id = '';
     const input: TaskInput & { title: string } = calendar ? { title, due_date: day } : { title };
-    if (await run(async () => { id = (await api.createTask(projectId, input)).id; }, `Added "${title}"${calendar ? ` on ${dayName(day)}` : ''}. Fill in the rest of its details in the form.`)) {
+    if (await run(async () => { id = (await api.createTask(projectId, input)).id; }, `Added "${title}"${calendar ? ` on ${dayName(day)}` : ''}. Fill in the rest of its details in the form.${overdue ? " It isn't overdue, so it won't be in this list." : ''}`)) {
       setNewTitle('');
       // Adding is usually the start: open the new task's form.
       if (id) open(id);
@@ -382,8 +387,12 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
     scrollToForm(id);
   }
 
+  // The overdue list shows only tasks past their due time.
+  const overdueCount = tasks.filter(isOverdue).length;
+  const shown = useMemo(() => (overdue ? rows.filter((r) => { const t = byId.get(r.id); return !!t && isOverdue(t); }) : rows), [overdue, rows, byId]);
+
   // Group header rows take space too when the list is grouped.
-  const groupCount = groupBy ? new Set(rows.map((r) => r[groupBy as keyof TaskRow] as string)).size : 0;
+  const groupCount = groupBy ? new Set(shown.map((r) => r[groupBy as keyof TaskRow] as string)).size : 0;
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
   const done = tasks.filter((t) => t.status === 'done').length;
 
@@ -398,10 +407,11 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
         <label className="label sm:flex-row sm:items-center sm:gap-2">Show
           <select className="field sm:w-auto" value={view} onChange={(e) => changeView(e.target.value)} aria-label="How to show tasks">
-            {VIEWS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+            {VIEWS.map((v) => <option key={v.value} value={v.value}>{v.value === 'overdue' ? `Overdue (${overdueCount})` : v.label}</option>)}
           </select>
         </label>
         {groupBy && <span className="hint">Drag more column headers into the bar above the grid to group further.</span>}
+        {overdue && <span className="hint">Tasks that aren't done and are past their due time, oldest first. Drag a column header into the bar above the grid to group them.</span>}
       </div>
       <form className="form-row my-2" onSubmit={addTask}>
         <input className="field" placeholder={calendar ? `New task on ${dayName(day)}` : 'New task, e.g. Scout locations'} aria-label="New task name" value={newTitle} maxLength={200}
@@ -420,8 +430,8 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
         ) : (
           <LatticeGrid
             options={options}
-            rows={rows}
-            height={Math.min(160 + (rows.length + groupCount) * 34 + (groupBy ? 44 : 0), 640)}
+            rows={shown}
+            height={Math.min(160 + (shown.length + groupCount) * 34 + (flat ? 44 : 0), 640)}
             on={{ cellValueChanged: onCellChanged, rangeChanged: onRange }}
             reveal={reveal}
             onReady={(g) => { gridRef.current = g; }}

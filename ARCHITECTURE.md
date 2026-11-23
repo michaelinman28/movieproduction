@@ -27,8 +27,9 @@ day to day.
   with its category, status, priority, person assigned, due date and time, tags and
   sub-task progress. Quick filter, column filters and expand/collapse are in the grid.
 - **Who:** everyone on the project, plus admins of its company.
-- **Views:** a "Show" menu switches between the sub-task tree, a calendar, and a flat
-  list grouped by person, category, location, status, priority, due date or tags (more
+- **Views:** a "Show" menu switches between the sub-task tree, a calendar, an Overdue
+  list (only tasks that aren't done and are past their due time, oldest first, with the
+  count in the menu), and a flat list grouped by person, category, location, status, priority, due date or tags (more
   columns can be dragged into the grouping bar). The choice is remembered on the device.
 - **Calendar** (`src/components/TaskCalendar.tsx`): a month of tasks by due date, in
   order of the day. Click a day to list its tasks below the month (phones show a count
