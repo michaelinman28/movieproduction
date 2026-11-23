@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Section } from './Section';
 import { api, type TaskNote } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { displayName, errorText } from '../lib/format';
@@ -45,8 +46,7 @@ export function TaskNotes({ taskId, canManage }: { taskId: string; canManage: bo
   }
 
   return (
-    <section className="flex flex-col gap-2" aria-label="Notes">
-      <h4>Notes{notes.length ? ` (${notes.length})` : ''}</h4>
+    <Section id="task.notes" title="Notes" level="h4" summary={notes.length || undefined} bodyClassName="flex flex-col gap-2">
       {error && <p className="error">{error}</p>}
       {!loaded ? <p className="hint">Loading notes…</p> : !notes.length && <p className="hint">No notes yet.</p>}
       <ul className="flex flex-col gap-2">
@@ -83,6 +83,6 @@ export function TaskNotes({ taskId, canManage }: { taskId: string; canManage: bo
           onChange={(e) => setDraft(e.target.value)} required />
         <button type="submit" className="btn btn-secondary">Add note</button>
       </form>
-    </section>
+    </Section>
   );
 }

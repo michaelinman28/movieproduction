@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { LatticeGrid } from '../components/LatticeGrid';
+import { Section } from '../components/Section';
 import { api, type Company, type TaskCategory, type TaskTag } from '../lib/api';
 import { errorText } from '../lib/format';
 
@@ -122,8 +123,7 @@ export function TaskSettingsPage() {
       {notice && <p className="notice">{notice}</p>}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <h2>Categories</h2>
+        <Section id="settings.categories" title="Categories" summary={categories.length} bodyClassName="flex flex-col gap-2">
           <p className="hint">
             {isAdmin
               ? 'Double-click a name to rename it. Drag the handle on the left to change the order people see.'
@@ -149,10 +149,9 @@ export function TaskSettingsPage() {
               <button className="btn btn-danger sm:ml-auto" onClick={() => deleteCategory(selectedCat)}>Delete category</button>
             </div>
           )}
-        </div>
+        </Section>
 
-        <div className="flex flex-col gap-2">
-          <h2>Tags</h2>
+        <Section id="settings.tags" title="Tags" summary={tags.length} bodyClassName="flex flex-col gap-2">
           <p className="hint">
             Anyone in the company can add tags while editing a task.
             {isAdmin ? ' Double-click a tag to rename it, or select it to delete it.' : ''}
@@ -174,7 +173,7 @@ export function TaskSettingsPage() {
               <button className="btn btn-danger sm:ml-auto" onClick={() => deleteTag(selectedTag)}>Delete tag</button>
             </div>
           )}
-        </div>
+        </Section>
       </div>
     </section>
   );

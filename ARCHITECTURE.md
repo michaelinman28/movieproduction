@@ -183,8 +183,13 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   tokens (`bg-surface`, `text-muted`, `border-line`, `bg-accent`). lattice-grid
   follows the same switch and is tinted to match.
 - **lattice-grid** keeps its own stylesheet. Tailwind styles the page around it.
-- **Collapsible sections.** Page sections (Team, Tasks, Projects, People, roles)
-  open and close from their heading, remembered per device (`src/components/Section.tsx`).
+- **Every section is collapsible (standard).** Each titled section below a page's
+  heading, and each titled part of a side panel, uses the `Section` component
+  (`src/components/Section.tsx`): its heading opens and closes it, it can show a short
+  summary (a count, "1 of 5 done"), and whether it's open is remembered per device
+  under a stable id such as `project.tasks`. Use `level="h4"` inside panels. The page
+  heading itself (h1 and the actions beside it) is never collapsible. New sections
+  must follow this.
 
 ## Repository layout
 

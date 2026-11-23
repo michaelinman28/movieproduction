@@ -462,8 +462,8 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, 
 
       <TaskNotes taskId={task.id} canManage={canManage} />
 
-      <section className="flex flex-col gap-2" aria-label="Sub-tasks">
-        <h4>Sub-tasks{children.length ? ` (${children.filter((c) => c.status === 'done').length} of ${children.length} done)` : ''}</h4>
+      <Section id="task.subtasks" title="Sub-tasks" level="h4" bodyClassName="flex flex-col gap-2"
+        summary={children.length ? `${children.filter((c) => c.status === 'done').length} of ${children.length} done` : undefined}>
         {children.length > 0 && (
           <ul className="flex flex-col">
             {children.map((c) => (
@@ -479,7 +479,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, 
             ))}
           </ul>
         )}
-      </section>
+      </Section>
 
       <form className="flex flex-col gap-2" onSubmit={addSub}>
         <label className="label">Add a sub-task
