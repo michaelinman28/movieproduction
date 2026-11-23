@@ -89,7 +89,7 @@ confirmation emails link back to the app.
 | Roles | `/companies/:id/roles` | Standard roles and the company's custom roles |
 | Task categories and tags | `/companies/:id/task-settings` | The company's category list (admins add, rename, reorder, delete) and its tags |
 | Project overview | `/projects/:id` | Details (admins edit them), counts of open and overdue tasks, locations and people, and what's coming up |
-| Project tasks | `/projects/:id/tasks` | The task tree, calendar, overdue list and grouped lists, with each task's form under the table |
+| Project tasks | `/projects/:id/tasks` | The task tree, calendar, overdue list, grouped lists and My tasks, with each task's form under the table |
 | Project locations | `/projects/:id/locations` | The project's locations |
 | Project team | `/projects/:id/team` | Who's on the project and their project roles |
 | Project journal | `/projects/:id/journal` | Coming next |
