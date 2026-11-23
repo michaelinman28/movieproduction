@@ -29,8 +29,11 @@ day to day.
 - **Who:** everyone on the project, plus admins of its company.
 - **Views:** a "Show" menu switches between the sub-task tree, a calendar, an Overdue
   list (only tasks that aren't done and are past their due time, oldest first, with the
-  count in the menu), and a flat list grouped by person, category, location, status, priority, due date or tags (more
-  columns can be dragged into the grouping bar). The choice is remembered on the device.
+  count in the menu), flat lists grouped by person, category, location, status,
+  priority or due date (more columns can be dragged into the grouping bar), and My
+  tasks (only tasks assigned to you, soonest due first; tasks added there are assigned
+  to you). Switching views closes the open task form. The choice is remembered on the
+  device.
 - **Calendar** (`src/components/TaskCalendar.tsx`): a month of tasks by due date, in
   order of the day. Click a day to list its tasks below the month (phones show a count
   per day instead of names); click a task to open its panel (choosing another day closes it, unless the task is due that day). Tasks added while the
