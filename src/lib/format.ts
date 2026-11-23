@@ -23,14 +23,5 @@ export function roleNames(ids: Set<string> | string[], roles: Role[]) {
   return roles.filter((r) => set.has(r.id)).map((r) => r.name).join(', ');
 }
 
-export function sortRoles(roles: Role[]) {
-  // Standard roles first in their set order, then custom roles by name.
-  return [...roles].sort((a, b) =>
-    a.company_id === b.company_id
-      ? a.sort_order - b.sort_order || a.name.localeCompare(b.name)
-      : a.company_id === null ? -1 : b.company_id === null ? 1 : 0,
-  );
-}
-
 export const errorText = (e: unknown) =>
   e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : String(e);

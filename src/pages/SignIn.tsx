@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
+import { ThemeSwitch } from '../components/ThemeSwitch';
 
 export function SignIn() {
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
@@ -29,27 +30,28 @@ export function SignIn() {
   }
 
   return (
-    <main className="auth">
-      <form className="card" onSubmit={submit}>
+    <main className="relative grid min-h-dvh place-items-center p-4">
+      <div className="absolute top-2 right-2"><ThemeSwitch /></div>
+      <form className="card w-full max-w-sm" onSubmit={submit}>
         <h1>Movie Production</h1>
-        <p className="muted">{mode === 'sign-in' ? 'Sign in to your account' : 'Create an account'}</p>
+        <p className="text-muted">{mode === 'sign-in' ? 'Sign in to your account' : 'Create an account'}</p>
         {mode === 'sign-up' && (
-          <label>
+          <label className="label">
             Full name
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" />
+            <input className="field" value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" />
           </label>
         )}
         {mode === 'sign-up' && (
-          <label>
-            Phone number <span className="muted">(optional)</span>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
+          <label className="label">
+            Phone number <span className="text-muted">(optional)</span>
+            <input className="field" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
           </label>
         )}
-        <label>
+        <label className="label">
           Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+          <input className="field" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
         </label>
-        <label>
+        <label className="label">
           Password
           <input
             type="password"
@@ -60,13 +62,13 @@ export function SignIn() {
             autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
           />
         </label>
-        {message && <p className={message.kind}>{message.text}</p>}
-        <button type="submit" disabled={busy}>
+        {message && <p className={message.kind === 'error' ? 'error' : 'notice'}>{message.text}</p>}
+        <button type="submit" className="btn sm:w-full" disabled={busy}>
           {busy ? 'Please wait…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
         </button>
         <button
           type="button"
-          className="link"
+          className="btn-link justify-center"
           onClick={() => { setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in'); setMessage(null); }}
         >
           {mode === 'sign-in' ? 'New here? Create an account' : 'Already have an account? Sign in'}

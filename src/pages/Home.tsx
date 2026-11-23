@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LatticeGrid, gridLink } from '../components/LatticeGrid';
-import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
-import type { Company } from '../lib/database.types';
+import { api } from '../lib/api';
+import { errorText } from '../lib/format';
 
 interface CompanyRow { id: string; name: string; description: string; role: string; created_at: string }
 
 export function Home() {
-  const { session } = useAuth();
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -16,17 +14,14 @@ export function Home() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [c, m] = await Promise.all([
-      supabase.from('companies').select('*').order('name'),
-      supabase.from('company_members').select('company_id, is_admin').eq('user_id', session?.user.id ?? ''),
-    ]);
-    if (c.error || m.error) return setError((c.error || m.error)!.message);
-    const admin = new Map((m.data ?? []).map((x) => [x.company_id, x.is_admin]));
-    setCompanies(((c.data ?? []) as Company[]).map((x) => ({
-      id: x.id, name: x.name, description: x.description ?? '',
-      role: admin.get(x.id) ? 'Admin' : 'Member', created_at: x.created_at.slice(0, 10),
-    })));
-  }, [session]);
+    try {
+      const list = await api.companies();
+      setCompanies(list.map((x) => ({
+        id: x.id, name: x.name, description: x.description ?? '',
+        role: x.is_admin ? 'Admin' : 'Member', created_at: x.created_at.slice(0, 10),
+      })));
+    } catch (e) { setError(errorText(e)); }
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -34,10 +29,10 @@ export function Home() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { data, error } = await supabase.from('companies').insert({ name: name.trim() }).select('id').single();
-    setBusy(false);
-    if (error) return setError(error.message);
-    navigate(`/companies/${data.id}`);
+    try {
+      const c = await api.createCompany({ name: name.trim() });
+      navigate(`/companies/${c.id}`);
+    } catch (err) { setError(errorText(err)); setBusy(false); }
   }
 
   const options = useMemo(() => ({
@@ -53,17 +48,17 @@ export function Home() {
   }), []);
 
   return (
-    <section className="stack">
+    <section className="flex flex-col gap-5">
       <h1>Your production companies</h1>
-      <form className="inline" onSubmit={createCompany}>
-        <input placeholder="New company name" value={name} onChange={(e) => setName(e.target.value)} required />
-        <button type="submit" disabled={busy}>Create company</button>
+      <form className="form-row" onSubmit={createCompany}>
+        <input className="field" placeholder="New company name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <button type="submit" className="btn shrink-0" disabled={busy}>Create company</button>
       </form>
       {error && <p className="error">{error}</p>}
       <LatticeGrid options={options} rows={companies} height={Math.min(80 + companies.length * 34, 400)} />
-      <p className="muted small">
+      <p className="hint">
         Waiting to be added to a company? Ask its admin to add you with the email you signed up with.
-        You can add your phone number on <Link to="/profile" >your profile</Link>.
+        You can add your phone number on <Link to="/profile">your profile</Link>.
       </p>
     </section>
   );
