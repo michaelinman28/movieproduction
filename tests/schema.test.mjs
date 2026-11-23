@@ -198,6 +198,9 @@ await expect('off-project member cannot add locations', () => as(U.d, `insert in
 await expect('outsider cannot see locations', () => as(U.c, `select * from project_locations`), len(0));
 await expect('member edits a location', () => as(U.b, `update project_locations set description='Two floors' where id=$1 returning description`, [loc.id]), r => r[0]?.description === 'Two floors');
 const [lt] = await as(U.b, `insert into tasks (project_id,title,location_id) values ($1,'Light the mill',$2) returning *`, [lp.id,loc.id]);
+await expect('new location is being considered', () => as(U.b, `select status from project_locations where id=$1`, [loc.id]), r => r[0]?.status === 'considering');
+await expect('location marked not using', () => as(U.b, `update project_locations set status='not_using' where id=$1 returning status`, [loc.id]), r => r[0]?.status === 'not_using');
+await expect('bad location status refused', () => as(U.b, `update project_locations set status='maybe' where id=$1`, [loc.id]), isErr);
 await expect('task assigned to a location', () => Promise.resolve([lt]), r => r[0].location_id === loc.id);
 await expect('location from another project refused', () => as(U.b, `insert into tasks (project_id,title,location_id) values ($1,'Wrong place',$2)`, [pc.id,loc.id]), isErr);
 const [loc2] = await as(U.a, `insert into project_locations (project_id,name) values ($1,'Studio B') returning id`, [lp.id]);

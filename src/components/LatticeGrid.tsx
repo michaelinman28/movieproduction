@@ -1,6 +1,7 @@
 import { useEffect, useRef, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../lib/theme';
+import { confirmDiscard } from '../lib/unsaved';
 import '../vendor/lattice-grid/lattice-grid.js';
 import '../vendor/lattice-grid/lattice-grid.css';
 import type {
@@ -115,7 +116,7 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
     if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    navigate(a.dataset.to!);
+    if (confirmDiscard()) navigate(a.dataset.to!);
   }
   function onClick(e: MouseEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest('a[data-to]') && !(e.metaKey || e.ctrlKey || e.shiftKey)) e.preventDefault();

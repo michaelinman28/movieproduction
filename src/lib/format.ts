@@ -90,3 +90,9 @@ export function isOverdue(t: Pick<Task, 'status' | 'due_date' | 'due_part' | 'du
   const deadline = t.due_part ? DAY_PARTS.find((p) => p.value === t.due_part)!.ends : t.due_time ? t.due_time.slice(0, 5) : '24:00';
   return now.time >= deadline;
 }
+
+export const LOCATION_STATUSES: { value: 'considering' | 'confirmed' | 'not_using'; label: string }[] = [
+  { value: 'considering', label: 'Considering' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'not_using', label: 'Not using' },
+];

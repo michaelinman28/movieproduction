@@ -3,6 +3,7 @@ import { Section } from './Section';
 import { api, type TaskNote } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { displayName, errorText } from '../lib/format';
+import { useUnsaved } from '../lib/unsaved';
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -16,6 +17,8 @@ export function TaskNotes({ taskId, canManage }: { taskId: string; canManage: bo
   const [draft, setDraft] = useState('');
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A half-written note, or an edit in progress, counts as unsaved.
+  useUnsaved(Boolean(draft.trim()) || Boolean(editing && editing.body.trim() !== notes.find((n) => n.id === editing.id)?.body));
 
   const load = useCallback(async () => {
     try { setNotes(await api.taskNotes(taskId)); } catch (e) { setError(errorText(e)); }

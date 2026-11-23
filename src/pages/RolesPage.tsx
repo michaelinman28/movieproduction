@@ -4,6 +4,7 @@ import { LatticeGrid } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { api, type Company, type RoleWithUsage } from '../lib/api';
 import { errorText } from '../lib/format';
+import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 
 const NEW_DEPT = '__new__';
 
@@ -76,6 +77,9 @@ export function RolesPage() {
     if (selected) setForm({ name: selected.name, department: selected.department, description: selected.description });
     // Reset the form only when a different role is selected, or after a save reloads it.
   }, [selected?.id, selected?.name, selected?.department, selected?.description]); // eslint-disable-line react-hooks/exhaustive-deps
+  const formChanged = Boolean(selected) && (form.name.trim() !== selected!.name
+    || form.department.trim() !== selected!.department || form.description.trim() !== selected!.description);
+  useUnsaved(formChanged);
   async function saveForm(e: FormEvent) {
     e.preventDefault();
     if (!selected) return;
@@ -182,7 +186,7 @@ export function RolesPage() {
           <LatticeGrid options={customOptions} rows={custom} height={Math.min(100 + custom.length * 34, 400)}
             on={{
               cellValueChanged: saveEdit,
-              selectionChanged: (rows: RoleRow[]) => setSelectedId(rows[0]?.id ?? null),
+              selectionChanged: (rows: RoleRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
             }} />
           {isAdmin && (selected ? (
             <aside data-pin-scope className="card gap-2">
@@ -203,7 +207,8 @@ export function RolesPage() {
                   <textarea className="field" rows={3} value={form.description} maxLength={500}
                     onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </label>
-                <button type="submit" className="btn" data-pin="2">Save</button>
+                <button type="submit" className="btn" disabled={!formChanged} data-pin="2">Save</button>
+                {formChanged && <p className="hint">Unsaved changes.</p>}
               </form>
               <button className="btn btn-danger" onClick={deleteRole}>Delete role</button>
             </aside>

@@ -1,23 +1,31 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { LatticeGrid } from './LatticeGrid';
+import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
 import { Section } from './Section';
-import { api, type Location, type LocationInput } from '../lib/api';
+import { api, type Location, type LocationInput, type LocationStatus } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { errorText } from '../lib/format';
+import { confirmDiscard, useUnsaved } from '../lib/unsaved';
+import { LOCATION_STATUSES, errorText, labelOf, valueOf } from '../lib/format';
 
 interface LocationRow {
   id: string; name: string; description: string; address: string;
-  contact_name: string; contact_email: string; contact_phone: string; tasks: number;
+  contact_name: string; contact_email: string; contact_phone: string; status: string; tasks: number;
 }
-type Field = keyof Omit<LocationRow, 'id' | 'tasks'>;
+type Field = keyof Omit<LocationRow, 'id' | 'tasks' | 'status'>;
 const FIELDS: Field[] = ['name', 'description', 'address', 'contact_name', 'contact_email', 'contact_phone'];
 
 const toRow = (l: Location): LocationRow => ({
   id: l.id, name: l.name, description: l.description ?? '', address: l.address ?? '',
-  contact_name: l.contact_name ?? '', contact_email: l.contact_email ?? '', contact_phone: l.contact_phone ?? '', tasks: l.tasks,
+  contact_name: l.contact_name ?? '', contact_email: l.contact_email ?? '', contact_phone: l.contact_phone ?? '', status: labelOf(LOCATION_STATUSES, l.status), tasks: l.tasks,
 });
 
 /** A link that opens the address in the phone's or computer's maps app. */
+const pill = (label: string) =>
+  `<span class="task-pill task-pill-loc-${valueOf(LOCATION_STATUSES, label) ?? 'considering'}">${gridEsc(label)}</span>`;
+
+// Whether to list the locations marked "Not using"; remembered on this device.
+const SHOW_KEY = 'mp-locations-show-unused';
+const readShow = () => { try { return localStorage.getItem(SHOW_KEY) === '1'; } catch { return false; } };
+
 const mapsUrl = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
 /**
@@ -34,6 +42,11 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
   const [newName, setNewName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showUnused, setShowUnused] = useState(readShow);
+  function toggleUnused(on: boolean) {
+    setShowUnused(on);
+    try { if (on) localStorage.setItem(SHOW_KEY, '1'); else localStorage.removeItem(SHOW_KEY); } catch { /* storage unavailable */ }
+  }
 
   const run = async (fn: () => Promise<unknown>, ok?: string) => {
     setError(null);
@@ -44,14 +57,20 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
     return true;
   };
 
-  const rows = useMemo(() => locations.map(toRow), [locations]);
+  const unused = locations.filter((l) => l.status === 'not_using').length;
+  const rows = useMemo(() => locations.filter((l) => showUnused || l.status !== 'not_using').map(toRow), [locations, showUnused]);
   const options = useMemo(() => ({
     rowId: (r: LocationRow) => r.id,
     toolbar: false, groupPanel: false, statusBar: false,
     selection: 'single', rowClickSelection: true,
-    emptyMessage: 'No locations yet',
+    emptyMessage: locations.length ? 'Every location is marked Not using' : 'No locations yet',
     columns: [
       { field: 'name', header: 'Location', width: 180, editable: true, pinned: 'left' },
+      {
+        field: 'status', header: 'Status', width: 140, editable: true, editor: 'select',
+        editorOptions: LOCATION_STATUSES.map((s) => s.label),
+        render: ({ value }: { value: string }) => gridDropdown(pill(value)),
+      },
       { field: 'address', header: 'Address', width: 240, editable: true, editor: 'textarea' },
       { field: 'contact_name', header: 'Contact', width: 160, editable: true },
       { field: 'contact_email', header: 'Contact email', width: 200, editable: true },
@@ -59,10 +78,16 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
       { field: 'description', header: 'Description', width: 260, editable: true, editor: 'textarea' },
       { field: 'tasks', header: 'Tasks', type: 'number', width: 90 },
     ],
-  }), []);
+  }), [locations.length]);
 
   async function saveCell(e: { data: LocationRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
+    if (e.column === 'status') {
+      const status = valueOf(LOCATION_STATUSES, v) as LocationStatus | undefined;
+      if (status) await run(() => api.updateLocation(e.data.id, { status }), status === 'not_using' && !showUnused ? `${e.data.name} is hidden now. Tick "Show the ones we're not using" to see it.` : undefined);
+      else await onChanged();
+      return;
+    }
     if (!FIELDS.includes(e.column as Field) || (e.column === 'name' && !v)) { await onChanged(); return; }
     await run(() => api.updateLocation(e.data.id, { [e.column]: v || null }));
   }
@@ -81,18 +106,25 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
   const selected = locations.find((l) => l.id === selectedId) ?? null;
 
   return (
-    <Section id="project.locations" title="Locations" summary={locations.length || undefined}>
+    <Section id="project.locations" title="Locations"
+      summary={locations.length ? `${locations.length - unused} in use${unused ? `, ${unused} not` : ''}` : undefined}>
       <form className="form-row mb-2" onSubmit={add}>
         <input className="field" placeholder="New location, e.g. Old Mill" aria-label="New location name" value={newName} maxLength={120}
           onChange={(e) => setNewName(e.target.value)} required />
         <button type="submit" className="btn" data-pin>Add location</button>
       </form>
+      {unused > 0 && (
+        <label className="check mb-2">
+          <input type="checkbox" checked={showUnused} onChange={(e) => toggleUnused(e.target.checked)} />
+          Show the ones we're not using ({unused})
+        </label>
+      )}
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
       {/* The panel's space stays put so selecting a row doesn't resize the grid mid double-click. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <LatticeGrid options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)}
-          on={{ cellValueChanged: saveCell, selectionChanged: (r: LocationRow[]) => setSelectedId(r[0]?.id ?? null) }} />
+          on={{ cellValueChanged: saveCell, selectionChanged: (r: LocationRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); } }} />
         {selected ? (
           <LocationPanel key={selected.id} location={selected} run={run}
             canDelete={canManage || selected.created_by === me} onDeleted={() => setSelectedId(null)} />
@@ -114,17 +146,23 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
   run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
   canDelete: boolean; onDeleted: () => void;
 }) {
-  const initial = useMemo(() => toRow(location), [location]);
+  // Every field here, status included, is held until Save.
+  const initial = useMemo(() => ({ ...toRow(location), status: location.status as string }), [location]);
   const [draft, setDraft] = useState(initial);
-  useEffect(() => setDraft(initial), [initial]);
-  const changed = FIELDS.some((f) => draft[f].trim() !== initial[f]);
-  const set = (f: Field) => (e: { target: { value: string } }) => setDraft({ ...draft, [f]: e.target.value });
+  const changed = FIELDS.some((f) => draft[f].trim() !== initial[f]) || draft.status !== initial.status;
+  useUnsaved(changed);
+  // Show changes made elsewhere (the table) unless something here is unsaved.
+  useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (f: Field | 'status') => (e: { target: { value: string } }) => setDraft({ ...draft, [f]: e.target.value });
 
   async function save(e: FormEvent) {
     e.preventDefault();
     const patch: LocationInput = {};
     for (const f of FIELDS) if (draft[f].trim() !== initial[f]) patch[f] = draft[f].trim() || (f === 'name' ? undefined : null) as never;
-    await run(() => api.updateLocation(location.id, patch), `Saved ${draft.name.trim()}.`);
+    if (draft.status !== initial.status) patch.status = draft.status as LocationStatus;
+    if (await run(() => api.updateLocation(location.id, patch), `Saved ${draft.name.trim()}.`)) {
+      setDraft((d) => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])) as typeof d);
+    }
   }
 
   async function remove() {
@@ -142,6 +180,11 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
         <label className="label">Name
           <input className="field" value={draft.name} maxLength={120} required onChange={set('name')} />
         </label>
+        <label className="label">Status
+          <select className="field" value={draft.status} onChange={set('status')}>
+            {LOCATION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </label>
         <label className="label">Description
           <textarea className="field" rows={3} value={draft.description} maxLength={2000} onChange={set('description')} />
         </label>
@@ -158,7 +201,11 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
         <label className="label">Contact phone
           <input className="field" type="tel" value={draft.contact_phone} maxLength={40} onChange={set('contact_phone')} />
         </label>
-        <button type="submit" className="btn" disabled={!changed} data-pin="2">Save</button>
+        <div className="flex gap-2">
+          <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>
+          <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
+        </div>
+        {changed && <p className="hint">Unsaved changes.</p>}
       </form>
       {(initial.contact_email || initial.contact_phone) && (
         <p className="flex flex-wrap gap-3 text-sm">

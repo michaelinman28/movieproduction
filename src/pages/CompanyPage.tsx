@@ -4,6 +4,7 @@ import { LatticeGrid, gridDropdown, gridEsc, gridLink } from '../components/Latt
 import { Section } from '../components/Section';
 import { RolePicker } from '../components/RolePicker';
 import { useAuth } from '../lib/auth';
+import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 import { api, type Company, type CompanyMember, type Project } from '../lib/api';
 import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, statusLabel, statusValue } from '../lib/format';
 import type { Role } from '../lib/database.types';
@@ -256,7 +257,7 @@ export function CompanyPage() {
             options={peopleOptions}
             rows={peopleRows}
             height={Math.min(80 + peopleRows.length * 34, 420)}
-            on={{ selectionChanged: (rows: PersonRow[]) => setSelectedId(rows[0]?.id ?? null), cellValueChanged: savePersonCell }}
+            on={{ selectionChanged: (rows: PersonRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); }, cellValueChanged: savePersonCell }}
           />
           {selected && (
             <MemberPanel
@@ -281,15 +282,29 @@ export function CompanyPage() {
 function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }: {
   companyId: string; member: CompanyMember; roles: Role[]; isAdmin: boolean; isMe: boolean; run: Run; onRemoved: () => void;
 }) {
-  const [title, setTitle] = useState(member.title ?? '');
   const name = displayName(member.profile);
   const roleIds = new Set(member.role_ids);
+  // Title, admin and roles are held until Save.
+  const initial = useMemo(() => ({ title: member.title ?? '', admin: member.is_admin, roles: [...member.role_ids].sort() }), [member]);
+  const [draft, setDraft] = useState(initial);
+  const titleChanged = draft.title.trim() !== initial.title || draft.admin !== initial.admin;
+  const rolesChanged = draft.roles.join() !== initial.roles.join();
+  const changed = titleChanged || rolesChanged;
+  useUnsaved(changed);
+  useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleRole = (roleId: string, on: boolean) => {
-    const next = new Set(roleIds);
-    if (on) next.add(roleId); else next.delete(roleId);
-    return run(() => api.setMemberRoles(companyId, member.user_id, [...next]));
-  };
+  const toggleRole = (roleId: string, on: boolean) => setDraft((d) => ({
+    ...d, roles: (on ? [...d.roles, roleId] : d.roles.filter((r) => r !== roleId)).sort(),
+  }));
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    const ok = await run(async () => {
+      if (titleChanged) await api.updateMember(companyId, member.user_id, { title: draft.title.trim() || null, is_admin: draft.admin });
+      if (rolesChanged) await api.setMemberRoles(companyId, member.user_id, draft.roles);
+    }, `Saved ${name}.`);
+    if (ok) setDraft((d) => ({ ...d, title: d.title.trim() }));
+  }
 
   async function remove() {
     const msg = isMe ? 'Leave this company? You will lose access to its projects.'
@@ -306,17 +321,22 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
       </p>
       {isAdmin ? (
         <>
-          <form className="form-row mb-2" onSubmit={(e) => { e.preventDefault(); run(() => api.updateMember(companyId, member.user_id, { title: title.trim() || null }), 'Title saved.'); }}>
-            <input className="field" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <button type="submit" className="btn btn-secondary">Save title</button>
+          <form className="flex flex-col gap-2" onSubmit={save}>
+            <label className="label">Title
+              <input className="field" placeholder="e.g. Line producer" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={draft.admin} onChange={(e) => setDraft({ ...draft, admin: e.target.checked })} />
+              Company admin
+            </label>
+            <h4>Company roles</h4>
+            <RolePicker roles={roles} selected={new Set(draft.roles)} onToggle={toggleRole} />
+            <div className="flex gap-2">
+              <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>
+              <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
+            </div>
+            {changed && <p className="hint">Unsaved changes.</p>}
           </form>
-          <label className="check">
-            <input type="checkbox" checked={member.is_admin}
-              onChange={(e) => run(() => api.updateMember(companyId, member.user_id, { is_admin: e.target.checked }))} />
-            Company admin
-          </label>
-          <h4>Company roles</h4>
-          <RolePicker roles={roles} selected={roleIds} onToggle={toggleRole} />
           <button className="btn btn-danger" onClick={remove}>{isMe ? 'Leave company' : 'Remove from company'}</button>
         </>
       ) : (
