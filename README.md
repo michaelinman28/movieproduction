@@ -1,104 +1,116 @@
 # Movie Production
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture and technology overview.
+A web platform for running movie productions. A production company signs up, creates
+its film projects, brings its people on board, and runs each project day to day with
+tasks, sub-tasks and (next) a project journal.
 
-A platform for running a movie production: production companies, projects,
-people and roles, tasks with sub-tasks, and a project journal.
+- **Preview:** https://michaelinman28.github.io/movieproduction/
+- **API docs (Swagger):** https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api/docs
+- **Architecture and technology overview:** [ARCHITECTURE.md](ARCHITECTURE.md)
 
-Built mobile-first with React (Vite) and Tailwind CSS, a separate API layer (Hono, with an OpenAPI spec and
-Swagger UI), Supabase (database, sign-in, row-level security) and
-[lattice-grid](https://github.com/michaelinman28/lattice-grid) for tables.
+## What you can do
+
+| Area | Features |
+|---|---|
+| Accounts | Sign up with name, email, optional phone and password; confirm the email; edit your profile |
+| Companies | Create a production company (you become its admin) |
+| People | Admins add people who already have an account, by email, and give them a title, admin rights and company roles |
+| Roles | 32 shared standard film roles, plus each company's own custom roles |
+| Projects | Several projects per company, with status, dates and logline |
+| Project teams | Admins assign company members to projects and pick their project roles |
+| Tasks | A tree of tasks and sub-tasks per project, with category, tags, status, priority, assignee, and a due date with an optional time of day (Morning, Afternoon, Evening) or exact time. Each task has a description and any number of notes |
+| Task categories and tags | Each company has its own category list (admins set it up) and its own tags (anyone can add them while tagging a task) |
+| Journal | Coming next: private, shared and public entries per project |
+
+People create their own account first. A company admin then adds them to the company
+and assigns them to projects.
+
+## How it fits together
 
 ```
-React app (src/)  ──HTTP──▶  API (supabase/functions/api)  ──▶  Supabase Postgres
-                              Swagger UI at /docs              row-level security
+React app (src/)  ──HTTPS──▶  API (supabase/functions/api)  ──▶  Supabase Postgres
+Tailwind, lattice-grid         Hono + OpenAPI, Swagger at /docs   row-level security
 ```
 
-The app reads and writes all data through the API. The API calls the database
-as the signed-in person (it forwards their access token and uses only the
-publishable key), so the database's security rules apply to every request.
+The app reads and writes all data through the API, and uses Supabase only to sign
+people in. The API calls the database as the signed-in person (it forwards their
+access token and uses only the publishable key), so the database's security rules
+decide what every request can see and change. See [ARCHITECTURE.md](ARCHITECTURE.md)
+for the details.
 
-## Setup
+## Run it locally
 
 1. **Install:** `npm install`
-2. **Configure Supabase:** copy `.env.example` to `.env.local` and fill in your
-   project URL and publishable key (Supabase dashboard > Project Settings > API).
-3. **Create the database:** run each file in `supabase/migrations` in order, in the
-   Supabase dashboard's **SQL Editor** (or `npx supabase link` then `npx supabase db push`).
-   The live project already has every migration in this folder applied.
-4. **Run the API:** `npm run api`, then open http://localhost:8787/docs for Swagger.
-5. **Run the app:** in another terminal, `npm run dev` and open http://localhost:5173
+2. **Configure:** copy `.env.example` to `.env.local` and fill in the Supabase project
+   URL and publishable key (Supabase dashboard > Project Settings > API). Leave
+   `VITE_API_URL` unset to use the local API, or point it at the live one.
+3. **Run the API:** `npm run api`, then open http://localhost:8787/docs for Swagger.
+4. **Run the app:** in another terminal, `npm run dev`, then open http://localhost:5173.
 
-## Preview site
-
-Every push to `main` builds the app and publishes it to GitHub Pages at
-https://michaelinman28.github.io/movieproduction/ (see `.github/workflows/pages.yml`).
-One-time setup: repository Settings > Pages > Source: **GitHub Actions**, and in Supabase,
-Authentication > URL Configuration: set the Site URL to that address and add it
-(plus `http://localhost:5173/**`) to the Redirect URLs.
-
-## Preview site
-
-Every push to `main` builds the app and publishes it to GitHub Pages at
-https://michaelinman28.github.io/movieproduction/ (see `.github/workflows/pages.yml`).
-One-time setup: repository Settings > Pages > Source: **GitHub Actions**, and in Supabase,
-Authentication > URL Configuration: set the Site URL to that address and add it
-(plus `http://localhost:5173/**`) to the Redirect URLs.
+The live database already has every migration applied, so a local setup can use it
+as is. To set up a new Supabase project instead, apply the files in
+`supabase/migrations` in order (SQL Editor, or `npx supabase db push`).
 
 ## Scripts
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Start the app locally |
+| `npm run dev` | Start the app locally on port 5173 |
 | `npm run api` | Start the API locally on port 8787 (Swagger at `/docs`, spec at `/openapi.json`) |
 | `npm run api:spec` | Write the OpenAPI spec to `api/openapi.json` |
-| `npm run build` | Type check and build for production |
+| `npm run typecheck` | Type check the app and the API |
 | `npm run test:db` | Check the schema and security rules against an in-memory Postgres |
+| `npm run build` | Type check and build the app for production |
+| `npm run preview` | Serve the production build locally |
 
-## API
+## Deploying
 
-- Code: `supabase/functions/api` (routes in `routes/`, request and response schemas in `schemas.ts`).
-  The same code runs on Node locally (`api/server.ts`) and on Supabase Edge Functions (`index.ts`).
-- Live: https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api/docs (Swagger). Redeploy after API changes with
+- **Web app:** every push to `main` builds the app and publishes it to GitHub Pages
+  (`.github/workflows/pages.yml`).
+- **API:** deploy to Supabase Edge Functions after API changes:
   `npx supabase functions deploy api --remote=qixblelhruxdzxfaeamz --no-verify-jwt --use-api`
-  (the API checks tokens itself so sign-up and sign-in work without one).
-- Spec: `api/openapi.json`, or `/openapi.json` on a running API.
-- Auth: `POST /auth/signin` returns an `access_token`; send it as `Authorization: Bearer <token>`.
+  (add `--yes` when running without a prompt). `--no-verify-jwt` is needed because
+  sign-up and sign-in are called without a token; the API checks tokens itself.
+- **Database:** apply each new file in `supabase/migrations` to the live project, in
+  order, before deploying API code that needs it.
 
-## Data model
-
-- **companies**: production companies. The creator becomes the first admin.
-- **company_members**: people in a company. `is_admin` grants management rights.
-- **roles**: standard film roles (shared, `company_id` null) plus each company's custom roles.
-- **company_member_roles / project_member_roles**: the roles a person holds in the company or on a project.
-- **projects**: films under a company.
-- **project_members**: people assigned to a project (must already be in the company).
-- **tasks**: project tasks; `parent_id` makes a sub-task.
-- **journal_entries**: project journal. `private` entries are visible only to the
-  author and the people in **journal_entry_shares**; `public` entries are visible to
-  everyone on the project.
+One-time setup for the preview: repository Settings > Pages > Source: **GitHub
+Actions**. In Supabase, Authentication > URL Configuration: set the Site URL to the
+preview address and add it (plus `http://localhost:5173/**`) to the Redirect URLs, so
+confirmation emails link back to the app.
 
 ## Pages
 
-- **Companies** (`/`): your companies; create a new one (you become its admin).
-- **Company** (`/companies/:id`): projects and people. Admins create projects, add
-  people by the email they signed up with, set titles, admin rights and company roles.
-- **Project** (`/projects/:id`): details, status and dates, and the team. Admins assign
-  company members to the project and pick their project roles.
-- **Profile** (`/profile`): your name and phone number.
+| Page | Path | What it shows |
+|---|---|---|
+| Companies | `/` | Your companies; create a new one |
+| Company | `/companies/:id` | Projects and people. Admins create projects and add people by email |
+| Roles | `/companies/:id/roles` | Standard roles and the company's custom roles |
+| Task categories and tags | `/companies/:id/task-settings` | The company's category list (admins add, rename, reorder, delete) and its tags |
+| Project | `/projects/:id` | Details, the team, and the task tree with its side panel |
+| Profile | `/profile` | Your name and phone number |
 
-People create their own account first (name, email, optional phone, password).
-A company admin then adds them to the company and assigns them to projects.
+## Who can see and change what
 
-## Who can see what
+- You see the companies you belong to, and the profiles of people in them.
+- You see a project if you're assigned to it, or if you're an admin of its company.
+- Company admins manage people, projects, custom roles and task categories.
+- Everyone on a project (and company admins) can add and edit its tasks and add notes.
+  Only a note's author can edit it; the author or an admin can delete it.
+- Anyone in a company can create task tags; admins can rename or delete them.
+- Journal entries: private ones are seen only by the author and the people they share
+  them with; public ones by everyone on the project.
 
-- You see companies you belong to, and the profiles of people in them.
-- You see a project if you are assigned to it or are an admin of its company.
-- Company admins manage members, custom roles and projects.
-- Anyone on a project can create and edit its tasks.
-- Only the author can edit a journal entry or share a private one.
+## Project layout
 
-## lattice-grid
+```
+src/                     React app (pages/, components/, lib/api.ts, styles.css)
+supabase/migrations/     Database schema and security rules, one file per change
+supabase/functions/api/  The API (routes/, schemas.ts)
+api/                     Runs the API on Node, and its OpenAPI spec
+tests/schema.test.mjs    Security rule tests
+```
 
-A copy of lattice-grid lives in `src/vendor/lattice-grid` (see the README there).
-Use it through the `LatticeGrid` React component in `src/components/LatticeGrid.tsx`.
+Tables use a vendored copy of [lattice-grid](https://github.com/michaelinman28/lattice-grid)
+in `src/vendor/lattice-grid`, through the `LatticeGrid` React component in
+`src/components/LatticeGrid.tsx`.
