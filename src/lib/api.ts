@@ -44,7 +44,14 @@ export type { DayPart, TaskPriority, TaskStatus };
 export interface Task extends TaskRow { tag_ids: string[] }
 export interface TaskCategory { id: string; company_id: string; name: string; sort_order: number; tasks: number }
 export interface TaskTag { id: string; company_id: string; name: string; tasks: number }
-export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'assignee_id' | 'due_date' | 'due_part' | 'due_time' | 'parent_id' | 'sort_order' | 'category_id' | 'tag_ids'>>;
+export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'assignee_id' | 'due_date' | 'due_part' | 'due_time' | 'parent_id' | 'sort_order' | 'category_id' | 'tag_ids' | 'location_id'>>;
+
+export interface Location {
+  id: string; project_id: string; name: string; description: string | null; address: string | null;
+  contact_name: string | null; contact_email: string | null; contact_phone: string | null;
+  created_by: string | null; created_at: string; updated_at: string; tasks: number;
+}
+export type LocationInput = Partial<Pick<Location, 'name' | 'description' | 'address' | 'contact_name' | 'contact_email' | 'contact_phone'>>;
 
 export interface TaskNote { id: string; task_id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
 
@@ -84,6 +91,11 @@ export const api = {
   unassign: (projectId: string, userId: string) => call<void>('DELETE', `/projects/${enc(projectId)}/members/${enc(userId)}`),
   setTeamRoles: (projectId: string, userId: string, roleIds: string[]) =>
     call<unknown>('PUT', `/projects/${enc(projectId)}/members/${enc(userId)}/roles`, { role_ids: roleIds }),
+
+  locations: (projectId: string) => call<Location[]>('GET', `/projects/${enc(projectId)}/locations`),
+  createLocation: (projectId: string, b: LocationInput & { name: string }) => call<Location>('POST', `/projects/${enc(projectId)}/locations`, b),
+  updateLocation: (id: string, b: LocationInput) => call<Location>('PATCH', `/locations/${enc(id)}`, b),
+  deleteLocation: (id: string) => call<void>('DELETE', `/locations/${enc(id)}`),
 
   tasks: (projectId: string) => call<Task[]>('GET', `/projects/${enc(projectId)}/tasks`),
   createTask: (projectId: string, b: TaskInput & { title: string }) => call<Task>('POST', `/projects/${enc(projectId)}/tasks`, b),

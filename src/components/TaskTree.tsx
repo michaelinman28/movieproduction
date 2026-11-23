@@ -4,7 +4,7 @@ import { Section } from './Section';
 import { TagPicker } from './TagPicker';
 import { TaskNotes } from './TaskNotes';
 import {
-  api, type DayPart, type ProjectMember, type Task, type TaskCategory, type TaskInput, type TaskPriority, type TaskStatus, type TaskTag,
+  api, type DayPart, type Location, type ProjectMember, type Task, type TaskCategory, type TaskInput, type TaskPriority, type TaskStatus, type TaskTag,
 } from '../lib/api';
 import {
   DAY_PARTS, HALF_HOURS, TASK_PRIORITIES, TASK_STATUSES, displayName, dueWhen, errorText, isOverdue, labelOf, timeLabel, valueOf,
@@ -24,6 +24,7 @@ interface TaskRow {
   when: string;
   subtasks: string;
   category: string;
+  location: string;
   tags: string;
 }
 
@@ -34,6 +35,7 @@ const VIEWS = [
   { value: '', label: 'Sub-task tree' },
   { value: 'assignee', label: 'Grouped by person' },
   { value: 'category', label: 'Grouped by category' },
+  { value: 'location', label: 'Grouped by location' },
   { value: 'status', label: 'Grouped by status' },
   { value: 'priority', label: 'Grouped by priority' },
   { value: 'due', label: 'Grouped by due date' },
@@ -47,6 +49,7 @@ const dropdown = gridDropdown;
 const esc = gridEsc;
 const NO_CATEGORY = 'No category';
 const TOP_LEVEL = 'Top level';
+const NO_LOCATION = 'No location';
 const ANY_TIME = 'Any time';
 // Choices for the grid's Time cell: a part of the day, or a half hour.
 const WHEN_OPTIONS = [ANY_TIME, ...DAY_PARTS.map((p) => p.label), ...HALF_HOURS.map(timeLabel)];
@@ -84,8 +87,13 @@ function subtree(id: string, kids: Map<string, Task[]>): Set<string> {
 
 const pill = (text: string, tone: string) => `<span class="task-pill task-pill-${tone}">${text}</span>`;
 
-export function TaskTree({ projectId, companyId, team, canManage }: {
-  projectId: string; companyId: string; team: ProjectMember[]; canManage: boolean;
+export function TaskTree({ projectId, companyId, team, locations, canManage, onTasksChanged }: {
+  projectId: string; companyId: string; team: ProjectMember[];
+  /** The project's locations, which a task can be assigned to. */
+  locations: Location[];
+  canManage: boolean;
+  /** Called after tasks change, e.g. so location task counts can refresh. */
+  onTasksChanged?: () => void;
 }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [categories, setCategories] = useState<TaskCategory[]>([]);
@@ -114,6 +122,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
     try { await fn(); } catch (e) { setError(errorText(e)); await load(); return false; }
     if (ok) setNotice(ok);
     await load();
+    onTasksChanged?.();
     return true;
   };
 
@@ -122,6 +131,9 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
   const nameOf = useMemo(() => new Map(people.map((p) => [p.id, p.name])), [people]);
   const categoryName = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
   const tagName = useMemo(() => new Map(tags.map((t) => [t.id, t.name])), [tags]);
+  const locationName = useMemo(() => new Map(locations.map((l) => [l.id, l.name])), [locations]);
+  // Only the names matter to the grid; task counts changing shouldn't rebuild it.
+  const locationList = locations.map((l) => l.name).join('\n');
   const kids = useMemo(() => childrenOf(tasks), [tasks]);
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   // A unique label per task for the "Sub-task of" picker: tasks sharing a title get (2), (3)…
@@ -155,6 +167,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
           when: dueWhen(t),
           subtasks: sub.length ? `${sub.filter((s) => s.status === 'done').length} of ${sub.length} done` : '',
           category: t.category_id ? categoryName.get(t.category_id) ?? '' : '',
+          location: t.location_id ? locationName.get(t.location_id) ?? '' : '',
           tags: t.tag_ids.map((id) => tagName.get(id)).filter(Boolean).sort().join(', '),
         });
         walk(t.id, path);
@@ -162,7 +175,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
     };
     walk('', []);
     return out;
-  }, [kids, taskLabels, nameOf, categoryName, tagName]);
+  }, [kids, taskLabels, nameOf, categoryName, tagName, locationName]);
 
   const [view, setView] = useState<string>(readView);
   function changeView(v: string) {
@@ -197,6 +210,11 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
         field: 'priority', header: 'Priority', width: 115, editable: true, editor: 'select',
         editorOptions: TASK_PRIORITIES.map((s) => s.label),
         render: ({ value }: { value: string }) => dropdown(pill(value, valueOf(TASK_PRIORITIES, value) ?? 'medium')),
+      },
+      {
+        field: 'location', header: 'Location', width: 160, editable: true, editor: 'select',
+        editorOptions: [NO_LOCATION, ...locationList.split('\n').filter(Boolean)],
+        render: ({ value }: { value: string }) => dropdown(value ? esc(value) : '<span class="text-muted">None</span>'),
       },
       { field: 'due', header: 'Due', type: 'date', width: 120, editable: true, render: overdueText },
       {
@@ -251,7 +269,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
         groupColumnWidth: window.innerWidth < 640 ? 190 : 260,
         groupPanel: false,
       };
-  }, [people, categories, view]);
+  }, [people, categories, locationList, view]);
 
   // The due-date renderer reads the latest tasks without rebuilding the grid.
   const byIdRef = useRef(byId);
@@ -291,6 +309,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
       : e.column === 'due' ? (v ? { due_date: v } : { due_date: null, due_part: null, due_time: null })
       : e.column === 'when' ? parseWhen(v)
       : e.column === 'category' ? { category_id: v === NO_CATEGORY || !v ? null : categories.find((c) => c.name === v)?.id }
+      : e.column === 'location' ? { location_id: v === NO_LOCATION || !v ? null : locations.find((l) => l.name === v)?.id }
       : null;
     if (!patch || Object.values(patch).some((x) => x === undefined)) { await load(); return; }
     await run(() => api.updateTask(e.data.id, patch));
@@ -319,7 +338,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
   return (
     <Section id="project.tasks" title="Tasks" summary={tasks.length ? `${done} of ${tasks.length} done` : undefined}>
       <p className="hint">
-        Click a person, category, status, priority, time or parent task to pick from its list. Double-click a task name, due date, tags or description to type a change.
+        Click a person, location, category, status, priority, time or parent task to pick from its list. Double-click a task name, due date, tags or description to type a change.
         Select a task to edit its description, tags and notes, add sub-tasks, or move it.
       </p>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -333,7 +352,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
       <form className="form-row my-2" onSubmit={addTask}>
         <input className="field" placeholder="New task, e.g. Scout locations" value={newTitle} maxLength={200}
           onChange={(e) => setNewTitle(e.target.value)} required />
-        <button type="submit" className="btn">Add task</button>
+        <button type="submit" className="btn" data-pin>Add task</button>
       </form>
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -360,13 +379,14 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
             people={people}
             companyId={companyId}
             categories={categories}
+            locations={locations}
             tags={tags}
             run={run}
             onDeleted={() => setSelectedId(null)}
             onAdded={(id) => setSelectedId(id)}
           />
         ) : (
-          <aside className="card hidden lg:flex">
+          <aside data-pin-scope className="card hidden lg:flex">
             <p className="text-muted">Select a task to see its details.</p>
           </aside>
         )}
@@ -375,9 +395,9 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
   );
 }
 
-function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, people, canManage, run, onDeleted, onAdded }: {
+function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locations, tags, people, canManage, run, onDeleted, onAdded }: {
   task: Task; projectId: string; companyId: string; tasks: Task[]; kids: Map<string, Task[]>;
-  categories: TaskCategory[]; tags: TaskTag[]; people: { id: string; name: string }[]; canManage: boolean;
+  categories: TaskCategory[]; locations: Location[]; tags: TaskTag[]; people: { id: string; name: string }[]; canManage: boolean;
   run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
   onDeleted: () => void; onAdded: (id: string) => void;
 }) {
@@ -441,7 +461,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, 
   }
 
   return (
-    <aside className="card gap-3 lg:max-h-[720px] lg:overflow-auto">
+    <aside data-pin-scope className="card gap-3 lg:max-h-[720px] lg:overflow-auto">
       <form className="flex flex-col gap-2" onSubmit={save}>
         <label className="label">Task<input className="field" value={title} maxLength={200} required onChange={(e) => setTitle(e.target.value)} /></label>
         <label className="label">Description<textarea className="field" rows={3} value={description} maxLength={5000} onChange={(e) => setDescription(e.target.value)} /></label>
@@ -460,7 +480,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, 
             )}
           </div>
         )}
-        <button type="submit" className="btn" disabled={!changed}>Save</button>
+        <button type="submit" className="btn" disabled={!changed} data-pin="2">Save</button>
       </form>
 
       <div className="grid grid-cols-2 gap-2">
@@ -488,6 +508,15 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, 
         {people.length <= 1 && (
           <span className="hint">Only people on the project team can be assigned. Add more people in the Team section above.</span>
         )}
+      </label>
+
+      <label className="label">Location
+        <select className="field" value={task.location_id ?? ''}
+          onChange={(e) => run(() => api.updateTask(task.id, { location_id: e.target.value || null }))}>
+          <option value="">{NO_LOCATION}</option>
+          {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+        {!locations.length && <span className="hint">Add the project's locations in the Locations section above.</span>}
       </label>
 
       <label className="label">Category

@@ -167,6 +167,7 @@ export const Task = z.object({
   sort_order: z.number().int(),
   category_id: Uuid.nullable().openapi({ description: 'One of the company\'s task categories' }),
   tag_ids: z.array(Uuid).openapi({ description: 'The company tags on this task' }),
+  location_id: Uuid.nullable().openapi({ description: 'One of the project\'s locations' }),
   created_by: Uuid,
   created_at: z.string(),
   updated_at: z.string(),
@@ -184,6 +185,7 @@ const taskFields = {
   sort_order: z.number().int().optional(),
   category_id: Uuid.nullable().optional().openapi({ description: 'One of the company\'s task categories, or null' }),
   tag_ids: z.array(Uuid).optional().openapi({ description: 'Replaces the task\'s tags with exactly these company tags' }),
+  location_id: Uuid.nullable().optional().openapi({ description: 'One of the project\'s locations, or null' }),
 };
 
 export const TaskCreate = z.object({
@@ -238,3 +240,32 @@ export const TaskTag = z.object({
 export const TaskTagInput = z.object({
   name: z.string().trim().min(1).max(40).openapi({ example: 'night shoot' }),
 }).openapi('TaskTagInput');
+
+// ---- Project locations ------------------------------------------------------
+
+export const Location = z.object({
+  id: Uuid,
+  project_id: Uuid,
+  name: z.string().openapi({ example: 'Old Mill' }),
+  description: nullableText,
+  address: nullableText.openapi({ example: '1 Mill Road, Hudson, NY' }),
+  contact_name: nullableText.openapi({ example: 'Sam Rivera' }),
+  contact_email: nullableText.openapi({ example: 'sam@oldmill.com' }),
+  contact_phone: nullableText.openapi({ example: '+1 555 0100' }),
+  created_by: Uuid.nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  tasks: z.number().int().openapi({ description: 'How many tasks are at this location' }),
+}).openapi('Location');
+
+const optText = (max: number) => z.string().trim().max(max).nullable().optional();
+export const LocationInput = z.object({
+  name: z.string().trim().min(1).max(120).openapi({ example: 'Old Mill' }),
+  description: optText(2000),
+  address: optText(500),
+  contact_name: optText(120),
+  contact_email: z.union([z.literal(''), z.email().max(254)]).nullable().optional().openapi({ example: 'sam@oldmill.com' }),
+  contact_phone: optText(40),
+}).openapi('LocationInput');
+
+export const LocationUpdate = LocationInput.partial().openapi('LocationUpdate');

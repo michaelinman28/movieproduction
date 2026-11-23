@@ -173,7 +173,7 @@ export function RolesPage() {
                 <option value={NEW_DEPT}>New department…</option>
               </select>
             )}
-            <button type="submit" className="btn">Add role</button>
+            <button type="submit" className="btn" data-pin>Add role</button>
           </form>
         )}
         {/* The side panel is always there for admins, so selecting a row doesn't resize the
@@ -185,7 +185,7 @@ export function RolesPage() {
               selectionChanged: (rows: RoleRow[]) => setSelectedId(rows[0]?.id ?? null),
             }} />
           {isAdmin && (selected ? (
-            <aside className="card gap-2">
+            <aside data-pin-scope className="card gap-2">
               <h3>{selected.name}</h3>
               <p className="hint">
                 {selected.people ? `${selected.people === 1 ? '1 person holds' : `${selected.people} people hold`} this role.` : 'Nobody holds this role yet.'}
@@ -203,12 +203,12 @@ export function RolesPage() {
                   <textarea className="field" rows={3} value={form.description} maxLength={500}
                     onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </label>
-                <button type="submit" className="btn">Save</button>
+                <button type="submit" className="btn" data-pin="2">Save</button>
               </form>
               <button className="btn btn-danger" onClick={deleteRole}>Delete role</button>
             </aside>
           ) : custom.length > 0 && (
-            <aside className="card hidden gap-2 lg:flex">
+            <aside data-pin-scope className="card hidden gap-2 lg:flex">
               <p className="hint">Select a role to edit it in a form, see who holds it, or delete it.</p>
             </aside>
           ))}

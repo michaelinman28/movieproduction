@@ -224,7 +224,7 @@ export function CompanyPage() {
         {isAdmin && (
           <form className="form-row mb-2" onSubmit={createProject}>
             <input className="field" placeholder="New project name" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
-            <button type="submit" className="btn">Create project</button>
+            <button type="submit" className="btn" data-pin>Create project</button>
           </form>
         )}
         {isAdmin && projectRows.length > 0 && <p className="hint mb-2">Double-click a cell to change it, or click a status to pick one.</p>}
@@ -245,7 +245,7 @@ export function CompanyPage() {
                 onChange={(e) => setNewPerson({ ...newPerson, admin: e.target.checked })} />
               Make admin
             </label>
-            <button type="submit" className="btn">Add person</button>
+            <button type="submit" className="btn" data-pin>Add person</button>
           </form>
         )}
         {isAdmin && <p className="hint mt-2">People need to create their own account first. Then add them here with the email they signed up with.</p>}
@@ -270,7 +270,7 @@ export function CompanyPage() {
               onRemoved={() => { setSelectedId(null); if (selected.user_id === me) navigate('/'); }}
             />
           )}
-          {!selected && isAdmin && <aside className="card hidden lg:flex"><p className="hint">Select a person to see their details and pick their roles from the list.</p></aside>}
+          {!selected && isAdmin && <aside data-pin-scope className="card hidden lg:flex"><p className="hint">Select a person to see their details and pick their roles from the list.</p></aside>}
         </div>
         {!selected && peopleRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and change their roles, or double-click a title or roles cell to type a change' : ''}.</p>}
       </Section>
@@ -299,7 +299,7 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
   }
 
   return (
-    <aside className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
+    <aside data-pin-scope className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
       <h3>{name}</h3>
       <p className="hint mt-2">
         {member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}
