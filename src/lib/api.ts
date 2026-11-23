@@ -29,6 +29,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export interface Profile { id: string; full_name: string | null; email: string | null; phone: string | null }
 export interface Company { id: string; name: string; description: string | null; created_by: string; created_at: string; is_admin: boolean }
+export interface RoleWithUsage extends Role { is_custom: boolean; people: number }
+export type RoleInput = { name?: string; department?: string | null; description?: string | null };
 export interface CompanyMember { user_id: string; is_admin: boolean; title: string | null; joined_at: string; profile: Profile; role_ids: string[] }
 export interface Project {
   id: string; company_id: string; name: string; logline: string | null; description: string | null;
@@ -49,7 +51,10 @@ export const api = {
   company: (id: string) => call<Company>('GET', `/companies/${enc(id)}`),
   updateCompany: (id: string, b: { name?: string; description?: string | null }) => call<Company>('PATCH', `/companies/${enc(id)}`, b),
   deleteCompany: (id: string) => call<void>('DELETE', `/companies/${enc(id)}`),
-  roles: (companyId: string) => call<Role[]>('GET', `/companies/${enc(companyId)}/roles`),
+  roles: (companyId: string) => call<RoleWithUsage[]>('GET', `/companies/${enc(companyId)}/roles`),
+  createRole: (companyId: string, b: RoleInput & { name: string }) => call<RoleWithUsage>('POST', `/companies/${enc(companyId)}/roles`, b),
+  updateRole: (id: string, b: RoleInput) => call<Role>('PATCH', `/roles/${enc(id)}`, b),
+  deleteRole: (id: string) => call<void>('DELETE', `/roles/${enc(id)}`),
 
   members: (companyId: string) => call<CompanyMember[]>('GET', `/companies/${enc(companyId)}/members`),
   addMember: (companyId: string, b: { email: string; is_admin?: boolean; title?: string | null }) =>

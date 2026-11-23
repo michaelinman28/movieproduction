@@ -103,5 +103,21 @@ await expect('phone from sign-up', () => as(P, `select phone from profiles where
 await expect('edit own phone', () => as(U.b, `update profiles set phone='555-0199' where id=$1 returning phone`, [U.b]), len(1));
 await expect('cannot edit others phone', () => as(U.b, `update profiles set phone='1' where id=$1 returning id`, [U.a]), len(0));
 await expect('co-member sees phone', () => as(U.a, `select phone from profiles where id=$1`, [U.b]), r => r[0]?.phone === '555-0199');
+// step 3: custom roles
+const [co3] = await as(U.a, `insert into companies (name) values ('Third Co') returning id`);
+const c3 = co3.id;
+await as(U.a, `select add_company_member($1,'b@x.com')`, [c3]);
+await expect('admin adds custom role (trimmed)', () => as(U.a, `insert into roles (company_id,name,department) values ($1,'  Intimacy Coordinator ','  ') returning name, department`, [c3]), r => r[0]?.name === 'Intimacy Coordinator' && r[0]?.department === null);
+await expect('custom role cannot copy a standard name', () => as(U.a, `insert into roles (company_id,name) values ($1,'director')`, [c3]), e => isErr(e) && /standard role/.test(e.message));
+await expect('cannot rename custom role to a standard name', () => as(U.a, `update roles set name='Gaffer' where company_id=$1`, [c3]), isErr);
+await expect('duplicate custom name rejected', () => as(U.a, `insert into roles (company_id,name) values ($1,'intimacy coordinator')`, [c3]), isErr);
+await expect('other company can reuse the custom name', () => as(U.a, `insert into roles (company_id,name) values ($1,'Intimacy Coordinator') returning id`, [c2]), len(1));
+await expect('non-admin cannot add custom role', () => as(U.b, `insert into roles (company_id,name) values ($1,'Nope')`, [c3]), isErr);
+const [ic] = await as(U.a, `select id from roles where company_id=$1`, [c3]);
+await as(U.a, `insert into company_member_roles values ($1,$2,$3)`, [c3, U.b, ic.id]);
+await expect('role usage counts people', () => as(U.b, `select people from role_usage($1) where role_id=$2`, [c3, ic.id]), r => Number(r[0]?.people) === 1);
+await expect('outsider sees no usage', () => as(U.d, `select * from role_usage($1)`, [c3]), len(0));
+await expect('non-admin cannot delete custom role', () => as(U.b, `delete from roles where id=$1 returning id`, [ic.id]), len(0));
+await expect('admin deletes custom role, assignments go too', async () => { await as(U.a, `delete from roles where id=$1`, [ic.id]); return as(U.a, `select * from company_member_roles where company_id=$1`, [c3]); }, len(0));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

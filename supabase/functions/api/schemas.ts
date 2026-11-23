@@ -68,6 +68,19 @@ export const Role = z.object({
   sort_order: z.number().int(),
 }).openapi('Role');
 
+export const RoleWithUsage = Role.extend({
+  is_custom: z.boolean().openapi({ description: 'true for the company\'s own roles, which admins can edit' }),
+  people: z.number().int().openapi({ description: 'How many people hold this role in the company or its projects' }),
+}).openapi('RoleWithUsage');
+
+export const RoleCreate = z.object({
+  name: z.string().trim().min(1).max(80).openapi({ example: 'Intimacy Coordinator' }),
+  department: z.string().trim().max(60).nullable().optional().openapi({ example: 'Cast' }),
+  description: z.string().trim().max(500).nullable().optional(),
+}).openapi('RoleCreate');
+
+export const RoleUpdate = RoleCreate.partial().openapi('RoleUpdate');
+
 export const CompanyMember = z.object({
   user_id: Uuid,
   is_admin: z.boolean(),
