@@ -4,7 +4,9 @@ import { supabase, supabaseConfigured } from './lib/supabase';
 import { SignIn } from './pages/SignIn';
 import { Home } from './pages/Home';
 import { CompanyPage } from './pages/CompanyPage';
-import { ProjectPage } from './pages/ProjectPage';
+import { ProjectJournal, ProjectLayout } from './pages/project/ProjectLayout';
+import { ProjectLocationsPage, ProjectOverview, ProjectTasks } from './pages/project/ProjectOverview';
+import { ProjectTeam } from './pages/project/ProjectTeam';
 import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
 import { TaskSettingsPage } from './pages/TaskSettingsPage';
@@ -40,12 +42,18 @@ export function App() {
       </header>
       <PinnedAction />
       <UnsavedGuard />
-      <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">
+      <main className="mx-auto w-full max-w-screen-2xl px-4 py-6 md:py-8">
         <Routes>
           <Route path="/companies/:companyId" element={<CompanyPage />} />
           <Route path="/companies/:companyId/roles" element={<RolesPage />} />
           <Route path="/companies/:companyId/task-settings" element={<TaskSettingsPage />} />
-          <Route path="/projects/:projectId" element={<ProjectPage />} />
+          <Route path="/projects/:projectId" element={<ProjectLayout />}>
+            <Route index element={<ProjectOverview />} />
+            <Route path="tasks" element={<ProjectTasks />} />
+            <Route path="locations" element={<ProjectLocationsPage />} />
+            <Route path="team" element={<ProjectTeam />} />
+            <Route path="journal" element={<ProjectJournal />} />
+          </Route>
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<Home />} />
         </Routes>

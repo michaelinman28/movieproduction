@@ -187,9 +187,8 @@ export function RolesPage() {
             <button type="submit" className="btn" data-pin>Add role</button>
           </form>
         )}
-        {/* The side panel is always there for admins, so selecting a row doesn't resize the
-            grid mid double-click (which would stop the cell from opening for editing). */}
-        <div className={`grid grid-cols-1 gap-4 ${isAdmin ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
+        {/* The form opens under the table, which keeps the full width. */}
+        <div className="flex flex-col gap-4">
           <LatticeGrid options={customOptions} rows={custom} height={Math.min(100 + custom.length * 34, 400)} reveal={reveal}
             on={{
               cellValueChanged: saveEdit,
@@ -219,11 +218,7 @@ export function RolesPage() {
               </form>
               <button className="btn btn-danger" onClick={deleteRole}>Delete role</button>
             </aside>
-          ) : custom.length > 0 && (
-            <aside data-pin-scope className="card hidden gap-2 lg:flex">
-              <p className="hint">Select a role to edit it in a form, see who holds it, or delete it.</p>
-            </aside>
-          ))}
+          ) : null)}
         </div>
         {isAdmin && custom.length > 0 && (
           <p className="hint mt-2">Double-click (or tap twice) a cell to rename a role or change its department or description. Select a role to delete it.</p>

@@ -420,9 +420,8 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       </form>
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
-      {/* The panel's space is always kept so selecting a task doesn't resize the grid
-          in the middle of a double-click. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* The task's form opens under the table or calendar, which keeps the full width. */}
+      <div className="flex flex-col gap-4">
         {!loaded ? <p className="text-muted">Loading tasks…</p> : calendar ? (
           <TaskCalendar tasks={tasks} selectedId={selectedId} day={day} onDay={chooseDay} nameOf={nameOf}
             onOpen={openOnCalendar}
@@ -437,7 +436,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
             onReady={(g) => { gridRef.current = g; }}
           />
         )}
-        {selected ? (
+        {selected && (
           <TaskPanel
             key={selected.id}
             task={selected}
@@ -454,10 +453,6 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
             onDeleted={() => setSelectedId(null)}
             onAdded={(id) => { if (confirmDiscard()) open(id); }}
           />
-        ) : (
-          <aside data-pin-scope className="card hidden lg:flex">
-            <p className="text-muted">Select a task to see its details.</p>
-          </aside>
         )}
       </div>
     </Section>
@@ -553,7 +548,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
     if (await run(() => api.deleteTask(task.id), `Deleted "${task.title}".`)) onDeleted();
   }
   return (
-    <aside data-pin-scope data-form-for={task.id} className="card gap-3 lg:max-h-[720px] lg:overflow-auto">
+    <aside data-pin-scope data-form-for={task.id} className="card gap-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
       <form className="flex flex-col gap-2" onSubmit={save}>
         <label className="label">Task<input className="field" value={draft.title} maxLength={200} required onChange={(e) => set('title', e.target.value)} /></label>
         <label className="label">Description<textarea className="field" rows={3} value={draft.description} maxLength={5000} onChange={(e) => set('description', e.target.value)} /></label>
@@ -591,7 +586,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           {people.length <= 1 && (
-            <span className="hint">Only people on the project team can be assigned. Add more people in the Team section above.</span>
+            <span className="hint">Only people on the project team can be assigned. Add more people on the Team page.</span>
           )}
         </label>
         <label className="label">Location
@@ -605,7 +600,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
             const at = locations.find((l) => l.id === draft.location);
             return at?.address ? <a className="text-sm" {...mapsLinkProps(at.address)}>Open {at.name} in maps</a> : null;
           })()}
-          {!locations.length && <span className="hint">Add the project's locations in the Locations section above.</span>}
+          {!locations.length && <span className="hint">Add the project's locations on the Locations page.</span>}
         </label>
         <label className="label">Category
           <select className="field" value={draft.category} onChange={(e) => set('category', e.target.value)}>
@@ -629,35 +624,38 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
         {changed && <p className="hint">Unsaved changes.</p>}
       </form>
 
-      <TaskNotes taskId={task.id} canManage={canManage} />
+      {/* On wide screens: the form on the left; notes and sub-tasks on the right. */}
+      <div className="flex flex-col gap-3">
+        <TaskNotes taskId={task.id} canManage={canManage} />
 
-      <Section id="task.subtasks" title="Sub-tasks" level="h4" bodyClassName="flex flex-col gap-2"
-        summary={children.length ? `${children.filter((c) => c.status === 'done').length} of ${children.length} done` : undefined}>
-        {children.length > 0 && (
-          <ul className="flex flex-col">
-            {children.map((c) => (
-              <li key={c.id} className="flex items-center gap-2 border-b border-line py-1 last:border-b-0">
-                <input type="checkbox" className="h-5 w-5 shrink-0 cursor-pointer accent-accent" checked={c.status === 'done'} aria-label={`Mark ${c.title} done`}
-                  onChange={(e) => run(() => api.updateTask(c.id, { status: e.target.checked ? 'done' : 'todo' }))} />
-                <button type="button" className={`btn-link min-w-0 flex-1 truncate text-left ${c.status === 'done' ? 'line-through text-muted' : ''}`}
-                  title="Open this sub-task" onClick={() => onAdded(c.id)}>
-                  {c.title}
-                </button>
-                <span className={`task-pill task-pill-${c.status}`}>{labelOf(TASK_STATUSES, c.status)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
+        <Section id="task.subtasks" title="Sub-tasks" level="h4" bodyClassName="flex flex-col gap-2"
+          summary={children.length ? `${children.filter((c) => c.status === 'done').length} of ${children.length} done` : undefined}>
+          {children.length > 0 && (
+            <ul className="flex flex-col">
+              {children.map((c) => (
+                <li key={c.id} className="flex items-center gap-2 border-b border-line py-1 last:border-b-0">
+                  <input type="checkbox" className="h-5 w-5 shrink-0 cursor-pointer accent-accent" checked={c.status === 'done'} aria-label={`Mark ${c.title} done`}
+                    onChange={(e) => run(() => api.updateTask(c.id, { status: e.target.checked ? 'done' : 'todo' }))} />
+                  <button type="button" className={`btn-link min-w-0 flex-1 truncate text-left ${c.status === 'done' ? 'line-through text-muted' : ''}`}
+                    title="Open this sub-task" onClick={() => onAdded(c.id)}>
+                    {c.title}
+                  </button>
+                  <span className={`task-pill task-pill-${c.status}`}>{labelOf(TASK_STATUSES, c.status)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
 
-      <form className="flex flex-col gap-2" onSubmit={addSub}>
-        <label className="label">Add a sub-task
-          <input className="field" placeholder="e.g. Visit the warehouse" value={subTitle} maxLength={200} onChange={(e) => setSubTitle(e.target.value)} required />
-        </label>
-        <button type="submit" className="btn btn-secondary">Add sub-task</button>
-      </form>
+        <form className="flex flex-col gap-2" onSubmit={addSub}>
+          <label className="label">Add a sub-task
+            <input className="field" placeholder="e.g. Visit the warehouse" value={subTitle} maxLength={200} onChange={(e) => setSubTitle(e.target.value)} required />
+          </label>
+          <button type="submit" className="btn btn-secondary">Add sub-task</button>
+        </form>
 
-      <button type="button" className="btn btn-danger" onClick={remove}>Delete task</button>
+        <button type="button" className="btn btn-danger" onClick={remove}>Delete task</button>
+      </div>
     </aside>
   );
 }
