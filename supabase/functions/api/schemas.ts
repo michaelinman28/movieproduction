@@ -243,6 +243,10 @@ export const TaskTagInput = z.object({
 
 // ---- Project locations ------------------------------------------------------
 
+export const LocationStatus = z.enum(['considering', 'confirmed', 'not_using']).openapi('LocationStatus', {
+  description: 'considering (being scouted), confirmed (booked), or not_using (ruled out)',
+});
+
 export const Location = z.object({
   id: Uuid,
   project_id: Uuid,
@@ -252,6 +256,7 @@ export const Location = z.object({
   contact_name: nullableText.openapi({ example: 'Sam Rivera' }),
   contact_email: nullableText.openapi({ example: 'sam@oldmill.com' }),
   contact_phone: nullableText.openapi({ example: '+1 555 0100' }),
+  status: LocationStatus,
   created_by: Uuid.nullable(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -266,6 +271,7 @@ export const LocationInput = z.object({
   contact_name: optText(120),
   contact_email: z.union([z.literal(''), z.email().max(254)]).nullable().optional().openapi({ example: 'sam@oldmill.com' }),
   contact_phone: optText(40),
+  status: LocationStatus.optional().openapi({ description: 'Defaults to considering' }),
 }).openapi('LocationInput');
 
 export const LocationUpdate = LocationInput.partial().openapi('LocationUpdate');

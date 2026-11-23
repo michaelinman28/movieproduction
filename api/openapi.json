@@ -1358,6 +1358,9 @@
             ],
             "example": "+1 555 0100"
           },
+          "status": {
+            "$ref": "#/components/schemas/LocationStatus"
+          },
           "created_by": {
             "type": [
               "string",
@@ -1386,11 +1389,21 @@
           "contact_name",
           "contact_email",
           "contact_phone",
+          "status",
           "created_by",
           "created_at",
           "updated_at",
           "tasks"
         ]
+      },
+      "LocationStatus": {
+        "type": "string",
+        "enum": [
+          "considering",
+          "confirmed",
+          "not_using"
+        ],
+        "description": "considering (being scouted), confirmed (booked), or not_using (ruled out)"
       },
       "LocationInput": {
         "type": "object",
@@ -1447,6 +1460,16 @@
               "null"
             ],
             "maxLength": 40
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LocationStatus"
+              },
+              {
+                "description": "Defaults to considering"
+              }
+            ]
           }
         },
         "required": [
@@ -1508,6 +1531,16 @@
               "null"
             ],
             "maxLength": 40
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LocationStatus"
+              },
+              {
+                "description": "Defaults to considering"
+              }
+            ]
           }
         }
       }

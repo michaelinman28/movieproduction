@@ -1,23 +1,30 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { LatticeGrid } from './LatticeGrid';
+import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
 import { Section } from './Section';
-import { api, type Location, type LocationInput } from '../lib/api';
+import { api, type Location, type LocationInput, type LocationStatus } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { errorText } from '../lib/format';
+import { LOCATION_STATUSES, errorText, labelOf, valueOf } from '../lib/format';
 
 interface LocationRow {
   id: string; name: string; description: string; address: string;
-  contact_name: string; contact_email: string; contact_phone: string; tasks: number;
+  contact_name: string; contact_email: string; contact_phone: string; status: string; tasks: number;
 }
-type Field = keyof Omit<LocationRow, 'id' | 'tasks'>;
+type Field = keyof Omit<LocationRow, 'id' | 'tasks' | 'status'>;
 const FIELDS: Field[] = ['name', 'description', 'address', 'contact_name', 'contact_email', 'contact_phone'];
 
 const toRow = (l: Location): LocationRow => ({
   id: l.id, name: l.name, description: l.description ?? '', address: l.address ?? '',
-  contact_name: l.contact_name ?? '', contact_email: l.contact_email ?? '', contact_phone: l.contact_phone ?? '', tasks: l.tasks,
+  contact_name: l.contact_name ?? '', contact_email: l.contact_email ?? '', contact_phone: l.contact_phone ?? '', status: labelOf(LOCATION_STATUSES, l.status), tasks: l.tasks,
 });
 
 /** A link that opens the address in the phone's or computer's maps app. */
+const pill = (label: string) =>
+  `<span class="task-pill task-pill-loc-${valueOf(LOCATION_STATUSES, label) ?? 'considering'}">${gridEsc(label)}</span>`;
+
+// Whether to list the locations marked "Not using"; remembered on this device.
+const SHOW_KEY = 'mp-locations-show-unused';
+const readShow = () => { try { return localStorage.getItem(SHOW_KEY) === '1'; } catch { return false; } };
+
 const mapsUrl = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
 /**
@@ -34,6 +41,11 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
   const [newName, setNewName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showUnused, setShowUnused] = useState(readShow);
+  function toggleUnused(on: boolean) {
+    setShowUnused(on);
+    try { if (on) localStorage.setItem(SHOW_KEY, '1'); else localStorage.removeItem(SHOW_KEY); } catch { /* storage unavailable */ }
+  }
 
   const run = async (fn: () => Promise<unknown>, ok?: string) => {
     setError(null);
@@ -44,14 +56,20 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
     return true;
   };
 
-  const rows = useMemo(() => locations.map(toRow), [locations]);
+  const unused = locations.filter((l) => l.status === 'not_using').length;
+  const rows = useMemo(() => locations.filter((l) => showUnused || l.status !== 'not_using').map(toRow), [locations, showUnused]);
   const options = useMemo(() => ({
     rowId: (r: LocationRow) => r.id,
     toolbar: false, groupPanel: false, statusBar: false,
     selection: 'single', rowClickSelection: true,
-    emptyMessage: 'No locations yet',
+    emptyMessage: locations.length ? 'Every location is marked Not using' : 'No locations yet',
     columns: [
       { field: 'name', header: 'Location', width: 180, editable: true, pinned: 'left' },
+      {
+        field: 'status', header: 'Status', width: 140, editable: true, editor: 'select',
+        editorOptions: LOCATION_STATUSES.map((s) => s.label),
+        render: ({ value }: { value: string }) => gridDropdown(pill(value)),
+      },
       { field: 'address', header: 'Address', width: 240, editable: true, editor: 'textarea' },
       { field: 'contact_name', header: 'Contact', width: 160, editable: true },
       { field: 'contact_email', header: 'Contact email', width: 200, editable: true },
@@ -59,10 +77,16 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
       { field: 'description', header: 'Description', width: 260, editable: true, editor: 'textarea' },
       { field: 'tasks', header: 'Tasks', type: 'number', width: 90 },
     ],
-  }), []);
+  }), [locations.length]);
 
   async function saveCell(e: { data: LocationRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
+    if (e.column === 'status') {
+      const status = valueOf(LOCATION_STATUSES, v) as LocationStatus | undefined;
+      if (status) await run(() => api.updateLocation(e.data.id, { status }), status === 'not_using' && !showUnused ? `${e.data.name} is hidden now. Tick "Show the ones we're not using" to see it.` : undefined);
+      else await onChanged();
+      return;
+    }
     if (!FIELDS.includes(e.column as Field) || (e.column === 'name' && !v)) { await onChanged(); return; }
     await run(() => api.updateLocation(e.data.id, { [e.column]: v || null }));
   }
@@ -81,12 +105,19 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
   const selected = locations.find((l) => l.id === selectedId) ?? null;
 
   return (
-    <Section id="project.locations" title="Locations" summary={locations.length || undefined}>
+    <Section id="project.locations" title="Locations"
+      summary={locations.length ? `${locations.length - unused} in use${unused ? `, ${unused} not` : ''}` : undefined}>
       <form className="form-row mb-2" onSubmit={add}>
         <input className="field" placeholder="New location, e.g. Old Mill" aria-label="New location name" value={newName} maxLength={120}
           onChange={(e) => setNewName(e.target.value)} required />
         <button type="submit" className="btn" data-pin>Add location</button>
       </form>
+      {unused > 0 && (
+        <label className="check mb-2">
+          <input type="checkbox" checked={showUnused} onChange={(e) => toggleUnused(e.target.checked)} />
+          Show the ones we're not using ({unused})
+        </label>
+      )}
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
       {/* The panel's space stays put so selecting a row doesn't resize the grid mid double-click. */}
@@ -141,6 +172,12 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
       <form className="flex flex-col gap-2" onSubmit={save}>
         <label className="label">Name
           <input className="field" value={draft.name} maxLength={120} required onChange={set('name')} />
+        </label>
+        <label className="label">Status
+          <select className="field" value={location.status}
+            onChange={(e) => run(() => api.updateLocation(location.id, { status: e.target.value as LocationStatus }))}>
+            {LOCATION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
         </label>
         <label className="label">Description
           <textarea className="field" rows={3} value={draft.description} maxLength={2000} onChange={set('description')} />

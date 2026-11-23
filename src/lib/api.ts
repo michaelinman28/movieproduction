@@ -49,9 +49,12 @@ export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 
 export interface Location {
   id: string; project_id: string; name: string; description: string | null; address: string | null;
   contact_name: string | null; contact_email: string | null; contact_phone: string | null;
+  status: LocationStatus;
   created_by: string | null; created_at: string; updated_at: string; tasks: number;
 }
-export type LocationInput = Partial<Pick<Location, 'name' | 'description' | 'address' | 'contact_name' | 'contact_email' | 'contact_phone'>>;
+export type LocationInput = Partial<Pick<Location, 'name' | 'description' | 'address' | 'contact_name' | 'contact_email' | 'contact_phone' | 'status'>>;
+/** considering (being scouted), confirmed (booked), or not_using (ruled out). */
+export type LocationStatus = 'considering' | 'confirmed' | 'not_using';
 
 export interface TaskNote { id: string; task_id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
 

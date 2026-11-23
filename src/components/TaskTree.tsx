@@ -133,7 +133,8 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
   const tagName = useMemo(() => new Map(tags.map((t) => [t.id, t.name])), [tags]);
   const locationName = useMemo(() => new Map(locations.map((l) => [l.id, l.name])), [locations]);
   // Only the names matter to the grid; task counts changing shouldn't rebuild it.
-  const locationList = locations.map((l) => l.name).join('\n');
+  // Locations marked Not using aren't offered, except to a task already there.
+  const locationList = locations.filter((l) => l.status !== 'not_using').map((l) => l.name).join('\n');
   const kids = useMemo(() => childrenOf(tasks), [tasks]);
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   // A unique label per task for the "Sub-task of" picker: tasks sharing a title get (2), (3)…
@@ -213,7 +214,10 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       },
       {
         field: 'location', header: 'Location', width: 160, editable: true, editor: 'select',
-        editorOptions: [NO_LOCATION, ...locationList.split('\n').filter(Boolean)],
+        editorOptions: (d: TaskRow) => {
+          const names = locationList.split('\n').filter(Boolean);
+          return [NO_LOCATION, ...(d.location && !names.includes(d.location) ? [d.location] : []), ...names];
+        },
         render: ({ value }: { value: string }) => dropdown(value ? esc(value) : '<span class="text-muted">None</span>'),
       },
       { field: 'due', header: 'Due', type: 'date', width: 120, editable: true, render: overdueText },
@@ -514,7 +518,9 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
         <select className="field" value={task.location_id ?? ''}
           onChange={(e) => run(() => api.updateTask(task.id, { location_id: e.target.value || null }))}>
           <option value="">{NO_LOCATION}</option>
-          {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+          {locations.filter((l) => l.status !== 'not_using' || l.id === task.location_id).map((l) => (
+            <option key={l.id} value={l.id}>{l.name}{l.status === 'not_using' ? ' (not using)' : ''}</option>
+          ))}
         </select>
         {!locations.length && <span className="hint">Add the project's locations in the Locations section above.</span>}
       </label>
