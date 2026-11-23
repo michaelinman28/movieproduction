@@ -2,7 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { authed, fail, found, must } from '../context.ts';
 import {
   Company, CompanyCreate, CompanyMember, CompanyMemberAdd, CompanyMemberUpdate, CompanyUpdate,
-  IdParam, MemberParams, Role, RoleIds,
+  IdParam, MemberParams, Role, RoleCreate, RoleIds, RoleUpdate, RoleWithUsage,
 } from '../schemas.ts';
 import { body, errors, ok, send, profileFields, rolesByUser, router, secured, setRoles } from './common.ts';
 
@@ -85,18 +85,66 @@ companies.openapi(createRoute({
 companies.openapi(createRoute({
   method: 'get', path: '/companies/{id}/roles', tags: ['Roles'], security: secured,
   summary: 'Roles available in a company',
-  description: 'The standard film roles plus the company\'s custom roles, standard ones first.',
+  description: 'The standard film roles plus the company\'s custom roles, standard ones first, each with how many people hold it.',
   request: { params: IdParam },
-  responses: { 200: ok(z.array(Role)), 401: errors[401] },
+  responses: { 200: ok(z.array(RoleWithUsage)), 401: errors[401] },
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  const rows = must<{ company_id: string | null; sort_order: number; name: string }[]>(
-    await db.from('roles').select('*').or(`company_id.is.null,company_id.eq.${id}`));
+  const [r, u] = await Promise.all([
+    db.from('roles').select('*').or(`company_id.is.null,company_id.eq.${id}`),
+    db.rpc('role_usage', { cid: id }),
+  ]);
+  const rows = must<{ id: string; company_id: string | null; sort_order: number; name: string }[]>(r);
+  const usage = new Map(must<{ role_id: string; people: number }[]>(u).map((x) => [x.role_id, Number(x.people)]));
   rows.sort((a, b) => a.company_id === b.company_id
     ? a.sort_order - b.sort_order || a.name.localeCompare(b.name)
     : a.company_id === null ? -1 : 1);
-  return send(c, rows, 200);
+  return send(c, rows.map((x) => ({ ...x, is_custom: x.company_id !== null, people: usage.get(x.id) ?? 0 })), 200);
+});
+
+companies.openapi(createRoute({
+  method: 'post', path: '/companies/{id}/roles', tags: ['Roles'], security: secured,
+  summary: 'Add a custom role (admins)',
+  description: 'Custom roles sit alongside the standard film roles. The name must not match a standard role or another custom role in the company.',
+  request: { params: IdParam, ...body(RoleCreate) },
+  responses: { 201: ok(RoleWithUsage, 'Created'), 400: errors[400], 401: errors[401], 403: errors[403] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const { id } = c.req.valid('param');
+  const b = c.req.valid('json');
+  const row = must<object>(await db.from('roles')
+    .insert({ company_id: id, name: b.name, department: b.department ?? null, description: b.description ?? null })
+    .select('*').single());
+  return send(c, { ...row, is_custom: true, people: 0 }, 201);
+});
+
+companies.openapi(createRoute({
+  method: 'patch', path: '/roles/{id}', tags: ['Roles'], security: secured,
+  summary: 'Rename or describe a custom role (admins)',
+  description: 'Standard roles can\'t be changed.',
+  request: { params: IdParam, ...body(RoleUpdate) },
+  responses: { 200: ok(Role), 400: errors[400], 401: errors[401], 404: errors[404] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const { id } = c.req.valid('param');
+  const b = c.req.valid('json');
+  const patch: Record<string, unknown> = {};
+  for (const k of ['name', 'department', 'description'] as const) if (b[k] !== undefined) patch[k] = b[k];
+  return send(c, found(must(await db.from('roles').update(patch).eq('id', id).not('company_id', 'is', null).select('*'))), 200);
+});
+
+companies.openapi(createRoute({
+  method: 'delete', path: '/roles/{id}', tags: ['Roles'], security: secured,
+  summary: 'Delete a custom role (admins)',
+  description: 'Also removes the role from everyone who holds it, in the company and on its projects. Standard roles can\'t be deleted.',
+  request: { params: IdParam },
+  responses: { 204: { description: 'Deleted' }, 401: errors[401], 404: errors[404] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const { id } = c.req.valid('param');
+  found(must(await db.from('roles').delete().eq('id', id).not('company_id', 'is', null).select('id')));
+  return c.body(null, 204);
 });
 
 // ---- People -----------------------------------------------------------------

@@ -15,7 +15,7 @@ day to day.
 | People | Company admins add people who already have an account, by email. They can give people a title, admin rights and company roles | Done |
 | Projects | Admins create several projects per company, each with a status (development to released), dates and a logline | Done |
 | Project teams | Admins assign company members to projects and give them project roles | Done |
-| Roles | 32 standard film roles (Producer, Director, DP, Gaffer…) are shared by every company. Each company can add its own custom roles | Standard roles done; managing custom roles is next |
+| Roles | 32 standard film roles (Producer, Director, DP, Gaffer…) are shared by every company. Company admins add, rename and delete their own custom roles on the Roles page; a custom role can't reuse a standard role's name | Done |
 | Tasks | Tasks and sub-tasks per project, with assignee, status, priority and due date, shown as a tree | Database ready; screens next |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
 
@@ -74,7 +74,8 @@ There are three layers, and each one can be run and tested by itself.
 | Group | Endpoints |
 |---|---|
 | Account | `POST /auth/signup`, `POST /auth/signin`, `POST /auth/refresh`, `GET /me`, `PATCH /me` |
-| Companies | `GET/POST /companies`, `GET/PATCH/DELETE /companies/{id}`, `GET /companies/{id}/roles` |
+| Companies | `GET/POST /companies`, `GET/PATCH/DELETE /companies/{id}` |
+| Roles | `GET/POST /companies/{id}/roles` (with how many people hold each), `PATCH/DELETE /roles/{id}` (custom roles only) |
 | Company people | `GET/POST /companies/{id}/members`, `PATCH/DELETE /companies/{id}/members/{userId}`, `PUT …/roles` |
 | Projects | `GET/POST /companies/{id}/projects`, `GET/PATCH/DELETE /projects/{id}` |
 | Project team | `GET/POST /projects/{id}/members`, `DELETE /projects/{id}/members/{userId}`, `PUT …/roles` |
@@ -153,7 +154,7 @@ src/                         React app
   components/                LatticeGrid wrapper, RolePicker, shared UI
   lib/api.ts                 API client used by every page
   lib/supabase.ts, auth.tsx  Sign-in session only
-  pages/                     Companies, Company, Project, Profile, Sign in
+  pages/                     Companies, Company, Roles, Project, Profile, Sign in
   styles.css                 Tailwind entry and theme tokens
   vendor/lattice-grid/       Michael's grid library
 supabase/
@@ -188,6 +189,6 @@ Checks: `npm run typecheck` (app and API), `npm run test:db` (security rules), `
 
 1. Foundation: schema, security rules, sign-in (done)
 2. Companies, projects and people (done)
-3. Roles: manage custom roles per company
+3. Roles: manage custom roles per company (done)
 4. Tasks and sub-tasks in a lattice-grid tree
 5. Project journal with private, shared and public entries

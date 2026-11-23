@@ -6,6 +6,7 @@ import { Home } from './pages/Home';
 import { CompanyPage } from './pages/CompanyPage';
 import { ProjectPage } from './pages/ProjectPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { RolesPage } from './pages/RolesPage';
 import { ThemeSwitch } from './components/ThemeSwitch';
 
 export function App() {
@@ -37,6 +38,7 @@ export function App() {
       <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">
         <Routes>
           <Route path="/companies/:companyId" element={<CompanyPage />} />
+          <Route path="/companies/:companyId/roles" element={<RolesPage />} />
           <Route path="/projects/:projectId" element={<ProjectPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<Home />} />
