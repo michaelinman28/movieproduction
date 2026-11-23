@@ -4,6 +4,8 @@ import { LatticeGrid } from '../components/LatticeGrid';
 import { api, type Company, type RoleWithUsage } from '../lib/api';
 import { errorText } from '../lib/format';
 
+const NEW_DEPT = '__new__';
+
 interface RoleRow { id: string; name: string; department: string; description: string; people: number }
 
 const toRow = (r: RoleWithUsage): RoleRow => ({
@@ -19,6 +21,9 @@ export function RolesPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [draft, setDraft] = useState({ name: '', department: '' });
+  // The department is picked from a list of the ones already in use, or typed in
+  // when "New department…" is chosen.
+  const [newDept, setNewDept] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +49,7 @@ export function RolesPage() {
       const r = await api.createRole(companyId, { name: draft.name.trim(), department: draft.department.trim() || null });
       setNotice(`Added ${r.name}. Assign it to people from the company or project pages.`);
       setDraft({ name: '', department: '' });
+      setNewDept(false);
       await load();
     } catch (err) { setError(errorText(err)); }
   }
@@ -125,9 +131,25 @@ export function RolesPage() {
           <form className="form-row mb-2" onSubmit={addRole}>
             <input className="field" placeholder="Role name, e.g. Drone Pilot" value={draft.name} maxLength={80}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
-            <input className="field" placeholder="Department (optional)" value={draft.department} maxLength={60} list="departments"
-              onChange={(e) => setDraft({ ...draft, department: e.target.value })} />
-            <datalist id="departments">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+            {newDept ? (
+              <div className="flex gap-2">
+                <input className="field" placeholder="New department name" value={draft.department} maxLength={60} autoFocus
+                  aria-label="New department" onChange={(e) => setDraft({ ...draft, department: e.target.value })} />
+                <button type="button" className="btn btn-secondary" onClick={() => { setNewDept(false); setDraft({ ...draft, department: '' }); }}>
+                  Back to list
+                </button>
+              </div>
+            ) : (
+              <select className="field" aria-label="Department" value={draft.department}
+                onChange={(e) => {
+                  if (e.target.value === NEW_DEPT) { setNewDept(true); setDraft({ ...draft, department: '' }); }
+                  else setDraft({ ...draft, department: e.target.value });
+                }}>
+                <option value="">No department</option>
+                {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                <option value={NEW_DEPT}>New department…</option>
+              </select>
+            )}
             <button type="submit" className="btn">Add role</button>
           </form>
         )}
