@@ -86,7 +86,7 @@ export function RolesPage() {
 
   const customOptions = useMemo(() => ({
     rowId: (r: RoleRow) => r.id,
-    toolbar: false, groupPanel: false, statusBar: false, floatingFilters: false,
+    toolbar: false, groupPanel: false, statusBar: false,
     selection: 'single', rowClickSelection: true, readOnly: !isAdmin,
     emptyMessage: isAdmin ? 'No custom roles yet. Add one above.' : 'This company has no custom roles',
     columns: [
@@ -103,6 +103,7 @@ export function RolesPage() {
     columns: [
       { field: 'name', header: 'Role', width: 220 },
       { field: 'department', header: 'Department', width: 160 },
+      { field: 'description', header: 'Description', width: 320 },
       { field: 'people', header: 'People', type: 'number', width: 90 },
     ],
   }), []);
@@ -156,7 +157,7 @@ export function RolesPage() {
         {/* The side panel is always there for admins, so selecting a row doesn't resize the
             grid mid double-click (which would stop the cell from opening for editing). */}
         <div className={`grid grid-cols-1 gap-4 ${isAdmin ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
-          <LatticeGrid options={customOptions} rows={custom} height={Math.min(60 + custom.length * 34, 360)}
+          <LatticeGrid options={customOptions} rows={custom} height={Math.min(100 + custom.length * 34, 400)}
             on={{
               cellValueChanged: saveEdit,
               selectionChanged: (rows: RoleRow[]) => setSelectedId(rows[0]?.id ?? null),
