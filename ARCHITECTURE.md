@@ -29,9 +29,12 @@ day to day.
 - **Views:** a "Show" menu switches between the sub-task tree and a flat list grouped
   by person, category, status, priority, due date or tags (more columns can be dragged
   into the grouping bar). The choice is remembered on the device.
-- **Editing in the grid:** person, category, status, priority and time cells look like
-  dropdowns and open their list with one click; double-click a due date to change it.
-- **The task panel** (select a task): title, description, due date with a time of day
+- **Editing in the grid:** every task field. Person, category, status, priority, time
+  and "Sub-task of" cells look like dropdowns and open their list with one click.
+  Double-click the task name, due date, description or tags to type a change (tags are
+  comma-separated, and new names become company tags).
+- **The task panel** (select a task): title, description, status, priority, person
+  assigned, due date with a time of day
   (Any time, Morning, Afternoon, Evening) or an exact time, category, tags, notes,
   the list of sub-tasks (tick to mark done, click to open), adding a sub-task, moving
   the task under another one, and deleting it with its sub-tasks.
@@ -190,6 +193,16 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   under a stable id such as `project.tasks`. Use `level="h4"` inside panels. The page
   heading itself (h1 and the actions beside it) is never collapsible. New sections
   must follow this.
+- **Every field is editable in both the table and the form (standard).** If someone
+  may change a field, they can change it in the table (in place) and in the page's
+  form or side panel. Pick-list fields use a `select` editor shown as a dropdown
+  (`gridDropdown`), which the `LatticeGrid` wrapper opens on one click and saves on
+  pick. Free text uses the text or `textarea` editor. Lists of names (roles, tags) are
+  typed comma-separated in the table and ticked or picked in the panel. A row that is
+  also a link gets a separate Open link column when its name is editable. Fields that
+  belong to someone else's record, such as a person's name, email and phone (their own
+  profile), stay read-only there. Panels that sit beside an editable grid keep their
+  space so a double-click doesn't resize the grid mid-click.
 
 ## Repository layout
 

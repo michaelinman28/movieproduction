@@ -487,6 +487,9 @@
       this._dragCol = { special: 'drag', id: '__drag', header: '', width: 34, minWidth: 34, flex: 0, pinned: 'left', resizable: false, sortable: false, filterType: null, def: {} };
       this._selCol = { special: 'sel', id: '__sel', header: '', width: 44, minWidth: 44, flex: 0, pinned: 'left', resizable: false, sortable: false, filterType: null, def: {} };
       this._groupCol = { special: 'group', id: '__group', header: this.o.treeData ? this.o.treeColumnHeader : this.o.groupColumnHeader, width: this.o.groupColumnWidth, minWidth: 100, flex: 0, pinned: 'left', resizable: true, sortable: true, filterType: null, def: {} };
+      // movieproduction patch: with treeData, `treeColumnField` makes the tree column
+      // editable as that field of each row (e.g. a task's title).
+      if (this.o.treeData && this.o.treeColumnField) { this._groupCol.field = this.o.treeColumnField; this._groupCol.def = { editable: true }; }
 
       this._initColumns(this.o.columns);
       this._initialState = this.getState();
@@ -659,7 +662,8 @@
       return s;
     }
     _isEditable(col, e) {
-      if (this.o.readOnly || !e || !col || col.special || col.generated || !col.def) return false;
+      const treeEdit = col && col.special === 'group' && this.o.treeData && this.o.treeColumnField; // movieproduction patch
+      if (this.o.readOnly || !e || !col || (col.special && !treeEdit) || col.generated || !col.def) return false;
       const n = e.node;
       if (!n.data) return false;
       if (e.kind !== 'leaf' && !(n.tree && !col.agg)) return false;

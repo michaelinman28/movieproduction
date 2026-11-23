@@ -83,8 +83,8 @@ confirmation emails link back to the app.
 
 | Page | Path | What it shows |
 |---|---|---|
-| Companies | `/` | Your companies; create a new one |
-| Company | `/companies/:id` | Projects and people. Admins create projects and add people by email |
+| Companies | `/` | Your companies; create a new one. Admins edit the name and description in the table |
+| Company | `/companies/:id` | Projects and people. Admins create projects, add people by email, and edit both tables in place |
 | Roles | `/companies/:id/roles` | Standard roles and the company's custom roles |
 | Task categories and tags | `/companies/:id/task-settings` | The company's category list (admins add, rename, reorder, delete) and its tags |
 | Project | `/projects/:id` | Details, the team, and the task tree with its side panel |

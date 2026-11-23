@@ -5,7 +5,7 @@ import { Section } from '../components/Section';
 import { RolePicker } from '../components/RolePicker';
 import { TaskTree } from '../components/TaskTree';
 import { api, type CompanyMember, type ProjectDetail, type ProjectMember } from '../lib/api';
-import { PROJECT_STATUSES, displayName, errorText, roleNames, statusLabel } from '../lib/format';
+import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, statusLabel } from '../lib/format';
 import type { ProjectStatus, Role } from '../lib/database.types';
 import type { Run } from './CompanyPage';
 
@@ -100,16 +100,31 @@ export function ProjectPage() {
   const teamOptions = useMemo(() => ({
     rowId: (r: TeamRow) => r.id,
     toolbar: false, groupPanel: false, statusBar: false,
-    selection: 'single', rowClickSelection: true, readOnly: true,
+    selection: 'single', rowClickSelection: true, readOnly: !isAdmin,
     emptyMessage: 'Nobody is assigned yet',
+    // Name, email and phone belong to each person's own profile.
     columns: [
       { field: 'name', header: 'Name', width: 200 },
-      { field: 'roles', header: 'Project roles', width: 280 },
+      {
+        field: 'roles', header: 'Project roles', width: 280, editable: true,
+        tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
+      },
       { field: 'email', header: 'Email', width: 220 },
       { field: 'phone', header: 'Phone', width: 140 },
       { field: 'joined', header: 'Assigned', type: 'date', width: 120 },
     ],
-  }), []);
+  }), [isAdmin]);
+
+  async function saveTeamCell(e: { data: TeamRow; column: string; newValue: unknown }) {
+    if (e.column !== 'roles') { await load(); return; }
+    const { ids, unknown } = roleIdsFor(String(e.newValue ?? ''), roles);
+    if (unknown.length) {
+      setError(`There's no role called ${unknown.join(', ')}. Select the person to pick roles from the list.`);
+      await load();
+      return;
+    }
+    await run(() => api.setTeamRoles(projectId, e.data.id, ids));
+  }
 
   const selected = team.find((t) => t.user_id === selectedId) ?? null;
 
@@ -177,12 +192,14 @@ export function ProjectPage() {
             </p>
           )
         )}
-        <div className={`grid grid-cols-1 gap-4 ${selected ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
+        {/* Admins edit cells in place, so the panel's space stays put: opening it mid double-click
+            would resize the grid and stop the cell from opening. */}
+        <div className={`grid grid-cols-1 gap-4 ${selected || isAdmin ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
           <LatticeGrid
             options={teamOptions}
             rows={teamRows}
             height={Math.min(80 + teamRows.length * 34, 420)}
-            on={{ selectionChanged: (rows: TeamRow[]) => setSelectedId(rows[0]?.id ?? null) }}
+            on={{ selectionChanged: (rows: TeamRow[]) => setSelectedId(rows[0]?.id ?? null), cellValueChanged: saveTeamCell }}
           />
           {selected && (
             <TeamPanel
@@ -195,6 +212,7 @@ export function ProjectPage() {
               onRemoved={() => setSelectedId(null)}
             />
           )}
+          {!selected && isAdmin && <aside className="card hidden lg:flex"><p className="hint">Select a person to see their details and pick their roles from the list.</p></aside>}
         </div>
         {!selected && teamRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and set their project roles' : ''}.</p>}
       </Section>

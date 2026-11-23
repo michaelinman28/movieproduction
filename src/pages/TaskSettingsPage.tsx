@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { RenameForm } from '../components/RenameForm';
 import { LatticeGrid } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { api, type Company, type TaskCategory, type TaskTag } from '../lib/api';
@@ -126,7 +127,7 @@ export function TaskSettingsPage() {
         <Section id="settings.categories" title="Categories" summary={categories.length} bodyClassName="flex flex-col gap-2">
           <p className="hint">
             {isAdmin
-              ? 'Double-click a name to rename it. Drag the handle on the left to change the order people see.'
+              ? 'Double-click a name to rename it, or select it to edit it below. Drag the handle on the left to change the order people see.'
               : 'Only admins can change the categories.'}
           </p>
           {isAdmin && (
@@ -144,9 +145,11 @@ export function TaskSettingsPage() {
               selectionChanged: (rows: LabelRow[]) => setSelCat(rows[0]?.id ?? null),
             }} />
           {isAdmin && selectedCat && (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="card gap-2">
               <span className="hint">{selectedCat.name}: used by {plural(selectedCat.tasks)}.</span>
-              <button className="btn btn-danger sm:ml-auto" onClick={() => deleteCategory(selectedCat)}>Delete category</button>
+              <RenameForm key={selectedCat.id} label="Category name" value={selectedCat.name} maxLength={60}
+                onSave={(name) => run(() => api.updateTaskCategory(selectedCat.id, { name }), `Renamed to ${name}.`)} />
+              <button className="btn btn-danger sm:self-start" onClick={() => deleteCategory(selectedCat)}>Delete category</button>
             </div>
           )}
         </Section>
@@ -154,7 +157,7 @@ export function TaskSettingsPage() {
         <Section id="settings.tags" title="Tags" summary={tags.length} bodyClassName="flex flex-col gap-2">
           <p className="hint">
             Anyone in the company can add tags while editing a task.
-            {isAdmin ? ' Double-click a tag to rename it, or select it to delete it.' : ''}
+            {isAdmin ? ' Double-click a tag to rename it, or select it to rename or delete it below.' : ''}
           </p>
           <form className="form-row" onSubmit={addTag}>
             <input className="field" placeholder="New tag, e.g. night shoot" value={newTag} maxLength={40}
@@ -168,9 +171,11 @@ export function TaskSettingsPage() {
               selectionChanged: (rows: LabelRow[]) => setSelTag(rows[0]?.id ?? null),
             }} />
           {isAdmin && selectedTag && (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="card gap-2">
               <span className="hint">{selectedTag.name}: used by {plural(selectedTag.tasks)}.</span>
-              <button className="btn btn-danger sm:ml-auto" onClick={() => deleteTag(selectedTag)}>Delete tag</button>
+              <RenameForm key={selectedTag.id} label="Tag name" value={selectedTag.name} maxLength={40}
+                onSave={(name) => run(() => api.updateTaskTag(selectedTag.id, name), `Renamed to ${name}.`)} />
+              <button className="btn btn-danger sm:self-start" onClick={() => deleteTag(selectedTag)}>Delete tag</button>
             </div>
           )}
         </Section>

@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { LatticeGrid, gridLink } from '../components/LatticeGrid';
+import { LatticeGrid, gridDropdown, gridEsc, gridLink } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { RolePicker } from '../components/RolePicker';
 import { useAuth } from '../lib/auth';
 import { api, type Company, type CompanyMember, type Project } from '../lib/api';
-import { displayName, errorText, roleNames, statusLabel } from '../lib/format';
+import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, statusLabel, statusValue } from '../lib/format';
 import type { Role } from '../lib/database.types';
 
 interface PersonRow {
   id: string; name: string; email: string; phone: string; title: string; roles: string; admin: boolean;
 }
-interface ProjectRow { id: string; name: string; status: string; start_date: string; end_date: string; logline: string }
+interface ProjectRow { id: string; name: string; status: string; start_date: string; end_date: string; logline: string; description: string }
 
 export type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
 
@@ -89,20 +89,42 @@ export function CompanyPage() {
   }
   const projectRows = useMemo<ProjectRow[]>(() => projects.map((p) => ({
     id: p.id, name: p.name, status: statusLabel(p.status), logline: p.logline ?? '',
-    start_date: p.start_date ?? '', end_date: p.end_date ?? '',
+    start_date: p.start_date ?? '', end_date: p.end_date ?? '', description: p.description ?? '',
   })), [projects]);
   const projectOptions = useMemo(() => ({
     rowId: (r: ProjectRow) => r.id,
-    toolbar: false, groupPanel: false, statusBar: false, readOnly: true,
+    toolbar: false, groupPanel: false, statusBar: false, readOnly: !isAdmin,
     emptyMessage: 'No projects yet',
+    // Admins edit every field in place, so the name can't double as the link; Open is the link.
     columns: [
-      { field: 'name', header: 'Project', width: 240, render: ({ data }: { data: ProjectRow }) => gridLink(data.name, `/projects/${data.id}`) },
-      { field: 'status', header: 'Status', width: 150 },
-      { field: 'start_date', header: 'Start', type: 'date', width: 120 },
-      { field: 'end_date', header: 'End', type: 'date', width: 120 },
-      { field: 'logline', header: 'Logline', width: 380 },
+      ...(isAdmin ? [
+        { field: 'open', header: '', width: 80, sortable: false, filter: false, render: ({ data }: { data: ProjectRow }) => gridLink('Open', `/projects/${data.id}`) },
+        { field: 'name', header: 'Project', width: 220, editable: true },
+      ] : [
+        { field: 'name', header: 'Project', width: 240, render: ({ data }: { data: ProjectRow }) => gridLink(data.name, `/projects/${data.id}`) },
+      ]),
+      {
+        field: 'status', header: 'Status', width: 160, editable: true, editor: 'select',
+        editorOptions: PROJECT_STATUSES.map((x) => x.label),
+        render: ({ value }: { value: string }) => (isAdmin ? gridDropdown(gridEsc(value)) : gridEsc(value)),
+      },
+      { field: 'start_date', header: 'Start', type: 'date', width: 120, editable: true },
+      { field: 'end_date', header: 'End', type: 'date', width: 120, editable: true },
+      { field: 'logline', header: 'Logline', width: 320, editable: true, editor: 'textarea' },
+      { field: 'description', header: 'Description', width: 320, editable: true, editor: 'textarea' },
     ],
-  }), []);
+  }), [isAdmin]);
+
+  async function saveProjectCell(e: { data: ProjectRow; column: string; newValue: unknown }) {
+    const v = e.newValue == null ? '' : String(e.newValue).trim();
+    const b = e.column === 'name' ? (v ? { name: v } : null)
+      : e.column === 'status' ? (statusValue(v) ? { status: statusValue(v) } : null)
+      : e.column === 'start_date' || e.column === 'end_date' || e.column === 'logline' || e.column === 'description'
+        ? { [e.column]: v || null }
+      : null;
+    if (!b) { await load(); return; }
+    await run(() => api.updateProject(e.data.id, b));
+  }
 
   // ---- People --------------------------------------------------------------
   const [newPerson, setNewPerson] = useState({ email: '', title: '', admin: false });
@@ -129,16 +151,38 @@ export function CompanyPage() {
   const peopleOptions = useMemo(() => ({
     rowId: (r: PersonRow) => r.id,
     toolbar: false, groupPanel: false, statusBar: false,
-    selection: 'single', rowClickSelection: true, readOnly: true,
+    selection: 'single', rowClickSelection: true, readOnly: !isAdmin,
+    // Name, email and phone belong to each person's own profile, so only they change them.
     columns: [
       { field: 'name', header: 'Name', width: 200 },
-      { field: 'title', header: 'Title', width: 170 },
-      { field: 'roles', header: 'Company roles', width: 240 },
+      { field: 'title', header: 'Title', width: 170, editable: true },
+      {
+        field: 'roles', header: 'Company roles', width: 240, editable: true,
+        tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
+      },
       { field: 'email', header: 'Email', width: 220 },
       { field: 'phone', header: 'Phone', width: 140 },
-      { field: 'admin', header: 'Admin', type: 'boolean', width: 90 },
+      { field: 'admin', header: 'Admin', type: 'boolean', width: 90, editable: true },
     ],
-  }), []);
+  }), [isAdmin]);
+
+  async function savePersonCell(e: { data: PersonRow; column: string; newValue: unknown }) {
+    const userId = e.data.id;
+    if (e.column === 'title') {
+      const v = String(e.newValue ?? '').trim();
+      await run(() => api.updateMember(companyId, userId, { title: v || null }));
+    } else if (e.column === 'admin') {
+      await run(() => api.updateMember(companyId, userId, { is_admin: Boolean(e.newValue) }));
+    } else if (e.column === 'roles') {
+      const { ids, unknown } = roleIdsFor(String(e.newValue ?? ''), roles);
+      if (unknown.length) {
+        setError(`There's no role called ${unknown.join(', ')}. Add it on the roles page first, or select the person to pick from the list.`);
+        await load();
+        return;
+      }
+      await run(() => api.setMemberRoles(companyId, userId, ids));
+    } else await load();
+  }
 
   const selected = members.find((m) => m.user_id === selectedId) ?? null;
 
@@ -183,7 +227,9 @@ export function CompanyPage() {
             <button type="submit" className="btn">Create project</button>
           </form>
         )}
-        <LatticeGrid options={projectOptions} rows={projectRows} height={Math.min(80 + projectRows.length * 34, 320)} />
+        {isAdmin && projectRows.length > 0 && <p className="hint mb-2">Double-click a cell to change it, or click a status to pick one.</p>}
+        <LatticeGrid options={projectOptions} rows={projectRows} height={Math.min(80 + projectRows.length * 34, 320)}
+          on={{ cellValueChanged: saveProjectCell }} />
         {!isAdmin && <p className="hint mt-2">You see the projects you're assigned to. Company admins see all of them.</p>}
       </Section>
 
@@ -203,12 +249,14 @@ export function CompanyPage() {
           </form>
         )}
         {isAdmin && <p className="hint mt-2">People need to create their own account first. Then add them here with the email they signed up with.</p>}
-        <div className={`grid grid-cols-1 gap-4 ${selected ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
+        {/* Admins edit cells in place, so the panel's space stays put: opening it mid double-click
+            would resize the grid and stop the cell from opening. */}
+        <div className={`grid grid-cols-1 gap-4 ${selected || isAdmin ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
           <LatticeGrid
             options={peopleOptions}
             rows={peopleRows}
             height={Math.min(80 + peopleRows.length * 34, 420)}
-            on={{ selectionChanged: (rows: PersonRow[]) => setSelectedId(rows[0]?.id ?? null) }}
+            on={{ selectionChanged: (rows: PersonRow[]) => setSelectedId(rows[0]?.id ?? null), cellValueChanged: savePersonCell }}
           />
           {selected && (
             <MemberPanel
@@ -222,8 +270,9 @@ export function CompanyPage() {
               onRemoved={() => { setSelectedId(null); if (selected.user_id === me) navigate('/'); }}
             />
           )}
+          {!selected && isAdmin && <aside className="card hidden lg:flex"><p className="hint">Select a person to see their details and pick their roles from the list.</p></aside>}
         </div>
-        {!selected && peopleRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and change their roles' : ''}.</p>}
+        {!selected && peopleRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and change their roles, or double-click a title or roles cell to type a change' : ''}.</p>}
       </Section>
     </section>
   );

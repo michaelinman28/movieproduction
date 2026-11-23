@@ -64,9 +64,34 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
     };
     container.addEventListener('change', onChange);
 
+    // A click on a pick-list cell (editor: 'select') opens its list straight away;
+    // keyboard movement only focuses the cell. `visible`, `display`, `_isEditable`,
+    // `editing` and `startEdit` are lattice-grid internals outside its type declarations.
+    let clickedAt = 0;
+    const onPointer = () => { clickedAt = Date.now(); };
+    container.addEventListener('pointerdown', onPointer, true);
+    grid.on('rangeChanged', (r: { r1: number; r2: number; c1: number; c2: number }) => {
+      const g = grid as unknown as {
+        display?: unknown[]; visible?: { def?: { editor?: string } }[];
+        _isEditable?: (col: unknown, entry: unknown) => boolean;
+        startEdit?: (r: number, c: number) => boolean; editing?: { input?: HTMLSelectElement } | null;
+      };
+      const col = g.visible?.[r.c1];
+      if (r.r1 !== r.r2 || r.c1 !== r.c2 || col?.def?.editor !== 'select' || Date.now() - clickedAt > 400) return;
+      if (!g._isEditable?.(col, g.display?.[r.r1])) return;
+      clickedAt = 0;
+      // Wait for the grid to finish handling the click, which redraws the row.
+      setTimeout(() => {
+        if (g.editing || !g.startEdit?.(r.r1, r.c1)) return;
+        const input = (g as { editing?: { input?: HTMLSelectElement } | null }).editing?.input;
+        try { (input as HTMLSelectElement & { showPicker?: () => void })?.showPicker?.(); } catch { /* not supported; the list is focused */ }
+      }, 0);
+    });
+
     onReady?.(grid);
     return () => {
       container.removeEventListener('change', onChange);
+      container.removeEventListener('pointerdown', onPointer, true);
       grid.destroy();
       gridRef.current = null;
     };
@@ -112,3 +137,10 @@ export function gridLink(text: string, to: string): HTMLAnchorElement {
   a.className = 'grid-link';
   return a;
 }
+
+/** Escapes text for a cell render that returns HTML. */
+export const gridEsc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+/** Cell HTML for a pick-list column: the value with a caret, so it reads as a dropdown. */
+export const gridDropdown = (html: string) =>
+  `<span class="cell-dd"><span class="cell-dd-value">${html}</span><span class="cell-dd-caret">▾</span></span>`;
