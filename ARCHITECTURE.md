@@ -207,6 +207,11 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   row, following a link or closing the tab with unsaved changes asks first
   (`src/lib/unsaved.ts`, `UnsavedGuard`). Editing a table cell saves when the edit
   ends. One-off actions (add a sub-task or note, tick a sub-task done) happen at once.
+- **Dropdown filters for fixed values (standard).** In every table, a column whose
+  values come from a fixed set (person assigned, status, priority, category, location,
+  department, admin, roles, tags…) filters with a dropdown of tick boxes and counts.
+  List columns (roles, tags) list each name on its own (`filterSplit`, a local
+  lattice-grid option). Free text, dates and numbers keep the typed filter.
 - **Every field is editable in both the table and the form (standard).** If someone
   may change a field, they can change it in the table (in place) and in the page's
   form or side panel. Pick-list fields use a `select` editor shown as a dropdown

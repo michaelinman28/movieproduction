@@ -45,7 +45,7 @@ export function Home() {
     columns: [
       { field: 'open', header: '', width: 80, sortable: false, filter: false, render: ({ data }: { data: CompanyRow }) => gridLink('Open', `/companies/${data.id}`) },
       { field: 'name', header: 'Company', width: 240, editable: isAdminRow },
-      { field: 'role', header: 'You are', width: 110 },
+      { field: 'role', header: 'You are', width: 110, filter: 'set' },
       { field: 'description', header: 'Description', width: 360, editable: isAdminRow, editor: 'textarea' },
       { field: 'created_at', header: 'Created', type: 'date', width: 130 },
     ],

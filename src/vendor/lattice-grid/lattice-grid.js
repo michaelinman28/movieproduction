@@ -637,6 +637,13 @@
       const aggCell = e.kind === 'total' || n.group || (n.tree && n.children.length > 0 && !!col.agg);
       return this._fmt(col, v, aggCell ? null : n.data, aggCell);
     }
+    /** movieproduction patch: the items of a list value when the column sets `filterSplit`, else null. */
+    _splitParts(col, v) {
+      const sep = col.def && col.def.filterSplit;
+      if (!sep) return null;
+      const parts = v == null ? [] : String(v).split(sep).map((x) => x.trim()).filter(Boolean);
+      return parts.length ? parts : [''];
+    }
     _setKey(col, v) {
       if (v == null || v === '') return '(Blanks)';
       if (typeof v === 'boolean') return v ? 'true' : 'false';
@@ -831,7 +838,8 @@
     _matchFilter(col, m, v) {
       if (m.type === 'set') {
         if (!m._set) Object.defineProperty(m, '_set', { value: new Set(m.values), enumerable: false });
-        return m._set.has(this._setKey(col, v));
+        const parts = this._splitParts(col, v); // movieproduction patch: a list matches if any item does
+        return parts ? parts.some((p) => m._set.has(this._setKey(col, p))) : m._set.has(this._setKey(col, v));
       }
       if (m.type === 'text') {
         const s = v == null ? '' : String(v).toLowerCase();
@@ -2806,10 +2814,14 @@
       const map = new Map();
       for (const n of this.nodes) {
         const v = this._val(col, n.data);
-        const k = this._setKey(col, v);
-        const x = map.get(k);
-        if (x) x.count++;
-        else map.set(k, { key: k, raw: v, label: k === '(Blanks)' ? '(Blanks)' : this._fmt(col, v, n.data), count: 1 });
+        // movieproduction patch: `filterSplit` lists each item of a list value (e.g. "A, B") on its own.
+        const parts = this._splitParts(col, v);
+        for (const p of parts || [v]) {
+          const k = this._setKey(col, p);
+          const x = map.get(k);
+          if (x) x.count++;
+          else map.set(k, { key: k, raw: p, label: k === '(Blanks)' ? '(Blanks)' : parts ? String(p) : this._fmt(col, p, n.data), count: 1 });
+        }
       }
       u = Array.from(map.values()).sort((a, b) => compareValues(a.raw, b.raw));
       this._uvCache.set(col.id, u);

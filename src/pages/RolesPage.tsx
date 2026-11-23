@@ -116,7 +116,7 @@ export function RolesPage() {
     emptyMessage: isAdmin ? 'No custom roles yet. Add one above.' : 'This company has no custom roles',
     columns: [
       { field: 'name', header: 'Role', width: 220, editable: true },
-      { field: 'department', header: 'Department', width: 160, editable: true },
+      { field: 'department', header: 'Department', width: 160, editable: true, filter: 'set' },
       { field: 'description', header: 'Description', width: 320, editable: true, editor: 'textarea' },
       { field: 'people', header: 'People', type: 'number', width: 90 },
     ],
@@ -127,7 +127,7 @@ export function RolesPage() {
     toolbar: false, groupPanel: false, statusBar: false, readOnly: true,
     columns: [
       { field: 'name', header: 'Role', width: 220 },
-      { field: 'department', header: 'Department', width: 160 },
+      { field: 'department', header: 'Department', width: 160, filter: 'set' },
       { field: 'description', header: 'Description', width: 320 },
       { field: 'people', header: 'People', type: 'number', width: 90 },
     ],
