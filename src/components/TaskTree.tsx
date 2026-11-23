@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { LatticeGrid } from './LatticeGrid';
+import { Section } from './Section';
 import { TagPicker } from './TagPicker';
 import { TaskNotes } from './TaskNotes';
 import {
@@ -13,6 +14,8 @@ import type { LatticeGridInstance } from '../vendor/lattice-grid/lattice-grid';
 interface TaskRow {
   id: string;
   path: string[];
+  title: string;
+  parent: string;
   status: string;
   priority: string;
   assignee: string;
@@ -24,6 +27,24 @@ interface TaskRow {
 }
 
 const UNASSIGNED = 'Unassigned';
+
+// How the task grid is laid out: the sub-task tree, or a flat list grouped by a column.
+const VIEWS = [
+  { value: '', label: 'Sub-task tree' },
+  { value: 'assignee', label: 'Grouped by person' },
+  { value: 'category', label: 'Grouped by category' },
+  { value: 'status', label: 'Grouped by status' },
+  { value: 'priority', label: 'Grouped by priority' },
+  { value: 'due', label: 'Grouped by due date' },
+  { value: 'tags', label: 'Grouped by tags' },
+] as const;
+const VIEW_KEY = 'mp-task-view';
+const readView = () => { try { return localStorage.getItem(VIEW_KEY) ?? ''; } catch { return ''; } };
+
+// Columns edited by picking from a list. They show a caret and open with one click.
+const PICK_COLUMNS = new Set(['assignee', 'category', 'status', 'priority', 'when']);
+const dropdown = (html: string) => `<span class="cell-dd"><span class="cell-dd-value">${html}</span><span class="cell-dd-caret">▾</span></span>`;
+const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const NO_CATEGORY = 'No category';
 const ANY_TIME = 'Any time';
 // Choices for the grid's Time cell: a part of the day, or a half hour.
@@ -114,7 +135,8 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
         const path = [...parentPath, t.title + ZWSP.repeat(n)];
         const sub = kids.get(t.id) ?? [];
         out.push({
-          id: t.id, path,
+          id: t.id, path, title: t.title,
+          parent: t.parent_id ? byId.get(t.parent_id)?.title ?? '' : '',
           status: labelOf(TASK_STATUSES, t.status),
           priority: labelOf(TASK_PRIORITIES, t.priority),
           assignee: t.assignee_id ? nameOf.get(t.assignee_id) ?? 'Left the project' : UNASSIGNED,
@@ -129,58 +151,83 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
     };
     walk('', []);
     return out;
-  }, [kids, nameOf, categoryName, tagName]);
+  }, [kids, byId, nameOf, categoryName, tagName]);
 
-  const options = useMemo(() => ({
-    rowId: (r: TaskRow) => r.id,
-    treeData: true,
-    getTreePath: (r: TaskRow) => r.path,
-    treeColumnHeader: 'Task',
-    // Keep the pinned task column narrow enough on phones to leave room for the others.
-    groupColumnWidth: window.innerWidth < 640 ? 190 : 260,
-    groupDefaultExpanded: -1,
-    toolbar: { quickFilter: true, expandCollapse: true },
-    groupPanel: false, statusBar: false,
-    emptyMessage: 'No tasks yet. Add one above.',
-    columns: [
+  const [view, setView] = useState<string>(readView);
+  function changeView(v: string) {
+    setView(v);
+    try { localStorage.setItem(VIEW_KEY, v); } catch { /* storage unavailable */ }
+  }
+
+  const options = useMemo(() => {
+    const overdueText = ({ value, data }: { value: string; data: TaskRow }) => {
+      const t = byIdRef.current.get(data.id);
+      return value ? (t && isOverdue(t) ? `<span class="task-overdue">${value}</span>` : value) : '';
+    };
+    const columns = [
+      ...(view ? [
+        // A flat list needs the task's own name, and its parent for sub-tasks.
+        { field: 'title', header: 'Task', width: window.innerWidth < 640 ? 170 : 240, pinned: 'left' },
+        { field: 'parent', header: 'Sub-task of', width: 160 },
+      ] : []),
       {
-        field: 'assignee', header: 'Assigned to', width: 160, editable: true, editor: 'select',
+        field: 'assignee', header: 'Assigned to', width: 170, editable: true, editor: 'select',
         editorOptions: [UNASSIGNED, ...people.map((p) => p.name)],
+        render: ({ value }: { value: string }) => dropdown(esc(value)),
       },
       {
-        field: 'category', header: 'Category', width: 140, editable: true, editor: 'select',
+        field: 'category', header: 'Category', width: 150, editable: true, editor: 'select',
         editorOptions: [NO_CATEGORY, ...categories.map((c) => c.name)],
+        render: ({ value }: { value: string }) => dropdown(value ? esc(value) : '<span class="text-muted">None</span>'),
       },
       {
-        field: 'status', header: 'Status', width: 120, editable: true, editor: 'select',
+        field: 'status', header: 'Status', width: 130, editable: true, editor: 'select',
         editorOptions: TASK_STATUSES.map((s) => s.label),
-        render: ({ value }: { value: string }) => pill(value, valueOf(TASK_STATUSES, value) ?? 'todo'),
+        render: ({ value }: { value: string }) => dropdown(pill(value, valueOf(TASK_STATUSES, value) ?? 'todo')),
       },
       {
-        field: 'priority', header: 'Priority', width: 100, editable: true, editor: 'select',
+        field: 'priority', header: 'Priority', width: 115, editable: true, editor: 'select',
         editorOptions: TASK_PRIORITIES.map((s) => s.label),
-        render: ({ value }: { value: string }) => pill(value, valueOf(TASK_PRIORITIES, value) ?? 'medium'),
+        render: ({ value }: { value: string }) => dropdown(pill(value, valueOf(TASK_PRIORITIES, value) ?? 'medium')),
       },
-      {
-        field: 'due', header: 'Due', type: 'date', width: 120, editable: true,
-        render: ({ value, data }: { value: string; data: TaskRow }) => {
-          const t = byIdRef.current.get(data.id);
-          return value ? (t && isOverdue(t) ? `<span class="task-overdue">${value}</span>` : value) : '';
-        },
-      },
+      { field: 'due', header: 'Due', type: 'date', width: 120, editable: true, render: overdueText },
       {
         // A part of the day or a time on the due date. More exact times are set in the task panel.
-        field: 'when', header: 'Time', width: 110, editor: 'select', editorOptions: WHEN_OPTIONS,
+        field: 'when', header: 'Time', width: 120, editor: 'select', editorOptions: WHEN_OPTIONS,
         editable: (d: TaskRow) => !!d.due,
-        render: ({ value, data }: { value: string; data: TaskRow }) => {
-          const t = byIdRef.current.get(data.id);
-          return value ? (t && isOverdue(t) ? `<span class="task-overdue">${value}</span>` : value) : '';
-        },
+        render: (a: { value: string; data: TaskRow }) => (a.data.due ? dropdown(overdueText(a)) : ''),
       },
       { field: 'tags', header: 'Tags', width: 200 },
       { field: 'subtasks', header: 'Sub-tasks', width: 120 },
-    ],
-  }), [people, categories]);
+    ];
+    const common = {
+      rowId: (r: TaskRow) => r.id,
+      groupDefaultExpanded: -1,
+      toolbar: { quickFilter: true, expandCollapse: true },
+      statusBar: false,
+      emptyMessage: 'No tasks yet. Add one above.',
+      columns,
+    };
+    return view
+      ? {
+        ...common,
+        // Grouped list: one group per value of the chosen column. More columns can be
+        // dragged into the bar above the grid to group further.
+        groupBy: [view],
+        groupPanel: true,
+        groupColumnHeader: 'Group',
+        groupColumnWidth: window.innerWidth < 640 ? 160 : 200,
+      }
+      : {
+        ...common,
+        treeData: true,
+        getTreePath: (r: TaskRow) => r.path,
+        treeColumnHeader: 'Task',
+        // Keep the pinned task column narrow enough on phones to leave room for the others.
+        groupColumnWidth: window.innerWidth < 640 ? 190 : 260,
+        groupPanel: false,
+      };
+  }, [people, categories, view]);
 
   // The due-date renderer reads the latest tasks without rebuilding the grid.
   const byIdRef = useRef(byId);
@@ -202,11 +249,31 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
   }
 
   // Selecting follows the focused cell, so parent tasks (tree groups) can be picked too.
-  function onRange(r: { r1: number }) {
-    // `display` is lattice-grid's list of shown rows; it isn't in the type declarations.
-    const entry = (gridRef.current as unknown as { display?: { node?: { data?: TaskRow } }[] })?.display?.[r.r1];
+  // A click (not keyboard movement) on a pick-list cell opens its list straight away.
+  const clickedAt = useRef(0);
+  function onRange(r: { r1: number; r2: number; c1: number; c2: number }) {
+    // `display`, `visible`, `_isEditable`, `editing` and `startEdit` are lattice-grid
+    // internals that aren't in its type declarations.
+    const g = gridRef.current as unknown as {
+      display?: { node?: { data?: TaskRow } }[]; visible?: { id: string }[];
+      _isEditable?: (col: unknown, entry: unknown) => boolean;
+      startEdit?: (r: number, c: number) => boolean; editing?: { input?: HTMLSelectElement } | null;
+    } | null;
+    const entry = g?.display?.[r.r1];
     const id: string | undefined = entry?.node?.data?.id;
     if (id) setSelectedId(id);
+    const col = g?.visible?.[r.c1];
+    const single = r.r1 === r.r2 && r.c1 === r.c2;
+    if (!g || !col || !single || !PICK_COLUMNS.has(col.id) || Date.now() - clickedAt.current > 400) return;
+    if (!g._isEditable?.(col, entry)) return;
+    clickedAt.current = 0;
+    // Wait for the grid to finish handling the click, which redraws the row.
+    setTimeout(() => {
+      if (g.editing || !g.startEdit?.(r.r1, r.c1)) return;
+      // startEdit has just set `editing`.
+      const input = (g as { editing?: { input?: HTMLSelectElement } | null }).editing?.input;
+      try { (input as HTMLSelectElement & { showPicker?: () => void })?.showPicker?.(); } catch { /* not supported; the list is focused */ }
+    }, 0);
   }
 
   async function addTask(e: FormEvent) {
@@ -216,16 +283,25 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
     if (await run(() => api.createTask(projectId, { title }), `Added "${title}".`)) setNewTitle('');
   }
 
+  // Group header rows take space too when the list is grouped.
+  const groupCount = view ? new Set(rows.map((r) => r[view as keyof TaskRow] as string)).size : 0;
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
   const done = tasks.filter((t) => t.status === 'done').length;
 
   return (
-    <div>
-      <h2>Tasks</h2>
-      <p className="hint mt-1">
-        {tasks.length ? `${done} of ${tasks.length} done. ` : ''}
-        Double-click (or tap twice) a person, category, status, priority, due date or time to change it. Select a task to edit its description, tags and notes, add sub-tasks, or move it.
+    <Section id="project.tasks" title="Tasks" summary={tasks.length ? `${done} of ${tasks.length} done` : undefined}>
+      <p className="hint">
+        Click a person, category, status, priority or time to pick from its list, or double-click a due date to change it.
+        Select a task to edit its description, tags and notes, add sub-tasks, or move it.
       </p>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <label className="label sm:flex-row sm:items-center sm:gap-2">Show
+          <select className="field sm:w-auto" value={view} onChange={(e) => changeView(e.target.value)} aria-label="How to show tasks">
+            {VIEWS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+          </select>
+        </label>
+        {view && <span className="hint">Drag more column headers into the bar above the grid to group further.</span>}
+      </div>
       <form className="form-row my-2" onSubmit={addTask}>
         <input className="field" placeholder="New task, e.g. Scout locations" value={newTitle} maxLength={200}
           onChange={(e) => setNewTitle(e.target.value)} required />
@@ -237,13 +313,15 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
           in the middle of a double-click. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {loaded ? (
+          <div onPointerDownCapture={() => { clickedAt.current = Date.now(); }}>
           <LatticeGrid
             options={options}
             rows={rows}
-            height={Math.min(160 + rows.length * 34, 600)}
+            height={Math.min(160 + (rows.length + groupCount) * 34 + (view ? 44 : 0), 640)}
             on={{ cellValueChanged: onCellChanged, rangeChanged: onRange }}
             onReady={(g) => { gridRef.current = g; }}
           />
+          </div>
         ) : <p className="text-muted">Loading tasks…</p>}
         {selected ? (
           <TaskPanel
@@ -267,7 +345,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
           </aside>
         )}
       </div>
-    </div>
+    </Section>
   );
 }
 
@@ -384,8 +462,8 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, 
 
       <TaskNotes taskId={task.id} canManage={canManage} />
 
-      <section className="flex flex-col gap-2" aria-label="Sub-tasks">
-        <h4>Sub-tasks{children.length ? ` (${children.filter((c) => c.status === 'done').length} of ${children.length} done)` : ''}</h4>
+      <Section id="task.subtasks" title="Sub-tasks" level="h4" bodyClassName="flex flex-col gap-2"
+        summary={children.length ? `${children.filter((c) => c.status === 'done').length} of ${children.length} done` : undefined}>
         {children.length > 0 && (
           <ul className="flex flex-col">
             {children.map((c) => (
@@ -401,7 +479,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, 
             ))}
           </ul>
         )}
-      </section>
+      </Section>
 
       <form className="flex flex-col gap-2" onSubmit={addSub}>
         <label className="label">Add a sub-task

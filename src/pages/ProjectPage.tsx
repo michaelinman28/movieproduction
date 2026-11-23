@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { LatticeGrid } from '../components/LatticeGrid';
+import { Section } from '../components/Section';
 import { RolePicker } from '../components/RolePicker';
 import { TaskTree } from '../components/TaskTree';
 import { api, type CompanyMember, type ProjectDetail, type ProjectMember } from '../lib/api';
@@ -159,8 +160,7 @@ export function ProjectPage() {
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 
-      <div>
-        <h2>Team</h2>
+      <Section id="project.team" title="Team" summary={`${team.length} ${team.length === 1 ? 'person' : 'people'}`}>
         {isAdmin && (
           available.length ? (
             <form className="form-row mb-2" onSubmit={assign}>
@@ -197,7 +197,7 @@ export function ProjectPage() {
           )}
         </div>
         {!selected && teamRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and set their project roles' : ''}.</p>}
-      </div>
+      </Section>
 
       <TaskTree projectId={projectId} companyId={project.company_id} team={team} canManage={isAdmin} />
 

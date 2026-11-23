@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { LatticeGrid } from '../components/LatticeGrid';
+import { Section } from '../components/Section';
 import { api, type Company, type RoleWithUsage } from '../lib/api';
 import { errorText } from '../lib/format';
 
@@ -126,8 +127,7 @@ export function RolesPage() {
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 
-      <div>
-        <h2>Custom roles</h2>
+      <Section id="roles.custom" title="Custom roles" summary={custom.length}>
         {isAdmin && (
           <form className="form-row mb-2" onSubmit={addRole}>
             <input className="field" placeholder="Role name, e.g. Drone Pilot" value={draft.name} maxLength={80}
@@ -179,12 +179,11 @@ export function RolesPage() {
         {isAdmin && custom.length > 0 && (
           <p className="hint mt-2">Double-click (or tap twice) a cell to rename a role or change its department or description. Select a role to delete it.</p>
         )}
-      </div>
+      </Section>
 
-      <div>
-        <h2>Standard roles</h2>
+      <Section id="roles.standard" title="Standard roles" summary={standard.length}>
         <LatticeGrid options={standardOptions} rows={standard} height={360} />
-      </div>
+      </Section>
     </section>
   );
 }

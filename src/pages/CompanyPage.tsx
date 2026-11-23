@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { LatticeGrid, gridLink } from '../components/LatticeGrid';
+import { Section } from '../components/Section';
 import { RolePicker } from '../components/RolePicker';
 import { useAuth } from '../lib/auth';
 import { api, type Company, type CompanyMember, type Project } from '../lib/api';
@@ -175,8 +176,7 @@ export function CompanyPage() {
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 
-      <div>
-        <h2>Projects</h2>
+      <Section id="company.projects" title="Projects" summary={projectRows.length}>
         {isAdmin && (
           <form className="form-row mb-2" onSubmit={createProject}>
             <input className="field" placeholder="New project name" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
@@ -185,10 +185,9 @@ export function CompanyPage() {
         )}
         <LatticeGrid options={projectOptions} rows={projectRows} height={Math.min(80 + projectRows.length * 34, 320)} />
         {!isAdmin && <p className="hint mt-2">You see the projects you're assigned to. Company admins see all of them.</p>}
-      </div>
+      </Section>
 
-      <div>
-        <h2>People</h2>
+      <Section id="company.people" title="People" summary={peopleRows.length}>
         {isAdmin && (
           <form className="form-row mb-2" onSubmit={addPerson}>
             <input className="field" type="email" placeholder="Their account email" value={newPerson.email}
@@ -225,7 +224,7 @@ export function CompanyPage() {
           )}
         </div>
         {!selected && peopleRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and change their roles' : ''}.</p>}
-      </div>
+      </Section>
     </section>
   );
 }
