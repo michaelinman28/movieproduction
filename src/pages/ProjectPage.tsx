@@ -2,27 +2,20 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { LatticeGrid } from '../components/LatticeGrid';
 import { RolePicker } from '../components/RolePicker';
-import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
-import { PROJECT_STATUSES, displayName, roleNames, sortRoles, statusLabel } from '../lib/format';
-import type { Company, CompanyMember, Profile, Project, ProjectMember, ProjectStatus, Role } from '../lib/database.types';
+import { api, type CompanyMember, type ProjectDetail, type ProjectMember } from '../lib/api';
+import { PROJECT_STATUSES, displayName, errorText, roleNames, statusLabel } from '../lib/format';
+import type { ProjectStatus, Role } from '../lib/database.types';
+import type { Run } from './CompanyPage';
 
 interface TeamRow { id: string; name: string; roles: string; email: string; phone: string; joined: string }
 
-type Run = (fn: () => PromiseLike<{ error: { message: string } | null }>, ok?: string) => Promise<boolean>;
-
 export function ProjectPage() {
   const { projectId = '' } = useParams();
-  const { session } = useAuth();
-  const me = session?.user.id;
   const navigate = useNavigate();
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [company, setCompany] = useState<Company | null>(null);
+  const [project, setProject] = useState<ProjectDetail | null>(null);
   const [companyMembers, setCompanyMembers] = useState<CompanyMember[]>([]);
   const [team, setTeam] = useState<ProjectMember[]>([]);
-  const [teamRoles, setTeamRoles] = useState<Map<string, Set<string>>>(new Map());
-  const [profiles, setProfiles] = useState<Map<string, Profile>>(new Map());
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,46 +23,27 @@ export function ProjectPage() {
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    const p = await supabase.from('projects').select('*').eq('id', projectId).maybeSingle();
-    if (p.error || !p.data) { setError(p.error?.message ?? null); setProject(null); setLoaded(true); return; }
-    const proj = p.data as Project;
-    const cid = proj.company_id;
-    const [c, cm, pm, pmr, r] = await Promise.all([
-      supabase.from('companies').select('*').eq('id', cid).maybeSingle(),
-      supabase.from('company_members').select('*').eq('company_id', cid),
-      supabase.from('project_members').select('*').eq('project_id', projectId),
-      supabase.from('project_member_roles').select('*').eq('project_id', projectId),
-      supabase.from('roles').select('*').or(`company_id.is.null,company_id.eq.${cid}`),
-    ]);
-    const err = c.error || cm.error || pm.error || pmr.error || r.error;
-    if (err) setError(err.message);
-    const cms = (cm.data ?? []) as CompanyMember[];
-    const ids = [...new Set([...cms.map((x) => x.user_id), ...(pm.data ?? []).map((x) => x.user_id)])];
-    const prof = ids.length ? await supabase.from('profiles').select('*').in('id', ids) : { data: [], error: null };
-    const byUser = new Map<string, Set<string>>();
-    for (const x of pmr.data ?? []) {
-      if (!byUser.has(x.user_id)) byUser.set(x.user_id, new Set());
-      byUser.get(x.user_id)!.add(x.role_id);
+    try {
+      const p = await api.project(projectId);
+      const [cm, t, r] = await Promise.all([api.members(p.company_id), api.team(projectId), api.roles(p.company_id)]);
+      setProject(p);
+      setCompanyMembers(cm);
+      setTeam(t);
+      setRoles(r);
+    } catch (e) {
+      setError(errorText(e));
     }
-    setProject(proj);
-    setCompany(c.data as Company | null);
-    setCompanyMembers(cms);
-    setTeam((pm.data ?? []) as ProjectMember[]);
-    setTeamRoles(byUser);
-    setProfiles(new Map(((prof.data ?? []) as Profile[]).map((x) => [x.id, x])));
-    setRoles(sortRoles((r.data ?? []) as Role[]));
     setLoaded(true);
   }, [projectId]);
 
   useEffect(() => { load(); }, [load]);
 
-  const isAdmin = companyMembers.some((m) => m.user_id === me && m.is_admin);
+  const isAdmin = Boolean(project?.can_manage);
 
   const run: Run = async (fn, ok) => {
     setError(null);
     setNotice(null);
-    const { error } = await fn();
-    if (error) { setError(error.message); return false; }
+    try { await fn(); } catch (e) { setError(errorText(e)); return false; }
     if (ok) setNotice(ok);
     await load();
     return true;
@@ -88,16 +62,15 @@ export function ProjectPage() {
   }
   async function saveDetails(e: FormEvent) {
     e.preventDefault();
-    const ok = await run(() => supabase.from('projects').update({
+    const ok = await run(() => api.updateProject(projectId, {
       name: draft.name.trim(), logline: draft.logline.trim() || null, description: draft.description.trim() || null,
       status: draft.status, start_date: draft.start_date || null, end_date: draft.end_date || null,
-    }).eq('id', projectId), 'Project saved.');
+    }), 'Project saved.');
     if (ok) setEditing(false);
   }
   async function deleteProject() {
     if (!project || !window.confirm(`Delete ${project.name}? Its tasks and journal are deleted too.`)) return;
-    const { error } = await supabase.from('projects').delete().eq('id', projectId);
-    if (error) setError(error.message); else navigate(`/companies/${project.company_id}`);
+    try { await api.deleteProject(projectId); navigate(`/companies/${project.company_id}`); } catch (e) { setError(errorText(e)); }
   }
 
   // ---- Team ----------------------------------------------------------------
@@ -105,26 +78,22 @@ export function ProjectPage() {
   const onTeam = new Set(team.map((t) => t.user_id));
   const available = companyMembers
     .filter((m) => !onTeam.has(m.user_id))
-    .map((m) => ({ id: m.user_id, name: displayName(profiles.get(m.user_id)) }))
+    .map((m) => ({ id: m.user_id, name: displayName(m.profile) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   async function assign(e: FormEvent) {
     e.preventDefault();
     if (!addUser) return;
-    const name = displayName(profiles.get(addUser));
-    if (await run(() => supabase.from('project_members').insert({ project_id: projectId, user_id: addUser }), `Added ${name} to the project. Pick their project roles on the right.`)) {
-      setSelectedId(addUser);
+    const name = available.find((a) => a.id === addUser)?.name ?? 'them';
+    if (await run(() => api.assign(projectId, addUser), `Added ${name} to the project. Select them below to pick their project roles.`)) {
       setAddUser('');
     }
   }
 
-  const teamRows = useMemo<TeamRow[]>(() => team.map((t) => {
-    const p = profiles.get(t.user_id);
-    return {
-      id: t.user_id, name: displayName(p), email: p?.email ?? '', phone: p?.phone ?? '',
-      roles: roleNames(teamRoles.get(t.user_id) ?? new Set(), roles), joined: t.joined_at.slice(0, 10),
-    };
-  }).sort((a, b) => a.name.localeCompare(b.name)), [team, profiles, teamRoles, roles]);
+  const teamRows = useMemo<TeamRow[]>(() => team.map((t) => ({
+    id: t.user_id, name: displayName(t.profile), email: t.profile.email ?? '', phone: t.profile.phone ?? '',
+    roles: roleNames(t.role_ids, roles), joined: t.joined_at.slice(0, 10),
+  })).sort((a, b) => a.name.localeCompare(b.name)), [team, roles]);
 
   const teamOptions = useMemo(() => ({
     rowId: (r: TeamRow) => r.id,
@@ -143,12 +112,12 @@ export function ProjectPage() {
   const selected = team.find((t) => t.user_id === selectedId) ?? null;
 
   if (!loaded) return <p className="muted">Loading…</p>;
-  if (!project) return <p>That project doesn't exist or you aren't assigned to it. <Link to="/">Back to companies</Link></p>;
+  if (!project) return <p>{error ?? "That project doesn't exist or you aren't assigned to it."} <Link to="/">Back to companies</Link></p>;
 
   return (
     <section className="stack">
       <p className="crumbs">
-        <Link to="/">Companies</Link> / <Link to={`/companies/${project.company_id}`}>{company?.name ?? 'Company'}</Link> / {project.name}
+        <Link to="/">Companies</Link> / <Link to={`/companies/${project.company_id}`}>{project.company.name}</Link> / {project.name}
       </p>
 
       {editing ? (
@@ -220,10 +189,8 @@ export function ProjectPage() {
             <TeamPanel
               key={selected.user_id}
               projectId={projectId}
-              userId={selected.user_id}
-              profile={profiles.get(selected.user_id)}
+              member={selected}
               roles={roles}
-              roleIds={teamRoles.get(selected.user_id) ?? new Set()}
               isAdmin={isAdmin}
               run={run}
               onRemoved={() => setSelectedId(null)}
@@ -238,25 +205,26 @@ export function ProjectPage() {
   );
 }
 
-function TeamPanel({ projectId, userId, profile, roles, roleIds, isAdmin, run, onRemoved }: {
-  projectId: string; userId: string; profile?: Profile; roles: Role[]; roleIds: Set<string>;
-  isAdmin: boolean; run: Run; onRemoved: () => void;
+function TeamPanel({ projectId, member, roles, isAdmin, run, onRemoved }: {
+  projectId: string; member: ProjectMember; roles: Role[]; isAdmin: boolean; run: Run; onRemoved: () => void;
 }) {
-  const key = { project_id: projectId, user_id: userId };
-  const name = displayName(profile);
-  const toggleRole = (roleId: string, on: boolean) => run(() => on
-    ? supabase.from('project_member_roles').insert({ ...key, role_id: roleId })
-    : supabase.from('project_member_roles').delete().match({ ...key, role_id: roleId }));
+  const name = displayName(member.profile);
+  const roleIds = new Set(member.role_ids);
+  const toggleRole = (roleId: string, on: boolean) => {
+    const next = new Set(roleIds);
+    if (on) next.add(roleId); else next.delete(roleId);
+    return run(() => api.setTeamRoles(projectId, member.user_id, [...next]));
+  };
 
   async function remove() {
     if (!window.confirm(`Remove ${name} from this project? They stay in the company.`)) return;
-    if (await run(() => supabase.from('project_members').delete().match(key), `Removed ${name} from the project.`)) onRemoved();
+    if (await run(() => api.unassign(projectId, member.user_id), `Removed ${name} from the project.`)) onRemoved();
   }
 
   return (
     <aside className="panel">
       <h3>{name}</h3>
-      <p className="muted small">{profile?.email}{profile?.phone ? <><br />{profile.phone}</> : null}</p>
+      <p className="muted small">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
       {isAdmin ? (
         <>
           <h4>Project roles</h4>

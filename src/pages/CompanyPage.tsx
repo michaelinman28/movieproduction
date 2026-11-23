@@ -3,14 +3,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { LatticeGrid, gridLink } from '../components/LatticeGrid';
 import { RolePicker } from '../components/RolePicker';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
-import { displayName, roleNames, sortRoles, statusLabel } from '../lib/format';
-import type { Company, CompanyMember, Profile, Project, Role } from '../lib/database.types';
+import { api, type Company, type CompanyMember, type Project } from '../lib/api';
+import { displayName, errorText, roleNames, statusLabel } from '../lib/format';
+import type { Role } from '../lib/database.types';
 
 interface PersonRow {
   id: string; name: string; email: string; phone: string; title: string; roles: string; admin: boolean;
 }
 interface ProjectRow { id: string; name: string; status: string; start_date: string; end_date: string; logline: string }
+
+export type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
 
 export function CompanyPage() {
   const { companyId = '' } = useParams();
@@ -20,8 +22,6 @@ export function CompanyPage() {
 
   const [company, setCompany] = useState<Company | null>(null);
   const [members, setMembers] = useState<CompanyMember[]>([]);
-  const [profiles, setProfiles] = useState<Map<string, Profile>>(new Map());
-  const [memberRoles, setMemberRoles] = useState<Map<string, Set<string>>>(new Map());
   const [roles, setRoles] = useState<Role[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -30,46 +30,32 @@ export function CompanyPage() {
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    const [c, m, mr, r, p] = await Promise.all([
-      supabase.from('companies').select('*').eq('id', companyId).maybeSingle(),
-      supabase.from('company_members').select('*').eq('company_id', companyId),
-      supabase.from('company_member_roles').select('*').eq('company_id', companyId),
-      supabase.from('roles').select('*').or(`company_id.is.null,company_id.eq.${companyId}`),
-      supabase.from('projects').select('*').eq('company_id', companyId).order('created_at'),
-    ]);
-    const err = c.error || m.error || mr.error || r.error || p.error;
-    if (err) { setError(err.message); setLoaded(true); return; }
-    const mem = (m.data ?? []) as CompanyMember[];
-    const ids = mem.map((x) => x.user_id);
-    const prof = ids.length ? await supabase.from('profiles').select('*').in('id', ids) : { data: [], error: null };
-    if (prof.error) setError(prof.error.message);
-    const byUser = new Map<string, Set<string>>();
-    for (const x of mr.data ?? []) {
-      if (!byUser.has(x.user_id)) byUser.set(x.user_id, new Set());
-      byUser.get(x.user_id)!.add(x.role_id);
+    try {
+      const [c, m, r, p] = await Promise.all([
+        api.company(companyId), api.members(companyId), api.roles(companyId), api.projects(companyId),
+      ]);
+      setCompany(c);
+      setMembers(m);
+      setRoles(r);
+      setProjects(p);
+    } catch (e) {
+      setError(errorText(e));
     }
-    setCompany(c.data as Company | null);
-    setMembers(mem);
-    setProfiles(new Map(((prof.data ?? []) as Profile[]).map((x) => [x.id, x])));
-    setMemberRoles(byUser);
-    setRoles(sortRoles((r.data ?? []) as Role[]));
-    setProjects((p.data ?? []) as Project[]);
     setLoaded(true);
   }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
 
-  const isAdmin = members.some((m) => m.user_id === me && m.is_admin);
+  const isAdmin = Boolean(company?.is_admin);
 
-  async function run(fn: () => PromiseLike<{ error: { message: string } | null }>, ok?: string) {
+  const run: Run = async (fn, ok) => {
     setError(null);
     setNotice(null);
-    const { error } = await fn();
-    if (error) { setError(error.message); return false; }
+    try { await fn(); } catch (e) { setError(errorText(e)); return false; }
     if (ok) setNotice(ok);
     await load();
     return true;
-  }
+  };
 
   // ---- Company details -----------------------------------------------------
   const [editing, setEditing] = useState(false);
@@ -80,18 +66,14 @@ export function CompanyPage() {
   }
   async function saveCompany(e: FormEvent) {
     e.preventDefault();
-    const ok = await run(() =>
-      supabase.from('companies')
-        .update({ name: draft.name.trim(), description: draft.description.trim() || null })
-        .eq('id', companyId));
+    const ok = await run(() => api.updateCompany(companyId, { name: draft.name.trim(), description: draft.description.trim() || null }));
     if (ok) setEditing(false);
   }
   async function deleteCompany() {
     if (!company) return;
     const typed = window.prompt(`This deletes ${company.name} and all of its projects, tasks and journals. Type the company name to confirm.`);
     if (typed?.trim() !== company.name) return;
-    const { error } = await supabase.from('companies').delete().eq('id', companyId);
-    if (error) setError(error.message); else navigate('/');
+    try { await api.deleteCompany(companyId); navigate('/'); } catch (e) { setError(errorText(e)); }
   }
 
   // ---- Projects ------------------------------------------------------------
@@ -99,12 +81,10 @@ export function CompanyPage() {
   async function createProject(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const { data, error } = await supabase.from('projects')
-      .insert({ company_id: companyId, name: projectName.trim() })
-      .select('id').single();
-    if (error) return setError(error.message);
-    setProjectName('');
-    navigate(`/projects/${data.id}`);
+    try {
+      const p = await api.createProject(companyId, { name: projectName.trim() });
+      navigate(`/projects/${p.id}`);
+    } catch (err) { setError(errorText(err)); }
   }
   const projectRows = useMemo<ProjectRow[]>(() => projects.map((p) => ({
     id: p.id, name: p.name, status: statusLabel(p.status), logline: p.logline ?? '',
@@ -112,7 +92,7 @@ export function CompanyPage() {
   })), [projects]);
   const projectOptions = useMemo(() => ({
     rowId: (r: ProjectRow) => r.id,
-    toolbar: false, groupPanel: false, statusBar: false,
+    toolbar: false, groupPanel: false, statusBar: false, readOnly: true,
     emptyMessage: 'No projects yet',
     columns: [
       { field: 'name', header: 'Project', width: 240, render: ({ data }: { data: ProjectRow }) => gridLink(data.name, `/projects/${data.id}`) },
@@ -127,26 +107,23 @@ export function CompanyPage() {
   const [newPerson, setNewPerson] = useState({ email: '', title: '', admin: false });
   async function addPerson(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setNotice(null);
-    const { data, error } = await supabase.rpc('add_company_member', {
-      cid: companyId, member_email: newPerson.email, make_admin: newPerson.admin, member_title: newPerson.title,
+    const email = newPerson.email.trim();
+    let result = '';
+    const ok = await run(async () => {
+      result = (await api.addMember(companyId, { email, is_admin: newPerson.admin, title: newPerson.title.trim() || null })).result;
     });
-    if (error) return setError(error.message);
-    setNotice(data === 'already_member' ? `${newPerson.email} is already in this company.` : `Added ${newPerson.email}.`);
-    setNewPerson({ email: '', title: '', admin: false });
-    load();
+    if (ok) {
+      setNotice(result === 'already_member' ? `${email} is already in this company.` : `Added ${email}.`);
+      setNewPerson({ email: '', title: '', admin: false });
+    }
   }
 
   const peopleRows = useMemo<PersonRow[]>(() => members
-    .map((m) => {
-      const p = profiles.get(m.user_id);
-      return {
-        id: m.user_id, name: displayName(p), email: p?.email ?? '', phone: p?.phone ?? '',
-        title: m.title ?? '', roles: roleNames(memberRoles.get(m.user_id) ?? new Set(), roles), admin: m.is_admin,
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name)), [members, profiles, memberRoles, roles]);
+    .map((m) => ({
+      id: m.user_id, name: displayName(m.profile), email: m.profile.email ?? '', phone: m.profile.phone ?? '',
+      title: m.title ?? '', roles: roleNames(m.role_ids, roles), admin: m.is_admin,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name)), [members, roles]);
 
   const peopleOptions = useMemo(() => ({
     rowId: (r: PersonRow) => r.id,
@@ -165,7 +142,7 @@ export function CompanyPage() {
   const selected = members.find((m) => m.user_id === selectedId) ?? null;
 
   if (!loaded) return <p className="muted">Loading…</p>;
-  if (!company) return <p>That company doesn't exist or you don't have access. <Link to="/">Back to companies</Link></p>;
+  if (!company) return <p>{error ?? "That company doesn't exist or you don't have access."} <Link to="/">Back to companies</Link></p>;
 
   return (
     <section className="stack">
@@ -235,10 +212,9 @@ export function CompanyPage() {
           {selected && (
             <MemberPanel
               key={selected.user_id}
+              companyId={companyId}
               member={selected}
-              profile={profiles.get(selected.user_id)}
               roles={roles}
-              roleIds={memberRoles.get(selected.user_id) ?? new Set()}
               isAdmin={isAdmin}
               isMe={selected.user_id === me}
               run={run}
@@ -252,42 +228,41 @@ export function CompanyPage() {
   );
 }
 
-function MemberPanel({ member, profile, roles, roleIds, isAdmin, isMe, run, onRemoved }: {
-  member: CompanyMember; profile?: Profile; roles: Role[]; roleIds: Set<string>;
-  isAdmin: boolean; isMe: boolean;
-  run: (fn: () => PromiseLike<{ error: { message: string } | null }>, ok?: string) => Promise<boolean>;
-  onRemoved: () => void;
+function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }: {
+  companyId: string; member: CompanyMember; roles: Role[]; isAdmin: boolean; isMe: boolean; run: Run; onRemoved: () => void;
 }) {
   const [title, setTitle] = useState(member.title ?? '');
-  const key = { company_id: member.company_id, user_id: member.user_id };
-  const name = displayName(profile);
+  const name = displayName(member.profile);
+  const roleIds = new Set(member.role_ids);
 
-  const toggleRole = (roleId: string, on: boolean) => run(() => on
-    ? supabase.from('company_member_roles').insert({ ...key, role_id: roleId })
-    : supabase.from('company_member_roles').delete().match({ ...key, role_id: roleId }));
+  const toggleRole = (roleId: string, on: boolean) => {
+    const next = new Set(roleIds);
+    if (on) next.add(roleId); else next.delete(roleId);
+    return run(() => api.setMemberRoles(companyId, member.user_id, [...next]));
+  };
 
   async function remove() {
     const msg = isMe ? 'Leave this company? You will lose access to its projects.'
       : `Remove ${name} from the company? They will also be removed from its projects.`;
     if (!window.confirm(msg)) return;
-    if (await run(() => supabase.from('company_members').delete().match(key), isMe ? undefined : `Removed ${name}.`)) onRemoved();
+    if (await run(() => api.removeMember(companyId, member.user_id), isMe ? undefined : `Removed ${name}.`)) onRemoved();
   }
 
   return (
     <aside className="panel">
       <h3>{name}</h3>
       <p className="muted small">
-        {profile?.email}{profile?.phone ? <><br />{profile.phone}</> : null}
+        {member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}
       </p>
       {isAdmin ? (
         <>
-          <form className="inline" onSubmit={(e) => { e.preventDefault(); run(() => supabase.from('company_members').update({ title: title.trim() || null }).match(key), 'Title saved.'); }}>
+          <form className="inline" onSubmit={(e) => { e.preventDefault(); run(() => api.updateMember(companyId, member.user_id, { title: title.trim() || null }), 'Title saved.'); }}>
             <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
             <button type="submit" className="secondary">Save title</button>
           </form>
           <label className="check">
             <input type="checkbox" checked={member.is_admin}
-              onChange={(e) => run(() => supabase.from('company_members').update({ is_admin: e.target.checked }).match(key))} />
+              onChange={(e) => run(() => api.updateMember(companyId, member.user_id, { is_admin: e.target.checked }))} />
             Company admin
           </label>
           <h4>Company roles</h4>
@@ -304,4 +279,3 @@ function MemberPanel({ member, profile, roles, roleIds, isAdmin, isMe, run, onRe
     </aside>
   );
 }
-

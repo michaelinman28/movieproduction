@@ -3,8 +3,18 @@
 A platform for running a movie production: production companies, projects,
 people and roles, tasks with sub-tasks, and a project journal.
 
-Built with React (Vite), Supabase (database, sign-in, row-level security) and
+Built with React (Vite), a separate API layer (Hono, with an OpenAPI spec and
+Swagger UI), Supabase (database, sign-in, row-level security) and
 [lattice-grid](https://github.com/michaelinman28/lattice-grid) for tables.
+
+```
+React app (src/)  ──HTTP──▶  API (supabase/functions/api)  ──▶  Supabase Postgres
+                              Swagger UI at /docs              row-level security
+```
+
+The app reads and writes all data through the API. The API calls the database
+as the signed-in person (it forwards their access token and uses only the
+publishable key), so the database's security rules apply to every request.
 
 ## Setup
 
@@ -14,7 +24,8 @@ Built with React (Vite), Supabase (database, sign-in, row-level security) and
 3. **Create the database:** run each file in `supabase/migrations` in order, in the
    Supabase dashboard's **SQL Editor** (or `npx supabase link` then `npx supabase db push`).
    The live project already has every migration in this folder applied.
-4. **Run:** `npm run dev` and open http://localhost:5173
+4. **Run the API:** `npm run api`, then open http://localhost:8787/docs for Swagger.
+5. **Run the app:** in another terminal, `npm run dev` and open http://localhost:5173
 
 ## Preview site
 
@@ -29,8 +40,20 @@ Authentication > URL Configuration: set the Site URL to that address and add it
 | Command | What it does |
 |---|---|
 | `npm run dev` | Start the app locally |
+| `npm run api` | Start the API locally on port 8787 (Swagger at `/docs`, spec at `/openapi.json`) |
+| `npm run api:spec` | Write the OpenAPI spec to `api/openapi.json` |
 | `npm run build` | Type check and build for production |
 | `npm run test:db` | Check the schema and security rules against an in-memory Postgres |
+
+## API
+
+- Code: `supabase/functions/api` (routes in `routes/`, request and response schemas in `schemas.ts`).
+  The same code runs on Node locally (`api/server.ts`) and on Supabase Edge Functions (`index.ts`).
+- Live: https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api/docs once deployed with
+  `npx supabase functions deploy api --project-ref qixblelhruxdzxfaeamz --no-verify-jwt`
+  (the API checks tokens itself so sign-up and sign-in work without one).
+- Spec: `api/openapi.json`, or `/openapi.json` on a running API.
+- Auth: `POST /auth/signin` returns an `access_token`; send it as `Authorization: Bearer <token>`.
 
 ## Data model
 

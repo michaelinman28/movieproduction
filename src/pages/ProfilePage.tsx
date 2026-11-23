@@ -1,33 +1,27 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
+import { errorText } from '../lib/format';
 
 export function ProfilePage() {
-  const { session } = useAuth();
-  const me = session?.user.id ?? '';
   const [form, setForm] = useState({ full_name: '', phone: '' });
   const [email, setEmail] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
 
   useEffect(() => {
-    supabase.from('profiles').select('*').eq('id', me).maybeSingle().then(({ data, error }) => {
-      if (error) setMessage({ kind: 'error', text: error.message });
-      if (data) {
-        setForm({ full_name: data.full_name ?? '', phone: data.phone ?? '' });
-        setEmail(data.email ?? '');
-      }
-      setLoaded(true);
-    });
-  }, [me]);
+    api.me()
+      .then((p) => { setForm({ full_name: p.full_name ?? '', phone: p.phone ?? '' }); setEmail(p.email ?? ''); })
+      .catch((e) => setMessage({ kind: 'error', text: errorText(e) }))
+      .finally(() => setLoaded(true));
+  }, []);
 
   async function save(e: FormEvent) {
     e.preventDefault();
     setMessage(null);
-    const { error } = await supabase.from('profiles')
-      .update({ full_name: form.full_name.trim(), phone: form.phone.trim() || null })
-      .eq('id', me);
-    setMessage(error ? { kind: 'error', text: error.message } : { kind: 'info', text: 'Profile saved.' });
+    try {
+      await api.updateMe({ full_name: form.full_name.trim(), phone: form.phone.trim() || null });
+      setMessage({ kind: 'info', text: 'Profile saved.' });
+    } catch (err) { setMessage({ kind: 'error', text: errorText(err) }); }
   }
 
   if (!loaded) return <p className="muted">Loading…</p>;

@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "hono": "npm:hono@4.13.21",
+    "hono/": "npm:/hono@4.13.21/",
+    "@hono/zod-openapi": "npm:@hono/zod-openapi@1.6.3",
+    "@hono/swagger-ui": "npm:@hono/swagger-ui@0.6.2",
+    "zod": "npm:zod@4.6.7",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.119.2"
+  }
+}
