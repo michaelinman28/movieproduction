@@ -33,7 +33,8 @@ export function Home() {
     setError(null);
     try {
       const c = await api.createCompany({ name: name.trim() });
-      navigate(`/companies/${c.id}`);
+      // The new company opens with its details form, to add a description.
+      navigate(`/companies/${c.id}`, { state: { created: true } });
     } catch (err) { setError(errorText(err)); setBusy(false); }
   }
 

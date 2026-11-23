@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LatticeGrid } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { RolePicker } from '../components/RolePicker';
@@ -10,6 +10,7 @@ import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, status
 import type { ProjectStatus, Role } from '../lib/database.types';
 import type { Run } from './CompanyPage';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
+import { scrollToForm } from '../lib/reveal';
 
 interface TeamRow { id: string; name: string; roles: string; email: string; phone: string; joined: string }
 
@@ -71,6 +72,15 @@ export function ProjectPage() {
     });
     setEditing(true);
   }
+  // A project just created opens its details form, to fill in the rest.
+  const location = useLocation();
+  useEffect(() => {
+    if (project && (location.state as { created?: boolean } | null)?.created) {
+      startEdit();
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project]);
   async function saveDetails(e: FormEvent) {
     e.preventDefault();
     const ok = await run(() => api.updateProject(projectId, {
@@ -86,6 +96,7 @@ export function ProjectPage() {
 
   // ---- Team ----------------------------------------------------------------
   const [addUser, setAddUser] = useState('');
+  const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
   const onTeam = new Set(team.map((t) => t.user_id));
   const available = companyMembers
     .filter((m) => !onTeam.has(m.user_id))
@@ -96,8 +107,14 @@ export function ProjectPage() {
     e.preventDefault();
     if (!addUser) return;
     const name = available.find((a) => a.id === addUser)?.name ?? 'them';
-    if (await run(() => api.assign(projectId, addUser), `Added ${name} to the project. Select them below to pick their project roles.`)) {
+    if (!confirmDiscard()) return;
+    const id = addUser;
+    if (await run(() => api.assign(projectId, id), `Added ${name} to the project. Pick their project roles in the form.`)) {
       setAddUser('');
+      // Open their form, to pick their project roles.
+      setSelectedId(id);
+      setReveal({ id, n: Date.now() });
+      scrollToForm(id);
     }
   }
 
@@ -207,6 +224,7 @@ export function ProjectPage() {
           <LatticeGrid
             options={teamOptions}
             rows={teamRows}
+            reveal={reveal}
             height={Math.min(80 + teamRows.length * 34, 420)}
             on={{ selectionChanged: (rows: TeamRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); }, cellValueChanged: saveTeamCell }}
           />
@@ -259,7 +277,7 @@ function TeamPanel({ projectId, member, roles, isAdmin, run, onRemoved }: {
   }
 
   return (
-    <aside data-pin-scope className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
+    <aside data-pin-scope data-form-for={member.user_id} className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
       <h3>{name}</h3>
       <p className="hint mt-2">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
       {isAdmin ? (

@@ -207,6 +207,10 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   row, following a link or closing the tab with unsaved changes asks first
   (`src/lib/unsaved.ts`, `UnsavedGuard`). Editing a table cell saves when the edit
   ends. One-off actions (add a sub-task or note, tick a sub-task done) happen at once.
+- **Adding opens the new item's form (standard).** Adding a task, location, person,
+  team member, role, category or tag selects it, highlights its row and opens its form
+  (scrolled into view on a phone), since a name alone is rarely all it needs. A new
+  company or project opens its page with the details form ready.
 - **Dropdown filters for fixed values (standard).** In every table, a column whose
   values come from a fixed set (person assigned, status, priority, category, location,
   department, admin, roles, tags…) filters with a dropdown of tick boxes and counts.
