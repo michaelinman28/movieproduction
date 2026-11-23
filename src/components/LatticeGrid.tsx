@@ -2,6 +2,7 @@ import { useEffect, useRef, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../lib/theme';
 import { confirmDiscard } from '../lib/unsaved';
+import { mapsUrl, openMaps } from '../lib/maps';
 import '../vendor/lattice-grid/lattice-grid.js';
 import '../vendor/lattice-grid/lattice-grid.css';
 import type {
@@ -143,6 +144,14 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
   // The grid redraws cells on mousedown, so act on mousedown before it does.
   const navigate = useNavigate();
   function onMouseDown(e: MouseEvent<HTMLDivElement>) {
+    // Map links (see gridMapLink) open the device's maps app.
+    const m = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-map]');
+    if (m && e.button === 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      openMaps(m.dataset.map!);
+      return;
+    }
     const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-to]');
     if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
@@ -150,6 +159,7 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
     if (confirmDiscard()) navigate(a.dataset.to!);
   }
   function onClick(e: MouseEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest('a[data-map]')) { e.preventDefault(); return; }
     if ((e.target as HTMLElement).closest('a[data-to]') && !(e.metaKey || e.ctrlKey || e.shiftKey)) e.preventDefault();
   }
 
@@ -167,6 +177,17 @@ export function gridLink(text: string, to: string): HTMLAnchorElement {
   a.dataset.to = to;
   a.textContent = text;
   a.className = 'grid-link';
+  return a;
+}
+
+/** A cell link that opens an address in the device's maps app. */
+export function gridMapLink(text: string, address: string): HTMLAnchorElement {
+  const a = document.createElement('a');
+  a.href = mapsUrl(address);
+  a.dataset.map = address;
+  a.textContent = text;
+  a.className = 'grid-link';
+  a.title = `Open ${address} in maps`;
   return a;
 }
 

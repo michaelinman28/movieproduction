@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
+import { LatticeGrid, gridDropdown, gridEsc, gridMapLink } from './LatticeGrid';
+import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
 import { api, type Location, type LocationInput, type LocationStatus } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -9,25 +10,24 @@ import { LOCATION_STATUSES, errorText, labelOf, valueOf } from '../lib/format';
 
 interface LocationRow {
   id: string; name: string; description: string; address: string;
-  contact_name: string; contact_email: string; contact_phone: string; status: string; tasks: number;
+  contact_name: string; contact_email: string; contact_phone: string; status: string; tasks: number; map: string;
 }
-type Field = keyof Omit<LocationRow, 'id' | 'tasks' | 'status'>;
+type Field = keyof Omit<LocationRow, 'id' | 'tasks' | 'status' | 'map'>;
 const FIELDS: Field[] = ['name', 'description', 'address', 'contact_name', 'contact_email', 'contact_phone'];
 
 const toRow = (l: Location): LocationRow => ({
   id: l.id, name: l.name, description: l.description ?? '', address: l.address ?? '',
   contact_name: l.contact_name ?? '', contact_email: l.contact_email ?? '', contact_phone: l.contact_phone ?? '', status: labelOf(LOCATION_STATUSES, l.status), tasks: l.tasks,
+  map: l.address ? 'Open map' : '',
 });
 
-/** A link that opens the address in the phone's or computer's maps app. */
+/** A location's status as a coloured pill. */
 const pill = (label: string) =>
   `<span class="task-pill task-pill-loc-${valueOf(LOCATION_STATUSES, label) ?? 'considering'}">${gridEsc(label)}</span>`;
 
 // Whether to list the locations marked "Not using"; remembered on this device.
 const SHOW_KEY = 'mp-locations-show-unused';
 const readShow = () => { try { return localStorage.getItem(SHOW_KEY) === '1'; } catch { return false; } };
-
-const mapsUrl = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
 /**
  * A project's locations: where it shoots or works, with an address and an on-site
@@ -74,6 +74,11 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
         render: ({ value }: { value: string }) => gridDropdown(pill(value)),
       },
       { field: 'address', header: 'Address', width: 240, editable: true, editor: 'textarea' },
+      // Opens the address in the phone's or computer's own maps app.
+      {
+        field: 'map', header: 'Map', width: 100, sortable: false, filter: false, groupable: false,
+        render: ({ data }: { data: LocationRow }) => (data.address ? gridMapLink('Open map', data.address) : ''),
+      },
       { field: 'contact_name', header: 'Contact', width: 160, editable: true },
       { field: 'contact_email', header: 'Contact email', width: 200, editable: true },
       { field: 'contact_phone', header: 'Contact phone', width: 150, editable: true },
@@ -178,7 +183,7 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
 
   return (
     <aside data-pin-scope data-form-for={location.id} className="card gap-2 lg:max-h-[640px] lg:overflow-auto">
-      <h3>{location.name}</h3>
+      <h3>{location.address ? <a {...mapsLinkProps(location.address)} title="Open the address in maps">{location.name}</a> : location.name}</h3>
       <p className="hint">{location.tasks ? `${location.tasks === 1 ? '1 task is' : `${location.tasks} tasks are`} here.` : 'No tasks here yet.'}</p>
       <form className="flex flex-col gap-2" onSubmit={save}>
         <label className="label">Name
@@ -194,7 +199,7 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
         </label>
         <label className="label">Address
           <textarea className="field" rows={2} value={draft.address} maxLength={500} autoComplete="street-address" onChange={set('address')} />
-          {initial.address && <a className="text-sm" href={mapsUrl(initial.address)} target="_blank" rel="noreferrer">Open in maps</a>}
+          {initial.address && <a className="text-sm" {...mapsLinkProps(initial.address)}>Open in maps</a>}
         </label>
         <label className="label">Contact name
           <input className="field" value={draft.contact_name} maxLength={120} onChange={set('contact_name')} />

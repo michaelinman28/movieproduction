@@ -18,9 +18,9 @@ tasks, sub-tasks and (next) a project journal.
 | Roles | 32 shared standard film roles, plus each company's own custom roles |
 | Projects | Several projects per company, with status, dates and logline |
 | Project teams | Admins assign company members to projects and pick their project roles |
-| Tasks | A tree of tasks and sub-tasks per project, with category, tags, status, priority, assignee, and a due date with an optional time of day (Morning, Afternoon, Evening) or exact time. Each task has a description and any number of notes |
+| Tasks | A tree of tasks and sub-tasks per project, with category, tags, status, priority, assignee, and a due date with an optional time of day (Morning, Afternoon, Evening) or exact time. Each task has a description and any number of notes. A calendar view shows tasks by due date |
 | Task categories and tags | Each company has its own category list (admins set it up) and its own tags (anyone can add them while tagging a task) |
-| Locations | Each project's locations with a status (Considering, Confirmed, Not using), description, address and contact (name, email, phone); tasks can be assigned to one |
+| Locations | Each project's locations with a status (Considering, Confirmed, Not using), description, address (opens in your phone's or computer's maps app) and contact (name, email, phone); tasks can be assigned to one |
 | Journal | Coming next: private, shared and public entries per project |
 
 People create their own account first. A company admin then adds them to the company

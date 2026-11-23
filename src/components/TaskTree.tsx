@@ -3,8 +3,10 @@ import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
 import { Section } from './Section';
 import { TagPicker } from './TagPicker';
 import { TaskNotes } from './TaskNotes';
+import { TaskCalendar, isoDate } from './TaskCalendar';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 import { scrollToForm } from '../lib/reveal';
+import { mapsLinkProps } from '../lib/maps';
 import {
   api, type DayPart, type Location, type ProjectMember, type Task, type TaskCategory, type TaskInput, type TaskPriority, type TaskStatus, type TaskTag,
 } from '../lib/api';
@@ -31,10 +33,13 @@ interface TaskRow {
 }
 
 const UNASSIGNED = 'Unassigned';
+/** 'YYYY-MM-DD' to e.g. 'Mon, Nov 23'. */
+const dayName = (iso: string) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
 
-// How the task grid is laid out: the sub-task tree, or a flat list grouped by a column.
+// How tasks are shown: the sub-task tree, a month calendar by due date, or a flat list grouped by a column.
 const VIEWS = [
   { value: '', label: 'Sub-task tree' },
+  { value: 'calendar', label: 'Calendar' },
   { value: 'assignee', label: 'Grouped by person' },
   { value: 'category', label: 'Grouped by category' },
   { value: 'location', label: 'Grouped by location' },
@@ -189,6 +194,11 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
   }, [kids, taskLabels, nameOf, categoryName, tagName, locationName]);
 
   const [view, setView] = useState<string>(readView);
+  const calendar = view === 'calendar';
+  // The column the grid groups by ('' for the sub-task tree).
+  const groupBy = calendar ? '' : view;
+  // The calendar's chosen day; tasks added while the calendar shows are due on it.
+  const [day, setDay] = useState(() => isoDate(new Date()));
   function changeView(v: string) {
     setView(v);
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* storage unavailable */ }
@@ -201,7 +211,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
     };
     const columns = [
       // In the tree the task's name is the tree column; a flat list needs its own.
-      ...(view ? [{ field: 'title', header: 'Task', width: window.innerWidth < 640 ? 170 : 240, editable: true }] : []),
+      ...(groupBy ? [{ field: 'title', header: 'Task', width: window.innerWidth < 640 ? 170 : 240, editable: true }] : []),
       {
         field: 'assignee', header: 'Assigned to', width: 170, editable: true, editor: 'select',
         editorOptions: [UNASSIGNED, ...people.map((p) => p.name)],
@@ -262,12 +272,12 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       emptyMessage: 'No tasks yet. Add one above.',
       columns,
     };
-    return view
+    return groupBy
       ? {
         ...common,
         // Grouped list: one group per value of the chosen column. More columns can be
         // dragged into the bar above the grid to group further.
-        groupBy: [view],
+        groupBy: [groupBy],
         groupPanel: true,
         groupColumnHeader: 'Group',
         groupColumnWidth: window.innerWidth < 640 ? 160 : 200,
@@ -283,7 +293,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
         groupColumnWidth: window.innerWidth < 640 ? 190 : 260,
         groupPanel: false,
       };
-  }, [people, categories, locationList, view]);
+  }, [people, categories, locationList, groupBy]);
 
   // The due-date renderer reads the latest tasks without rebuilding the grid.
   const byIdRef = useRef(byId);
@@ -344,7 +354,8 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
     if (!title) return;
     if (!confirmDiscard()) return;
     let id = '';
-    if (await run(async () => { id = (await api.createTask(projectId, { title })).id; }, `Added "${title}". Fill in the rest of its details in the form.`)) {
+    const input: TaskInput & { title: string } = calendar ? { title, due_date: day } : { title };
+    if (await run(async () => { id = (await api.createTask(projectId, input)).id; }, `Added "${title}"${calendar ? ` on ${dayName(day)}` : ''}. Fill in the rest of its details in the form.`)) {
       setNewTitle('');
       // Adding is usually the start: open the new task's form.
       if (id) open(id);
@@ -352,15 +363,17 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
   }
 
   // Group header rows take space too when the list is grouped.
-  const groupCount = view ? new Set(rows.map((r) => r[view as keyof TaskRow] as string)).size : 0;
+  const groupCount = groupBy ? new Set(rows.map((r) => r[groupBy as keyof TaskRow] as string)).size : 0;
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
   const done = tasks.filter((t) => t.status === 'done').length;
 
   return (
     <Section id="project.tasks" title="Tasks" summary={tasks.length ? `${done} of ${tasks.length} done` : undefined}>
       <p className="hint">
-        Click a person, location, category, status, priority, time or parent task to pick from its list. Double-click a task name, due date, tags or description to type a change.
-        Select a task to edit its description, tags and notes, add sub-tasks, or move it.
+        {calendar
+          ? 'Tasks show on their due date. Click a day to list its tasks and add new ones on it, and click a task to open its form. On a computer, drag a task to another day to move it.'
+          : 'Click a person, location, category, status, priority, time or parent task to pick from its list. Double-click a task name, due date, tags or description to type a change.'}
+        {' '}Select a task to edit its description, tags and notes, add sub-tasks, or move it.
       </p>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
         <label className="label sm:flex-row sm:items-center sm:gap-2">Show
@@ -368,10 +381,10 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
             {VIEWS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
           </select>
         </label>
-        {view && <span className="hint">Drag more column headers into the bar above the grid to group further.</span>}
+        {groupBy && <span className="hint">Drag more column headers into the bar above the grid to group further.</span>}
       </div>
       <form className="form-row my-2" onSubmit={addTask}>
-        <input className="field" placeholder="New task, e.g. Scout locations" value={newTitle} maxLength={200}
+        <input className="field" placeholder={calendar ? `New task on ${dayName(day)}` : 'New task, e.g. Scout locations'} aria-label="New task name" value={newTitle} maxLength={200}
           onChange={(e) => setNewTitle(e.target.value)} required />
         <button type="submit" className="btn" data-pin>Add task</button>
       </form>
@@ -380,16 +393,20 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       {/* The panel's space is always kept so selecting a task doesn't resize the grid
           in the middle of a double-click. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        {loaded ? (
+        {!loaded ? <p className="text-muted">Loading tasks…</p> : calendar ? (
+          <TaskCalendar tasks={tasks} selectedId={selectedId} day={day} onDay={setDay} nameOf={nameOf}
+            onOpen={(id) => { if (id === selectedId || confirmDiscard()) { setSelectedId(id); scrollToForm(id); } }}
+            onMove={(id, to) => run(() => api.updateTask(id, { due_date: to }), `Moved "${byId.get(id)?.title}" to ${dayName(to)}.`)} />
+        ) : (
           <LatticeGrid
             options={options}
             rows={rows}
-            height={Math.min(160 + (rows.length + groupCount) * 34 + (view ? 44 : 0), 640)}
+            height={Math.min(160 + (rows.length + groupCount) * 34 + (groupBy ? 44 : 0), 640)}
             on={{ cellValueChanged: onCellChanged, rangeChanged: onRange }}
             reveal={reveal}
             onReady={(g) => { gridRef.current = g; }}
           />
-        ) : <p className="text-muted">Loading tasks…</p>}
+        )}
         {selected ? (
           <TaskPanel
             key={selected.id}
@@ -554,6 +571,10 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
               <option key={l.id} value={l.id}>{l.name}{l.status === 'not_using' ? ' (not using)' : ''}</option>
             ))}
           </select>
+          {(() => {
+            const at = locations.find((l) => l.id === draft.location);
+            return at?.address ? <a className="text-sm" {...mapsLinkProps(at.address)}>Open {at.name} in maps</a> : null;
+          })()}
           {!locations.length && <span className="hint">Add the project's locations in the Locations section above.</span>}
         </label>
         <label className="label">Category
