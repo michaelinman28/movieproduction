@@ -1,4 +1,4 @@
-import type { Profile, ProjectStatus, Role } from './database.types';
+import type { Profile, ProjectStatus, Role, TaskPriority, TaskStatus } from './database.types';
 
 export const PROJECT_STATUSES: { value: ProjectStatus; label: string }[] = [
   { value: 'development', label: 'Development' },
@@ -25,3 +25,21 @@ export function roleNames(ids: Set<string> | string[], roles: Role[]) {
 
 export const errorText = (e: unknown) =>
   e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : String(e);
+
+export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
+  { value: 'todo', label: 'To do' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'blocked', label: 'Blocked' },
+  { value: 'done', label: 'Done' },
+];
+
+export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'urgent', label: 'Urgent' },
+];
+
+export const labelOf = <T extends string>(list: { value: T; label: string }[], v: T) => list.find((x) => x.value === v)?.label ?? v;
+export const valueOf = <T extends string>(list: { value: T; label: string }[], label: string) =>
+  list.find((x) => x.label === label || x.value === label)?.value;

@@ -16,7 +16,7 @@ day to day.
 | Projects | Admins create several projects per company, each with a status (development to released), dates and a logline | Done |
 | Project teams | Admins assign company members to projects and give them project roles | Done |
 | Roles | 32 standard film roles (Producer, Director, DP, Gaffer…) are shared by every company. Company admins add, rename and delete their own custom roles on the Roles page; a custom role can't reuse a standard role's name | Done |
-| Tasks | Tasks and sub-tasks per project, with assignee, status, priority and due date, shown as a tree | Database ready; screens next |
+| Tasks | Tasks and sub-tasks per project, shown as a tree on the project page. Anyone on the project (and company admins) can add tasks, nest sub-tasks to any depth, move them, and set status, priority, the person assigned and a due date. Overdue dates show in red | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
 
 ### How people join
@@ -48,8 +48,8 @@ There are three layers, and each one can be run and tested by itself.
 - It uses Supabase Auth in the browser only to sign people in and keep their
   session. The session's access token is sent to the API with every request.
 - Tables use Michael's [lattice-grid](https://github.com/michaelinman28/lattice-grid)
-  library through a React wrapper (`src/components/LatticeGrid.tsx`). Tasks will
-  use its tree mode for sub-tasks.
+  library through a React wrapper (`src/components/LatticeGrid.tsx`). Tasks use
+  its tree mode for sub-tasks (`src/components/TaskTree.tsx`).
 - Styling uses Tailwind CSS with a mobile-first approach (see below).
 
 ### 2. API layer (`supabase/functions/api`)
@@ -79,6 +79,7 @@ There are three layers, and each one can be run and tested by itself.
 | Company people | `GET/POST /companies/{id}/members`, `PATCH/DELETE /companies/{id}/members/{userId}`, `PUT …/roles` |
 | Projects | `GET/POST /companies/{id}/projects`, `GET/PATCH/DELETE /projects/{id}` |
 | Project team | `GET/POST /projects/{id}/members`, `DELETE /projects/{id}/members/{userId}`, `PUT …/roles` |
+| Tasks | `GET/POST /projects/{id}/tasks`, `GET/PATCH/DELETE /tasks/{id}` (deleting a task deletes its sub-tasks) |
 
 ### 3. Database (`supabase/migrations`)
 
@@ -87,11 +88,14 @@ There are three layers, and each one can be run and tested by itself.
   - You see only the companies you belong to, and the profiles of people in them.
   - You see a project if you're assigned to it, or if you're an admin of its company.
   - Only company admins manage people, projects and custom roles.
+  - Everyone on a project, and admins of its company, can work on its tasks.
   - Private journal entries are visible only to the author and the people they
     share them with. Only the author can edit them.
 - Integrity rules live in the database too. A company always keeps at least one
   admin. Only company members can join its projects. Removing someone from a
-  company removes them from its projects. Sub-tasks can't form loops.
+  company removes them from its projects, and leaving a project unassigns their
+  tasks there. Tasks can only be assigned to people on the project. Sub-tasks stay
+  in their parent's project and can't form loops.
 
 | Table | Purpose |
 |---|---|
@@ -190,5 +194,5 @@ Checks: `npm run typecheck` (app and API), `npm run test:db` (security rules), `
 1. Foundation: schema, security rules, sign-in (done)
 2. Companies, projects and people (done)
 3. Roles: manage custom roles per company (done)
-4. Tasks and sub-tasks in a lattice-grid tree
+4. Tasks and sub-tasks in a lattice-grid tree (done)
 5. Project journal with private, shared and public entries

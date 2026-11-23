@@ -2,7 +2,7 @@
 // writes all data through the API; Supabase is used here only to keep the user
 // signed in and supply their access token.
 import { supabase } from './supabase';
-import type { ProjectStatus, Role } from './database.types';
+import type { ProjectStatus, Role, Task, TaskPriority, TaskStatus } from './database.types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://localhost:8787';
 
@@ -40,6 +40,9 @@ export interface ProjectDetail extends Project { company: { id: string; name: st
 export interface ProjectMember { user_id: string; joined_at: string; profile: Profile; role_ids: string[] }
 export type ProjectInput = Partial<Pick<Project, 'name' | 'logline' | 'description' | 'status' | 'start_date' | 'end_date'>>;
 
+export type { Task, TaskPriority, TaskStatus };
+export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'assignee_id' | 'due_date' | 'parent_id' | 'sort_order'>>;
+
 const enc = encodeURIComponent;
 
 export const api = {
@@ -76,6 +79,11 @@ export const api = {
   unassign: (projectId: string, userId: string) => call<void>('DELETE', `/projects/${enc(projectId)}/members/${enc(userId)}`),
   setTeamRoles: (projectId: string, userId: string, roleIds: string[]) =>
     call<unknown>('PUT', `/projects/${enc(projectId)}/members/${enc(userId)}/roles`, { role_ids: roleIds }),
+
+  tasks: (projectId: string) => call<Task[]>('GET', `/projects/${enc(projectId)}/tasks`),
+  createTask: (projectId: string, b: TaskInput & { title: string }) => call<Task>('POST', `/projects/${enc(projectId)}/tasks`, b),
+  updateTask: (id: string, b: TaskInput) => call<Task>('PATCH', `/tasks/${enc(id)}`, b),
+  deleteTask: (id: string) => call<void>('DELETE', `/tasks/${enc(id)}`),
 };
 
 export const API_BASE = BASE;

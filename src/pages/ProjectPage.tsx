@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { LatticeGrid } from '../components/LatticeGrid';
 import { RolePicker } from '../components/RolePicker';
+import { TaskTree } from '../components/TaskTree';
 import { api, type CompanyMember, type ProjectDetail, type ProjectMember } from '../lib/api';
 import { PROJECT_STATUSES, displayName, errorText, roleNames, statusLabel } from '../lib/format';
 import type { ProjectStatus, Role } from '../lib/database.types';
@@ -198,7 +199,9 @@ export function ProjectPage() {
         {!selected && teamRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and set their project roles' : ''}.</p>}
       </div>
 
-      <p className="hint mt-2">Tasks and the project journal are coming in the next steps.</p>
+      <TaskTree projectId={projectId} team={team} />
+
+      <p className="hint mt-2">The project journal is coming in the next step.</p>
     </section>
   );
 }
