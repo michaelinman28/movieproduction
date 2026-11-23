@@ -6,6 +6,7 @@ import { Home } from './pages/Home';
 import { CompanyPage } from './pages/CompanyPage';
 import { ProjectPage } from './pages/ProjectPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { ThemeSwitch } from './components/ThemeSwitch';
 
 export function App() {
   const { session, loading } = useAuth();
@@ -30,6 +31,7 @@ export function App() {
           <span className="sm:hidden">Profile</span>
           <span className="hidden sm:inline">{session.user.email}</span>
         </Link>
+        <ThemeSwitch />
         <button className="btn-link text-sm" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </header>
       <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">

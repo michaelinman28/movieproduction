@@ -1,5 +1,6 @@
 import { useEffect, useRef, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../lib/theme';
 import '../vendor/lattice-grid/lattice-grid.js';
 import '../vendor/lattice-grid/lattice-grid.css';
 import type {
@@ -25,14 +26,13 @@ interface Props<Row> {
 // lattice-grid's own CSS sets min-height: 240px; match it so the box doesn't overflow.
 const MIN_GRID_HEIGHT = 240;
 
-function prefersDark() {
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-}
-
 /** React wrapper around Michael's lattice-grid library. */
 export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, className }: Props<Row>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<LatticeGridInstance<Row> | null>(null);
+  const { theme } = useTheme();
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
   const handlersRef = useRef<Handlers | undefined>(on);
@@ -41,7 +41,7 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
   useEffect(() => {
     if (!containerRef.current) return;
     const grid = new window.LatticeGrid<Row>(containerRef.current, {
-      theme: prefersDark() ? 'dark' : 'light',
+      theme: themeRef.current,
       ...options,
       rows: rowsRef.current,
     });
@@ -54,13 +54,8 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
       grid.on(name, forwarders[name]);
     }
 
-    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-    const onScheme = (e: MediaQueryListEvent) => grid.setTheme(e.matches ? 'dark' : 'light');
-    if (!options.theme) media?.addEventListener('change', onScheme);
-
     onReady?.(grid);
     return () => {
-      media?.removeEventListener('change', onScheme);
       grid.destroy();
       gridRef.current = null;
     };
@@ -70,6 +65,11 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
   useEffect(() => {
     gridRef.current?.setRows(rows);
   }, [rows]);
+
+  // Follow the app's light/dark switch.
+  useEffect(() => {
+    if (!options.theme) gridRef.current?.setTheme(theme);
+  }, [theme, options.theme]);
 
   // Cells can render <a data-to="/path"> links (see gridLink); route them in-app.
   // The grid redraws cells on mousedown, so act on mousedown before it does.

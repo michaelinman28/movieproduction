@@ -134,10 +134,16 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   tables scroll inside their own box, never the whole page.
 - **Readable text.** Inputs use at least 16px text so phones don't zoom in when
   someone taps a field.
-- **Light and dark themes.** Colors come from theme tokens defined in
-  `src/styles.css` (`@theme`), and they switch with the system's dark mode.
-  Components use the tokens (`bg-surface`, `text-muted`, `border-line`,
-  `bg-accent`) rather than raw colors.
+- **Green is the primary color.** Buttons, links, selection and focus use the
+  accent green (`#15803d` in light mode, `#4ade80` in dark mode).
+- **Light and dark themes with a switch.** A sun/moon switch in the header (and
+  on the sign-in page) flips between light and dark. The app follows the
+  device setting until someone uses the switch, then remembers their choice on
+  that device (`src/lib/theme.tsx`, applied before first paint in `index.html`).
+- **Theme tokens, not raw colors.** Colors are defined once in `src/styles.css`
+  (`@theme`, with dark overrides under `[data-theme='dark']`). Components use the
+  tokens (`bg-surface`, `text-muted`, `border-line`, `bg-accent`). lattice-grid
+  follows the same switch and is tinted to match.
 - **lattice-grid** keeps its own stylesheet. Tailwind styles the page around it.
 
 ## Repository layout

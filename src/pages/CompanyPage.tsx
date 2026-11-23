@@ -191,10 +191,10 @@ export function CompanyPage() {
               onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} required />
             <input className="field" placeholder="Title (optional)" value={newPerson.title}
               onChange={(e) => setNewPerson({ ...newPerson, title: e.target.value })} />
-            <label className="check">
+            <label className="check-field">
               <input type="checkbox" checked={newPerson.admin}
                 onChange={(e) => setNewPerson({ ...newPerson, admin: e.target.checked })} />
-              Admin
+              Make admin
             </label>
             <button type="submit" className="btn">Add person</button>
           </form>

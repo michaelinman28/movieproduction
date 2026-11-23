@@ -1,33 +1,46 @@
 @import 'tailwindcss';
 
 /* Theme tokens. Components use these (bg-surface, text-muted, border-line,
-   bg-accent…) instead of raw colors, so light and dark mode switch in one place. */
+   bg-accent…) instead of raw colors. Light is the default; dark applies when
+   <html data-theme="dark"> is set by the theme switch (src/lib/theme.tsx). */
 @theme {
-  --color-bg: #f7f7f5;
+  --color-bg: #f5f7f5;
   --color-surface: #ffffff;
-  --color-fg: #1c1c1a;
-  --color-muted: #6b6b66;
-  --color-line: #e2e2dc;
-  --color-accent: #b4442c;
+  --color-fg: #18201a;
+  --color-muted: #5f6b62;
+  --color-line: #dce4dd;
+  --color-accent: #15803d;
+  --color-accent-strong: #166534;
+  --color-accent-soft: #dcfce7;
   --color-accent-fg: #ffffff;
   --color-danger: #b42318;
   --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #161614;
-    --color-surface: #1f1f1d;
-    --color-fg: #ededea;
-    --color-muted: #a3a39c;
-    --color-line: #34342f;
-    --color-accent: #e0694f;
-    --color-danger: #f97066;
-  }
+:root[data-theme='dark'] {
+  --color-bg: #0f1411;
+  --color-surface: #18201b;
+  --color-fg: #e6eee8;
+  --color-muted: #9aa89e;
+  --color-line: #2b372f;
+  --color-accent: #4ade80;
+  --color-accent-strong: #86efac;
+  --color-accent-soft: #14321f;
+  --color-accent-fg: #052e16;
+  --color-danger: #f97066;
+}
+
+/* Tint lattice-grid's selection and focus colors to match. */
+.lg-theme-light { --lg-accent: #15803d; --lg-accent-fg: #ffffff; --lg-selected: #e8f7ee; --lg-range: rgba(21, 128, 61, 0.12); }
+.lg-theme-dark {
+  --lg-accent: #4ade80; --lg-accent-fg: #052e16; --lg-selected: #173322; --lg-range: rgba(74, 222, 128, 0.16);
+  --lg-bg: #18201b; --lg-header-bg: #1e2821; --lg-row-alt: #1b231e; --lg-hover: #1f2b23; --lg-group-bg: #1e2821;
+  --lg-border: #2b372f; --lg-border-strong: #3a4a3f; --lg-input-bg: #0f1411; --lg-popup-bg: #18201b;
 }
 
 @layer base {
-  :root { color-scheme: light dark; }
+  :root { color-scheme: light; }
+  :root[data-theme='dark'] { color-scheme: dark; }
   body { @apply bg-bg text-fg font-sans antialiased; }
   h1 { @apply text-2xl font-bold leading-tight md:text-3xl; }
   h2 { @apply mb-3 text-lg font-semibold md:text-xl; }
@@ -45,11 +58,11 @@
   }
   .btn {
     @apply inline-flex min-h-11 w-full items-center justify-center rounded-md bg-accent px-4 py-2 text-base font-medium text-accent-fg;
-    @apply cursor-pointer disabled:cursor-default disabled:opacity-60 sm:w-auto;
+    @apply cursor-pointer hover:bg-accent-strong disabled:cursor-default disabled:opacity-60 sm:w-auto;
   }
   /* Use with .btn: class="btn btn-secondary". */
-  .btn-secondary { @apply border border-line bg-surface text-fg; }
-  .btn-danger { @apply border border-danger bg-transparent text-danger; }
+  .btn-secondary { @apply border border-line bg-surface text-fg hover:bg-accent-soft; }
+  .btn-danger { @apply border border-danger bg-transparent text-danger hover:bg-transparent; }
   .btn-link { @apply inline-flex min-h-11 cursor-pointer items-center bg-transparent px-1 text-accent; }
   /* A form whose fields stack on phones and share one row from sm: up. */
   .form-row { @apply flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center; }
@@ -58,6 +71,9 @@
   .label { @apply flex flex-col gap-1 text-sm; }
   .check { @apply inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm; }
   .check input { @apply size-5 accent-accent; }
+  /* A checkbox that sits in a form row with fields: same height and border as a field. */
+  .check-field { @apply inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-line bg-surface px-3 text-base; }
+  .check-field input { @apply size-5 accent-accent; }
   .notice { @apply text-sm text-muted; }
   .error { @apply text-sm text-danger; }
   .hint { @apply text-sm text-muted; }
