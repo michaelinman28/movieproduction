@@ -5,6 +5,7 @@ import { Section } from '../components/Section';
 import { api, type Company, type RoleWithUsage } from '../lib/api';
 import { errorText } from '../lib/format';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
+import { scrollToForm } from '../lib/reveal';
 
 const NEW_DEPT = '__new__';
 
@@ -26,6 +27,7 @@ export function RolesPage() {
   // The department is picked from a list of the ones already in use, or typed in
   // when "New department…" is chosen.
   const [newDept, setNewDept] = useState(false);
+  const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -45,6 +47,7 @@ export function RolesPage() {
 
   async function addRole(e: FormEvent) {
     e.preventDefault();
+    if (!confirmDiscard()) return;
     setError(null);
     setNotice(null);
     try {
@@ -55,6 +58,10 @@ export function RolesPage() {
       setDraft({ name: '', department: '', description: '' });
       setNewDept(false);
       await load();
+      // Open the new role's form.
+      setSelectedId(r.id);
+      setReveal({ id: r.id, n: Date.now() });
+      scrollToForm(r.id);
     } catch (err) { setError(errorText(err)); }
   }
 
@@ -183,13 +190,13 @@ export function RolesPage() {
         {/* The side panel is always there for admins, so selecting a row doesn't resize the
             grid mid double-click (which would stop the cell from opening for editing). */}
         <div className={`grid grid-cols-1 gap-4 ${isAdmin ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
-          <LatticeGrid options={customOptions} rows={custom} height={Math.min(100 + custom.length * 34, 400)}
+          <LatticeGrid options={customOptions} rows={custom} height={Math.min(100 + custom.length * 34, 400)} reveal={reveal}
             on={{
               cellValueChanged: saveEdit,
               selectionChanged: (rows: RoleRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
             }} />
           {isAdmin && (selected ? (
-            <aside data-pin-scope className="card gap-2">
+            <aside data-pin-scope data-form-for={selected.id} className="card gap-2">
               <h3>{selected.name}</h3>
               <p className="hint">
                 {selected.people ? `${selected.people === 1 ? '1 person holds' : `${selected.people} people hold`} this role.` : 'Nobody holds this role yet.'}

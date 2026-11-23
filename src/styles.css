@@ -123,3 +123,6 @@
 /* Pick-list column filters open a tick list; show a caret so they read as dropdowns. */
 .lg-ff-set { position: relative; padding-right: 1.25rem !important; text-align: left; }
 .lg-ff-set::after { content: '▾'; position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); color: var(--color-muted); font-size: 0.7rem; }
+
+/* A form opened after adding something scrolls into view below the header and pinned button. */
+[data-form-for] { scroll-margin-top: 7rem; }

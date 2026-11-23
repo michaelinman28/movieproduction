@@ -22,13 +22,19 @@ interface Props<Row> {
   onReady?: (grid: LatticeGridInstance<Row>) => void;
   height?: number | string;
   className?: string;
+  /**
+   * Selects this row and scrolls it into view once it's in `rows`; used after adding
+   * something, so the new row is highlighted while its form opens. Change `n` to show
+   * the same row again.
+   */
+  reveal?: { id: string; n: number } | null;
 }
 
 // lattice-grid's own CSS sets min-height: 240px; match it so the box doesn't overflow.
 const MIN_GRID_HEIGHT = 240;
 
 /** React wrapper around Michael's lattice-grid library. */
-export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, className }: Props<Row>) {
+export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, className, reveal }: Props<Row>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<LatticeGridInstance<Row> | null>(null);
   const { theme } = useTheme();
@@ -106,6 +112,27 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
   useEffect(() => {
     gridRef.current?.setRows(rows);
   }, [rows]);
+
+  // Highlight a newly added row. `nodeById`, `display`, `visible`, `selected`,
+  // `_setRange` and `_renderRows` are lattice-grid internals outside its type declarations.
+  const revealed = useRef<{ id: string; n: number } | null>(null);
+  useEffect(() => {
+    const g = gridRef.current as unknown as {
+      nodeById?: Map<string, { id: string; data?: unknown }>; display?: { node?: { data?: unknown } }[]; visible?: { special?: string }[];
+      selected?: Set<string>; o?: { selection?: string };
+      _setRange?: (a: { r: number; c: number }, b: { r: number; c: number }) => void;
+      ensureVisible?: (r: number, c: number) => void; _renderRows?: () => void;
+    } | null;
+    if (!g || !reveal || revealed.current === reveal) return;
+    const node = g.nodeById?.get(String(reveal.id));
+    if (!node) return; // not loaded yet; tries again when rows change
+    revealed.current = reveal;
+    if (g.o?.selection && g.selected) { g.selected.clear(); g.selected.add(node.id); }
+    // In tree mode the display wraps rows in tree nodes, so match on the row itself.
+    const r = g.display?.findIndex((e) => e.node === node || (e.node?.data !== undefined && e.node.data === node.data)) ?? -1;
+    const c = Math.max(0, g.visible?.findIndex((col) => !col.special || col.special === 'group') ?? 0);
+    if (r >= 0) { g._setRange?.({ r, c }, { r, c }); g.ensureVisible?.(r, c); } else g._renderRows?.();
+  }, [rows, reveal]);
 
   // Follow the app's light/dark switch.
   useEffect(() => {

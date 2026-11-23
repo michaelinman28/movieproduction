@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { RenameForm } from '../components/RenameForm';
+import { confirmDiscard } from '../lib/unsaved';
+import { scrollToForm } from '../lib/reveal';
 import { LatticeGrid } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { api, type Company, type TaskCategory, type TaskTag } from '../lib/api';
@@ -23,6 +25,8 @@ export function TaskSettingsPage() {
   const [newTag, setNewTag] = useState('');
   const [selCat, setSelCat] = useState<string | null>(null);
   const [selTag, setSelTag] = useState<string | null>(null);
+  const [revealCat, setRevealCat] = useState<{ id: string; n: number } | null>(null);
+  const [revealTag, setRevealTag] = useState<{ id: string; n: number } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -75,13 +79,23 @@ export function TaskSettingsPage() {
   async function addCategory(e: FormEvent) {
     e.preventDefault();
     const name = newCategory.trim();
-    if (name && await run(() => api.createTaskCategory(companyId, name), `Added the ${name} category.`)) setNewCategory('');
+    if (!name || !confirmDiscard()) return;
+    let id = '';
+    if (await run(async () => { id = (await api.createTaskCategory(companyId, name)).id; }, `Added the ${name} category.`)) {
+      setNewCategory('');
+      setSelCat(id); setRevealCat({ id, n: Date.now() }); scrollToForm(id);
+    }
   }
 
   async function addTag(e: FormEvent) {
     e.preventDefault();
     const name = newTag.trim();
-    if (name && await run(() => api.createTaskTag(companyId, name), `Added the ${name} tag.`)) setNewTag('');
+    if (!name || !confirmDiscard()) return;
+    let id = '';
+    if (await run(async () => { id = (await api.createTaskTag(companyId, name)).id; }, `Added the ${name} tag.`)) {
+      setNewTag('');
+      setSelTag(id); setRevealTag({ id, n: Date.now() }); scrollToForm(id);
+    }
   }
 
   async function reorder(e: { ids: string[]; toIndex: number }) {
@@ -137,7 +151,7 @@ export function TaskSettingsPage() {
               <button type="submit" className="btn" data-pin>Add category</button>
             </form>
           )}
-          <LatticeGrid options={catOptions} rows={catRows} height={Math.min(80 + catRows.length * 34, 480)}
+          <LatticeGrid options={catOptions} rows={catRows} height={Math.min(80 + catRows.length * 34, 480)} reveal={revealCat}
             on={{
               cellValueChanged: (e: { data: LabelRow; newValue: unknown }) =>
                 run(() => api.updateTaskCategory(e.data.id, { name: String(e.newValue ?? '').trim() })),
@@ -145,7 +159,7 @@ export function TaskSettingsPage() {
               selectionChanged: (rows: LabelRow[]) => setSelCat(rows[0]?.id ?? null),
             }} />
           {isAdmin && selectedCat && (
-            <div className="card gap-2">
+            <div className="card gap-2" data-form-for={selectedCat.id}>
               <span className="hint">{selectedCat.name}: used by {plural(selectedCat.tasks)}.</span>
               <RenameForm key={selectedCat.id} label="Category name" value={selectedCat.name} maxLength={60}
                 onSave={(name) => run(() => api.updateTaskCategory(selectedCat.id, { name }), `Renamed to ${name}.`)} />
@@ -164,14 +178,14 @@ export function TaskSettingsPage() {
               onChange={(e) => setNewTag(e.target.value)} required />
             <button type="submit" className="btn btn-secondary" data-pin>Add tag</button>
           </form>
-          <LatticeGrid options={tagOptions} rows={tagRows} height={Math.min(80 + tagRows.length * 34, 480)}
+          <LatticeGrid options={tagOptions} rows={tagRows} height={Math.min(80 + tagRows.length * 34, 480)} reveal={revealTag}
             on={{
               cellValueChanged: (e: { data: LabelRow; newValue: unknown }) =>
                 run(() => api.updateTaskTag(e.data.id, String(e.newValue ?? '').trim())),
               selectionChanged: (rows: LabelRow[]) => setSelTag(rows[0]?.id ?? null),
             }} />
           {isAdmin && selectedTag && (
-            <div className="card gap-2">
+            <div className="card gap-2" data-form-for={selectedTag.id}>
               <span className="hint">{selectedTag.name}: used by {plural(selectedTag.tasks)}.</span>
               <RenameForm key={selectedTag.id} label="Tag name" value={selectedTag.name} maxLength={40}
                 onSave={(name) => run(() => api.updateTaskTag(selectedTag.id, name), `Renamed to ${name}.`)} />

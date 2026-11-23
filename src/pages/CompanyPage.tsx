@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LatticeGrid, gridDropdown, gridEsc, gridLink } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { RolePicker } from '../components/RolePicker';
 import { useAuth } from '../lib/auth';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
+import { scrollToForm } from '../lib/reveal';
 import { api, type Company, type CompanyMember, type Project } from '../lib/api';
 import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, statusLabel, statusValue } from '../lib/format';
 import type { Role } from '../lib/database.types';
@@ -66,6 +67,15 @@ export function CompanyPage() {
     setDraft({ name: company?.name ?? '', description: company?.description ?? '' });
     setEditing(true);
   }
+  // A company just created opens its details form, to add a description.
+  const location = useLocation();
+  useEffect(() => {
+    if (company && (location.state as { created?: boolean } | null)?.created) {
+      startEdit();
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company]);
   async function saveCompany(e: FormEvent) {
     e.preventDefault();
     const ok = await run(() => api.updateCompany(companyId, { name: draft.name.trim(), description: draft.description.trim() || null }));
@@ -85,7 +95,8 @@ export function CompanyPage() {
     setError(null);
     try {
       const p = await api.createProject(companyId, { name: projectName.trim() });
-      navigate(`/projects/${p.id}`);
+      // The new project opens with its details form, to fill in the rest.
+      navigate(`/projects/${p.id}`, { state: { created: true } });
     } catch (err) { setError(errorText(err)); }
   }
   const projectRows = useMemo<ProjectRow[]>(() => projects.map((p) => ({
@@ -129,16 +140,22 @@ export function CompanyPage() {
 
   // ---- People --------------------------------------------------------------
   const [newPerson, setNewPerson] = useState({ email: '', title: '', admin: false });
+  const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
   async function addPerson(e: FormEvent) {
     e.preventDefault();
     const email = newPerson.email.trim();
+    if (!confirmDiscard()) return;
     let result = '';
+    let userId = '';
     const ok = await run(async () => {
       result = (await api.addMember(companyId, { email, is_admin: newPerson.admin, title: newPerson.title.trim() || null })).result;
+      userId = (await api.members(companyId)).find((m) => m.profile.email?.toLowerCase() === email.toLowerCase())?.user_id ?? '';
     });
     if (ok) {
-      setNotice(result === 'already_member' ? `${email} is already in this company.` : `Added ${email}.`);
+      setNotice(result === 'already_member' ? `${email} is already in this company.` : `Added ${email}. Pick their roles in the form.`);
       setNewPerson({ email: '', title: '', admin: false });
+      // Open the person's form, to pick their roles.
+      if (userId) { setSelectedId(userId); setReveal({ id: userId, n: Date.now() }); scrollToForm(userId); }
     }
   }
 
@@ -256,6 +273,7 @@ export function CompanyPage() {
           <LatticeGrid
             options={peopleOptions}
             rows={peopleRows}
+            reveal={reveal}
             height={Math.min(80 + peopleRows.length * 34, 420)}
             on={{ selectionChanged: (rows: PersonRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); }, cellValueChanged: savePersonCell }}
           />
@@ -314,7 +332,7 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
   }
 
   return (
-    <aside data-pin-scope className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
+    <aside data-pin-scope data-form-for={member.user_id} className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
       <h3>{name}</h3>
       <p className="hint mt-2">
         {member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}

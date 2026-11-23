@@ -4,6 +4,7 @@ import { Section } from './Section';
 import { TagPicker } from './TagPicker';
 import { TaskNotes } from './TaskNotes';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
+import { scrollToForm } from '../lib/reveal';
 import {
   api, type DayPart, type Location, type ProjectMember, type Task, type TaskCategory, type TaskInput, type TaskPriority, type TaskStatus, type TaskTag,
 } from '../lib/api';
@@ -104,6 +105,14 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
+  // A task just added (or opened from the panel) is highlighted in the grid.
+  const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
+  /** Selects a task, highlights it in the grid and shows its form. */
+  function open(id: string) {
+    setSelectedId(id);
+    setReveal({ id, n: Date.now() });
+    scrollToForm(id);
+  }
   const gridRef = useRef<LatticeGridInstance<TaskRow> | null>(null);
 
   const load = useCallback(async () => {
@@ -333,7 +342,13 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
     e.preventDefault();
     const title = newTitle.trim();
     if (!title) return;
-    if (await run(() => api.createTask(projectId, { title }), `Added "${title}".`)) setNewTitle('');
+    if (!confirmDiscard()) return;
+    let id = '';
+    if (await run(async () => { id = (await api.createTask(projectId, { title })).id; }, `Added "${title}". Fill in the rest of its details in the form.`)) {
+      setNewTitle('');
+      // Adding is usually the start: open the new task's form.
+      if (id) open(id);
+    }
   }
 
   // Group header rows take space too when the list is grouped.
@@ -371,6 +386,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
             rows={rows}
             height={Math.min(160 + (rows.length + groupCount) * 34 + (view ? 44 : 0), 640)}
             on={{ cellValueChanged: onCellChanged, rangeChanged: onRange }}
+            reveal={reveal}
             onReady={(g) => { gridRef.current = g; }}
           />
         ) : <p className="text-muted">Loading tasks…</p>}
@@ -389,7 +405,7 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
             tags={tags}
             run={run}
             onDeleted={() => setSelectedId(null)}
-            onAdded={(id) => { if (confirmDiscard()) setSelectedId(id); }}
+            onAdded={(id) => { if (confirmDiscard()) open(id); }}
           />
         ) : (
           <aside data-pin-scope className="card hidden lg:flex">
@@ -490,7 +506,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
     if (await run(() => api.deleteTask(task.id), `Deleted "${task.title}".`)) onDeleted();
   }
   return (
-    <aside data-pin-scope className="card gap-3 lg:max-h-[720px] lg:overflow-auto">
+    <aside data-pin-scope data-form-for={task.id} className="card gap-3 lg:max-h-[720px] lg:overflow-auto">
       <form className="flex flex-col gap-2" onSubmit={save}>
         <label className="label">Task<input className="field" value={draft.title} maxLength={200} required onChange={(e) => set('title', e.target.value)} /></label>
         <label className="label">Description<textarea className="field" rows={3} value={draft.description} maxLength={5000} onChange={(e) => set('description', e.target.value)} /></label>

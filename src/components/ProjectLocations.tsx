@@ -4,6 +4,7 @@ import { Section } from './Section';
 import { api, type Location, type LocationInput, type LocationStatus } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
+import { scrollToForm } from '../lib/reveal';
 import { LOCATION_STATUSES, errorText, labelOf, valueOf } from '../lib/format';
 
 interface LocationRow {
@@ -40,6 +41,7 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
   const me = session?.user.id;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showUnused, setShowUnused] = useState(readShow);
@@ -95,11 +97,13 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
   async function add(e: FormEvent) {
     e.preventDefault();
     const name = newName.trim();
-    if (!name) return;
+    if (!name || !confirmDiscard()) return;
     let id = '';
     if (await run(async () => { id = (await api.createLocation(projectId, { name })).id; }, `Added ${name}. Fill in its address and contact on the right.`)) {
       setNewName('');
       setSelectedId(id);
+      setReveal({ id, n: Date.now() });
+      scrollToForm(id);
     }
   }
 
@@ -123,7 +127,7 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
       {notice && <p className="notice">{notice}</p>}
       {/* The panel's space stays put so selecting a row doesn't resize the grid mid double-click. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <LatticeGrid options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)}
+        <LatticeGrid options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)} reveal={reveal}
           on={{ cellValueChanged: saveCell, selectionChanged: (r: LocationRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); } }} />
         {selected ? (
           <LocationPanel key={selected.id} location={selected} run={run}
@@ -173,7 +177,7 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
   }
 
   return (
-    <aside data-pin-scope className="card gap-2 lg:max-h-[640px] lg:overflow-auto">
+    <aside data-pin-scope data-form-for={location.id} className="card gap-2 lg:max-h-[640px] lg:overflow-auto">
       <h3>{location.name}</h3>
       <p className="hint">{location.tasks ? `${location.tasks === 1 ? '1 task is' : `${location.tasks} tasks are`} here.` : 'No tasks here yet.'}</p>
       <form className="flex flex-col gap-2" onSubmit={save}>
