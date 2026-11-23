@@ -181,7 +181,7 @@ Checks: `npm run typecheck` (app and API), `npm run test:db` (security rules), `
 | What | Where |
 |---|---|
 | Web app preview | https://michaelinman28.github.io/movieproduction/ (rebuilt on every push to `main`) |
-| API | `https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api` (Swagger at `/docs`) once deployed |
+| API | https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api (Swagger at [/docs](https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api/docs)) |
 | Database | Supabase project `qixblelhruxdzxfaeamz` |
 
 ## Roadmap
