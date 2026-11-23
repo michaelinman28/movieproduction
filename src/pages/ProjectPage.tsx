@@ -111,74 +111,72 @@ export function ProjectPage() {
 
   const selected = team.find((t) => t.user_id === selectedId) ?? null;
 
-  if (!loaded) return <p className="muted">Loading…</p>;
+  if (!loaded) return <p className="text-muted">Loading…</p>;
   if (!project) return <p>{error ?? "That project doesn't exist or you aren't assigned to it."} <Link to="/">Back to companies</Link></p>;
 
   return (
-    <section className="stack">
-      <p className="crumbs">
+    <section className="flex flex-col gap-6">
+      <p className="text-sm text-muted">
         <Link to="/">Companies</Link> / <Link to={`/companies/${project.company_id}`}>{project.company.name}</Link> / {project.name}
       </p>
 
       {editing ? (
-        <form className="card wide" onSubmit={saveDetails}>
-          <label>Project name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
-          <label>Logline<input value={draft.logline} onChange={(e) => setDraft({ ...draft, logline: e.target.value })} /></label>
-          <label>Description<textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></label>
-          <div className="row wrap">
-            <label>Status
-              <select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ProjectStatus })}>
+        <form className="card w-full max-w-2xl" onSubmit={saveDetails}>
+          <label className="label">Project name<input className="field" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
+          <label className="label">Logline<input className="field" value={draft.logline} onChange={(e) => setDraft({ ...draft, logline: e.target.value })} /></label>
+          <label className="label">Description<textarea className="field" rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="label">Status
+              <select className="field" value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ProjectStatus })}>
                 {PROJECT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </label>
-            <label>Start date<input type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} /></label>
-            <label>End date<input type="date" value={draft.end_date} min={draft.start_date || undefined} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} /></label>
+            <label className="label">Start date<input className="field" type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} /></label>
+            <label className="label">End date<input className="field" type="date" value={draft.end_date} min={draft.start_date || undefined} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} /></label>
           </div>
-          <div className="row">
-            <button type="submit">Save</button>
-            <button type="button" className="secondary" onClick={() => setEditing(false)}>Cancel</button>
-            <span className="spacer" />
-            <button type="button" className="danger" onClick={deleteProject}>Delete project</button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button type="submit" className="btn">Save</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
+            <button type="button" className="btn btn-danger sm:ml-auto" onClick={deleteProject}>Delete project</button>
           </div>
         </form>
       ) : (
-        <header className="row">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1>{project.name}</h1>
-            {project.logline && <p className="logline">{project.logline}</p>}
-            <p className="muted small">
-              <span className="badge">{statusLabel(project.status)}</span>
+            {project.logline && <p className="mt-1 italic">{project.logline}</p>}
+            <p className="hint mt-2">
+              <span className="rounded-full bg-line px-2 py-0.5 text-xs text-fg">{statusLabel(project.status)}</span>
               {project.start_date && <> · {project.start_date}{project.end_date ? ` to ${project.end_date}` : ''}</>}
             </p>
             {project.description && <p>{project.description}</p>}
           </div>
-          <span className="spacer" />
-          {isAdmin && <button className="secondary" onClick={startEdit}>Edit project</button>}
+          {isAdmin && <button className="btn btn-secondary" onClick={startEdit}>Edit project</button>}
         </header>
       )}
 
       {error && <p className="error">{error}</p>}
-      {notice && <p className="info">{notice}</p>}
+      {notice && <p className="notice">{notice}</p>}
 
       <div>
         <h2>Team</h2>
         {isAdmin && (
           available.length ? (
-            <form className="inline" onSubmit={assign}>
-              <select value={addUser} onChange={(e) => setAddUser(e.target.value)} required>
+            <form className="form-row mb-2" onSubmit={assign}>
+              <select className="field" value={addUser} onChange={(e) => setAddUser(e.target.value)} required>
                 <option value="">Choose someone from the company…</option>
                 {available.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
-              <button type="submit">Assign to project</button>
+              <button type="submit" className="btn">Assign to project</button>
             </form>
           ) : (
-            <p className="muted small">
+            <p className="hint mt-2">
               Everyone in the company is on this project. To assign someone new, first add them on the{' '}
               <Link to={`/companies/${project.company_id}`}>company page</Link>.
             </p>
           )
         )}
-        <div className="split">
+        <div className={`grid grid-cols-1 gap-4 ${selected ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
           <LatticeGrid
             options={teamOptions}
             rows={teamRows}
@@ -197,10 +195,10 @@ export function ProjectPage() {
             />
           )}
         </div>
-        {!selected && teamRows.length > 0 && <p className="muted small">Select a person to see their details{isAdmin ? ' and set their project roles' : ''}.</p>}
+        {!selected && teamRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and set their project roles' : ''}.</p>}
       </div>
 
-      <p className="muted small">Tasks and the project journal are coming in the next steps.</p>
+      <p className="hint mt-2">Tasks and the project journal are coming in the next steps.</p>
     </section>
   );
 }
@@ -222,17 +220,17 @@ function TeamPanel({ projectId, member, roles, isAdmin, run, onRemoved }: {
   }
 
   return (
-    <aside className="panel">
+    <aside className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
       <h3>{name}</h3>
-      <p className="muted small">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
+      <p className="hint mt-2">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
       {isAdmin ? (
         <>
           <h4>Project roles</h4>
           <RolePicker roles={roles} selected={roleIds} onToggle={toggleRole} />
-          <button className="danger" onClick={remove}>Remove from project</button>
+          <button className="btn btn-danger" onClick={remove}>Remove from project</button>
         </>
       ) : (
-        <p>{roleNames(roleIds, roles) || <span className="muted">No project roles</span>}</p>
+        <p>{roleNames(roleIds, roles) || <span className="text-muted">No project roles</span>}</p>
       )}
     </aside>
   );

@@ -1,99 +1,65 @@
-:root {
-  --bg: #f7f7f5;
-  --surface: #ffffff;
-  --fg: #1c1c1a;
-  --muted: #6b6b66;
-  --border: #e2e2dc;
-  --accent: #b4442c;
-  --accent-fg: #ffffff;
-  --error: #b42318;
-  color-scheme: light dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+@import 'tailwindcss';
+
+/* Theme tokens. Components use these (bg-surface, text-muted, border-line,
+   bg-accent…) instead of raw colors, so light and dark mode switch in one place. */
+@theme {
+  --color-bg: #f7f7f5;
+  --color-surface: #ffffff;
+  --color-fg: #1c1c1a;
+  --color-muted: #6b6b66;
+  --color-line: #e2e2dc;
+  --color-accent: #b4442c;
+  --color-accent-fg: #ffffff;
+  --color-danger: #b42318;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
+
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #161614;
-    --surface: #1f1f1d;
-    --fg: #ededea;
-    --muted: #a3a39c;
-    --border: #34342f;
-    --accent: #e0694f;
-    --error: #f97066;
+    --color-bg: #161614;
+    --color-surface: #1f1f1d;
+    --color-fg: #ededea;
+    --color-muted: #a3a39c;
+    --color-line: #34342f;
+    --color-accent: #e0694f;
+    --color-danger: #f97066;
   }
 }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); }
-h1, h2 { margin: 0 0 12px; }
-.muted { color: var(--muted); }
-.error { color: var(--error); }
-.info { color: var(--muted); }
-input {
-  font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
-  background: var(--surface); color: var(--fg);
-}
-button {
-  font: inherit; padding: 8px 14px; border: 0; border-radius: 6px; cursor: pointer;
-  background: var(--accent); color: var(--accent-fg);
-}
-button:disabled { opacity: 0.6; cursor: default; }
-button.link { background: none; color: var(--accent); padding: 4px; }
-.auth { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
-.card {
-  width: min(380px, 100%); background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 24px; display: flex; flex-direction: column; gap: 12px;
-}
-.card label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
-.topbar {
-  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-  background: var(--surface); border-bottom: 1px solid var(--border);
-}
-.spacer { flex: 1; }
-.page { padding: 24px 16px; max-width: 1100px; margin: 0 auto; }
-form.inline { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-form.inline input { flex: 1; min-width: 200px; }
 
-/* Step 2: company, project and profile pages */
-h3, h4 { margin: 0 0 8px; }
-h4 { margin-top: 12px; font-size: 14px; }
-a { color: var(--accent); }
-.brand { color: var(--fg); font-weight: 700; text-decoration: none; }
-.topbar a.muted { text-decoration: none; }
-.small { font-size: 13px; }
-.stack { display: flex; flex-direction: column; gap: 20px; }
-.stack > * { margin-top: 0; margin-bottom: 0; }
-.row { display: flex; align-items: center; gap: 8px; }
-.row.wrap { flex-wrap: wrap; align-items: flex-end; }
-header.row { align-items: flex-start; }
-.crumbs { font-size: 14px; color: var(--muted); margin: 0; }
-.logline { font-style: italic; margin: 0 0 6px; }
-.badge {
-  display: inline-block; padding: 2px 8px; border-radius: 999px;
-  background: var(--border); color: var(--fg); font-size: 12px;
+@layer base {
+  :root { color-scheme: light dark; }
+  body { @apply bg-bg text-fg font-sans antialiased; }
+  h1 { @apply text-2xl font-bold leading-tight md:text-3xl; }
+  h2 { @apply mb-3 text-lg font-semibold md:text-xl; }
+  h3 { @apply text-base font-semibold; }
+  h4 { @apply mt-2 text-sm font-semibold; }
+  a { @apply text-accent; }
 }
-.card.wide { width: 100%; max-width: 640px; }
-textarea, select {
-  font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
-  background: var(--surface); color: var(--fg);
-}
-input:disabled { opacity: 0.7; }
-button.secondary { background: var(--surface); color: var(--fg); border: 1px solid var(--border); }
-button.danger { background: none; color: var(--error); border: 1px solid var(--error); }
-label.check { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
-form.inline select { flex: 1; min-width: 200px; }
-.split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
-.split:has(.panel) { grid-template-columns: minmax(0, 1fr) 320px; }
-.panel {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
-  display: flex; flex-direction: column; gap: 8px; max-height: 560px; overflow: auto;
-}
-.panel p { margin: 0; }
-.panel .danger { align-self: flex-start; margin-top: 8px; }
-.role-picker { display: flex; flex-direction: column; gap: 6px; }
-.role-picker fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
-.role-picker legend { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 2px; }
-.grid-link { color: var(--accent); text-decoration: none; font-weight: 500; }
-.grid-link:hover { text-decoration: underline; }
-@media (max-width: 760px) {
-  .split:has(.panel) { grid-template-columns: minmax(0, 1fr); }
-  header.row { flex-wrap: wrap; }
+
+/* Mobile first: these are the phone styles. Bigger screens adapt with sm:/md:/lg:. */
+@layer components {
+  /* 16px text stops phones zooming in on focus; 44px min height is a comfortable tap target. */
+  .field {
+    @apply min-h-11 w-full rounded-md border border-line bg-surface px-3 py-2 text-base text-fg;
+    @apply focus:outline-2 focus:outline-accent disabled:opacity-70;
+  }
+  .btn {
+    @apply inline-flex min-h-11 w-full items-center justify-center rounded-md bg-accent px-4 py-2 text-base font-medium text-accent-fg;
+    @apply cursor-pointer disabled:cursor-default disabled:opacity-60 sm:w-auto;
+  }
+  /* Use with .btn: class="btn btn-secondary". */
+  .btn-secondary { @apply border border-line bg-surface text-fg; }
+  .btn-danger { @apply border border-danger bg-transparent text-danger; }
+  .btn-link { @apply inline-flex min-h-11 cursor-pointer items-center bg-transparent px-1 text-accent; }
+  /* A form whose fields stack on phones and share one row from sm: up. */
+  .form-row { @apply flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center; }
+  .form-row > .field { @apply sm:w-auto sm:min-w-48 sm:flex-1; }
+  .card { @apply flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 sm:p-6; }
+  .label { @apply flex flex-col gap-1 text-sm; }
+  .check { @apply inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm; }
+  .check input { @apply size-5 accent-accent; }
+  .notice { @apply text-sm text-muted; }
+  .error { @apply text-sm text-danger; }
+  .hint { @apply text-sm text-muted; }
+  .grid-link { @apply font-medium no-underline hover:underline; }
 }

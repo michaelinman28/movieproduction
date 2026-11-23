@@ -48,15 +48,15 @@ export function Home() {
   }), []);
 
   return (
-    <section className="stack">
+    <section className="flex flex-col gap-5">
       <h1>Your production companies</h1>
-      <form className="inline" onSubmit={createCompany}>
-        <input placeholder="New company name" value={name} onChange={(e) => setName(e.target.value)} required />
-        <button type="submit" disabled={busy}>Create company</button>
+      <form className="form-row" onSubmit={createCompany}>
+        <input className="field" placeholder="New company name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <button type="submit" className="btn shrink-0" disabled={busy}>Create company</button>
       </form>
       {error && <p className="error">{error}</p>}
       <LatticeGrid options={options} rows={companies} height={Math.min(80 + companies.length * 34, 400)} />
-      <p className="muted small">
+      <p className="hint">
         Waiting to be added to a company? Ask its admin to add you with the email you signed up with.
         You can add your phone number on <Link to="/profile">your profile</Link>.
       </p>

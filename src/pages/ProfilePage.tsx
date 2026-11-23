@@ -24,17 +24,17 @@ export function ProfilePage() {
     } catch (err) { setMessage({ kind: 'error', text: errorText(err) }); }
   }
 
-  if (!loaded) return <p className="muted">Loading…</p>;
+  if (!loaded) return <p className="text-muted">Loading…</p>;
   return (
-    <section className="stack">
+    <section className="flex flex-col gap-5">
       <h1>Your profile</h1>
-      <form className="card wide" onSubmit={save}>
-        <label>Full name<input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required autoComplete="name" /></label>
-        <label>Email<input value={email} disabled /></label>
-        <label>Phone number<input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} autoComplete="tel" placeholder="Optional" /></label>
-        <p className="muted small">Your name, email and phone are visible to people in the companies you belong to.</p>
-        {message && <p className={message.kind}>{message.text}</p>}
-        <div className="row"><button type="submit">Save profile</button></div>
+      <form className="card w-full max-w-xl" onSubmit={save}>
+        <label className="label">Full name<input className="field" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required autoComplete="name" /></label>
+        <label className="label">Email<input className="field" value={email} disabled /></label>
+        <label className="label">Phone number<input className="field" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} autoComplete="tel" placeholder="Optional" /></label>
+        <p className="hint">Your name, email and phone are visible to people in the companies you belong to.</p>
+        {message && <p className={message.kind === 'error' ? 'error' : 'notice'}>{message.text}</p>}
+        <div><button type="submit" className="btn">Save profile</button></div>
       </form>
     </section>
   );

@@ -15,10 +15,10 @@ export function RolePicker({ roles, selected, onToggle, disabled }: Props) {
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   return (
-    <div className="role-picker">
+    <div className="flex flex-col gap-3">
       {[...groups].map(([dept, list]) => (
-        <fieldset key={dept}>
-          <legend>{dept}</legend>
+        <fieldset key={dept} className="flex flex-col">
+          <legend className="mb-1 text-xs font-medium tracking-wide text-muted uppercase">{dept}</legend>
           {list.map((r) => (
             <label key={r.id} className="check">
               <input

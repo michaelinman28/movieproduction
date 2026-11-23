@@ -1,9 +1,11 @@
 # Movie Production
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture and technology overview.
+
 A platform for running a movie production: production companies, projects,
 people and roles, tasks with sub-tasks, and a project journal.
 
-Built with React (Vite), a separate API layer (Hono, with an OpenAPI spec and
+Built mobile-first with React (Vite) and Tailwind CSS, a separate API layer (Hono, with an OpenAPI spec and
 Swagger UI), Supabase (database, sign-in, row-level security) and
 [lattice-grid](https://github.com/michaelinman28/lattice-grid) for tables.
 

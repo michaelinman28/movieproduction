@@ -141,68 +141,66 @@ export function CompanyPage() {
 
   const selected = members.find((m) => m.user_id === selectedId) ?? null;
 
-  if (!loaded) return <p className="muted">Loading…</p>;
+  if (!loaded) return <p className="text-muted">Loading…</p>;
   if (!company) return <p>{error ?? "That company doesn't exist or you don't have access."} <Link to="/">Back to companies</Link></p>;
 
   return (
-    <section className="stack">
-      <p className="crumbs"><Link to="/">Companies</Link> / {company.name}</p>
+    <section className="flex flex-col gap-6">
+      <p className="text-sm text-muted"><Link to="/">Companies</Link> / {company.name}</p>
 
       {editing ? (
-        <form className="card wide" onSubmit={saveCompany}>
-          <label>Company name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
-          <label>Description<textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></label>
-          <div className="row">
-            <button type="submit">Save</button>
-            <button type="button" className="secondary" onClick={() => setEditing(false)}>Cancel</button>
-            <span className="spacer" />
-            <button type="button" className="danger" onClick={deleteCompany}>Delete company</button>
+        <form className="card w-full max-w-2xl" onSubmit={saveCompany}>
+          <label className="label">Company name<input className="field" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
+          <label className="label">Description<textarea className="field" rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button type="submit" className="btn">Save</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
+            <button type="button" className="btn btn-danger sm:ml-auto" onClick={deleteCompany}>Delete company</button>
           </div>
         </form>
       ) : (
-        <header className="row">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1>{company.name}</h1>
-            {company.description && <p className="muted">{company.description}</p>}
+            {company.description && <p className="mt-1 text-muted">{company.description}</p>}
           </div>
-          <span className="spacer" />
-          {isAdmin && <button className="secondary" onClick={startEdit}>Edit company</button>}
+          {isAdmin && <button className="btn btn-secondary" onClick={startEdit}>Edit company</button>}
         </header>
       )}
 
       {error && <p className="error">{error}</p>}
-      {notice && <p className="info">{notice}</p>}
+      {notice && <p className="notice">{notice}</p>}
 
       <div>
         <h2>Projects</h2>
         {isAdmin && (
-          <form className="inline" onSubmit={createProject}>
-            <input placeholder="New project name" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
-            <button type="submit">Create project</button>
+          <form className="form-row mb-2" onSubmit={createProject}>
+            <input className="field" placeholder="New project name" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
+            <button type="submit" className="btn">Create project</button>
           </form>
         )}
         <LatticeGrid options={projectOptions} rows={projectRows} height={Math.min(80 + projectRows.length * 34, 320)} />
-        {!isAdmin && <p className="muted small">You see the projects you're assigned to. Company admins see all of them.</p>}
+        {!isAdmin && <p className="hint mt-2">You see the projects you're assigned to. Company admins see all of them.</p>}
       </div>
 
       <div>
         <h2>People</h2>
         {isAdmin && (
-          <form className="inline" onSubmit={addPerson}>
-            <input type="email" placeholder="Their account email" value={newPerson.email}
+          <form className="form-row mb-2" onSubmit={addPerson}>
+            <input className="field" type="email" placeholder="Their account email" value={newPerson.email}
               onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} required />
-            <input placeholder="Title (optional)" value={newPerson.title}
+            <input className="field" placeholder="Title (optional)" value={newPerson.title}
               onChange={(e) => setNewPerson({ ...newPerson, title: e.target.value })} />
             <label className="check">
               <input type="checkbox" checked={newPerson.admin}
                 onChange={(e) => setNewPerson({ ...newPerson, admin: e.target.checked })} />
               Admin
             </label>
-            <button type="submit">Add person</button>
+            <button type="submit" className="btn">Add person</button>
           </form>
         )}
-        {isAdmin && <p className="muted small">People need to create their own account first. Then add them here with the email they signed up with.</p>}
-        <div className="split">
+        {isAdmin && <p className="hint mt-2">People need to create their own account first. Then add them here with the email they signed up with.</p>}
+        <div className={`grid grid-cols-1 gap-4 ${selected ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
           <LatticeGrid
             options={peopleOptions}
             rows={peopleRows}
@@ -222,7 +220,7 @@ export function CompanyPage() {
             />
           )}
         </div>
-        {!selected && peopleRows.length > 0 && <p className="muted small">Select a person to see their details{isAdmin ? ' and change their roles' : ''}.</p>}
+        {!selected && peopleRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and change their roles' : ''}.</p>}
       </div>
     </section>
   );
@@ -249,16 +247,16 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
   }
 
   return (
-    <aside className="panel">
+    <aside className="card gap-2 lg:max-h-[560px] lg:overflow-auto">
       <h3>{name}</h3>
-      <p className="muted small">
+      <p className="hint mt-2">
         {member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}
       </p>
       {isAdmin ? (
         <>
-          <form className="inline" onSubmit={(e) => { e.preventDefault(); run(() => api.updateMember(companyId, member.user_id, { title: title.trim() || null }), 'Title saved.'); }}>
-            <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <button type="submit" className="secondary">Save title</button>
+          <form className="form-row mb-2" onSubmit={(e) => { e.preventDefault(); run(() => api.updateMember(companyId, member.user_id, { title: title.trim() || null }), 'Title saved.'); }}>
+            <input className="field" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <button type="submit" className="btn btn-secondary">Save title</button>
           </form>
           <label className="check">
             <input type="checkbox" checked={member.is_admin}
@@ -267,13 +265,13 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
           </label>
           <h4>Company roles</h4>
           <RolePicker roles={roles} selected={roleIds} onToggle={toggleRole} />
-          <button className="danger" onClick={remove}>{isMe ? 'Leave company' : 'Remove from company'}</button>
+          <button className="btn btn-danger" onClick={remove}>{isMe ? 'Leave company' : 'Remove from company'}</button>
         </>
       ) : (
         <>
           {member.title && <p>{member.title}</p>}
-          <p>{roleNames(roleIds, roles) || <span className="muted">No company roles</span>}</p>
-          {isMe && <button className="danger" onClick={remove}>Leave company</button>}
+          <p>{roleNames(roleIds, roles) || <span className="text-muted">No company roles</span>}</p>
+          {isMe && <button className="btn btn-danger" onClick={remove}>Leave company</button>}
         </>
       )}
     </aside>
