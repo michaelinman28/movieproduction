@@ -4,6 +4,8 @@ import { LatticeGrid } from '../components/LatticeGrid';
 import { api, type Company, type RoleWithUsage } from '../lib/api';
 import { errorText } from '../lib/format';
 
+const NEW_DEPT = '__new__';
+
 interface RoleRow { id: string; name: string; department: string; description: string; people: number }
 
 const toRow = (r: RoleWithUsage): RoleRow => ({
@@ -19,6 +21,9 @@ export function RolesPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [draft, setDraft] = useState({ name: '', department: '' });
+  // The department is picked from a list of the ones already in use, or typed in
+  // when "New department…" is chosen.
+  const [newDept, setNewDept] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +49,7 @@ export function RolesPage() {
       const r = await api.createRole(companyId, { name: draft.name.trim(), department: draft.department.trim() || null });
       setNotice(`Added ${r.name}. Assign it to people from the company or project pages.`);
       setDraft({ name: '', department: '' });
+      setNewDept(false);
       await load();
     } catch (err) { setError(errorText(err)); }
   }
@@ -80,7 +86,7 @@ export function RolesPage() {
 
   const customOptions = useMemo(() => ({
     rowId: (r: RoleRow) => r.id,
-    toolbar: false, groupPanel: false, statusBar: false, floatingFilters: false,
+    toolbar: false, groupPanel: false, statusBar: false,
     selection: 'single', rowClickSelection: true, readOnly: !isAdmin,
     emptyMessage: isAdmin ? 'No custom roles yet. Add one above.' : 'This company has no custom roles',
     columns: [
@@ -97,6 +103,7 @@ export function RolesPage() {
     columns: [
       { field: 'name', header: 'Role', width: 220 },
       { field: 'department', header: 'Department', width: 160 },
+      { field: 'description', header: 'Description', width: 320 },
       { field: 'people', header: 'People', type: 'number', width: 90 },
     ],
   }), []);
@@ -125,16 +132,32 @@ export function RolesPage() {
           <form className="form-row mb-2" onSubmit={addRole}>
             <input className="field" placeholder="Role name, e.g. Drone Pilot" value={draft.name} maxLength={80}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
-            <input className="field" placeholder="Department (optional)" value={draft.department} maxLength={60} list="departments"
-              onChange={(e) => setDraft({ ...draft, department: e.target.value })} />
-            <datalist id="departments">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+            {newDept ? (
+              <div className="flex gap-2">
+                <input className="field" placeholder="New department name" value={draft.department} maxLength={60} autoFocus
+                  aria-label="New department" onChange={(e) => setDraft({ ...draft, department: e.target.value })} />
+                <button type="button" className="btn btn-secondary" onClick={() => { setNewDept(false); setDraft({ ...draft, department: '' }); }}>
+                  Back to list
+                </button>
+              </div>
+            ) : (
+              <select className="field" aria-label="Department" value={draft.department}
+                onChange={(e) => {
+                  if (e.target.value === NEW_DEPT) { setNewDept(true); setDraft({ ...draft, department: '' }); }
+                  else setDraft({ ...draft, department: e.target.value });
+                }}>
+                <option value="">No department</option>
+                {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                <option value={NEW_DEPT}>New department…</option>
+              </select>
+            )}
             <button type="submit" className="btn">Add role</button>
           </form>
         )}
         {/* The side panel is always there for admins, so selecting a row doesn't resize the
             grid mid double-click (which would stop the cell from opening for editing). */}
         <div className={`grid grid-cols-1 gap-4 ${isAdmin ? 'lg:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
-          <LatticeGrid options={customOptions} rows={custom} height={Math.min(60 + custom.length * 34, 360)}
+          <LatticeGrid options={customOptions} rows={custom} height={Math.min(100 + custom.length * 34, 400)}
             on={{
               cellValueChanged: saveEdit,
               selectionChanged: (rows: RoleRow[]) => setSelectedId(rows[0]?.id ?? null),
