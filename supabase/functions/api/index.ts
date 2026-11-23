@@ -4,6 +4,7 @@ import { createApp } from './app.ts';
 
 const app = createApp({
   basePath: '/api',
+  publicUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/api`,
   supabaseUrl: Deno.env.get('SUPABASE_URL')!,
   supabaseKey: Deno.env.get('SUPABASE_ANON_KEY')!,
 });

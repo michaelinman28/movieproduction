@@ -59,8 +59,8 @@ Authentication > URL Configuration: set the Site URL to that address and add it
 
 - Code: `supabase/functions/api` (routes in `routes/`, request and response schemas in `schemas.ts`).
   The same code runs on Node locally (`api/server.ts`) and on Supabase Edge Functions (`index.ts`).
-- Live: https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api/docs once deployed with
-  `npx supabase functions deploy api --project-ref qixblelhruxdzxfaeamz --no-verify-jwt`
+- Live: https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api/docs (Swagger). Redeploy after API changes with
+  `npx supabase functions deploy api --remote=qixblelhruxdzxfaeamz --no-verify-jwt --use-api`
   (the API checks tokens itself so sign-up and sign-in work without one).
 - Spec: `api/openapi.json`, or `/openapi.json` on a running API.
 - Auth: `POST /auth/signin` returns an `access_token`; send it as `Authorization: Bearer <token>`.

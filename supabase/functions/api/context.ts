@@ -5,6 +5,9 @@ import type { Context } from 'hono';
 export interface ApiConfig {
   /** Path the API is mounted under, e.g. '/api' on Supabase Edge Functions. */
   basePath?: string;
+  /** Public address of the API, when it differs from the request URL (e.g. behind
+   * Supabase's /functions/v1 prefix). Used for Swagger links and the spec's server. */
+  publicUrl?: string;
   supabaseUrl: string;
   /** The project's publishable (anon) key. Never the secret key: the database's
    * row-level security decides what each caller can see and change. */
