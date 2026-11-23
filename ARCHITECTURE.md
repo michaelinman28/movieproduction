@@ -26,8 +26,11 @@ day to day.
   with its category, status, priority, person assigned, due date and time, tags and
   sub-task progress. Quick filter, column filters and expand/collapse are in the grid.
 - **Who:** everyone on the project, plus admins of its company.
-- **Editing in the grid:** double-click (or tap twice) a category, status, priority,
-  person, due date or time to change it.
+- **Views:** a "Show" menu switches between the sub-task tree and a flat list grouped
+  by person, category, status, priority, due date or tags (more columns can be dragged
+  into the grouping bar). The choice is remembered on the device.
+- **Editing in the grid:** person, category, status, priority and time cells look like
+  dropdowns and open their list with one click; double-click a due date to change it.
 - **The task panel** (select a task): title, description, due date with a time of day
   (Any time, Morning, Afternoon, Evening) or an exact time, category, tags, notes,
   the list of sub-tasks (tick to mark done, click to open), adding a sub-task, moving
@@ -180,6 +183,8 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   tokens (`bg-surface`, `text-muted`, `border-line`, `bg-accent`). lattice-grid
   follows the same switch and is tinted to match.
 - **lattice-grid** keeps its own stylesheet. Tailwind styles the page around it.
+- **Collapsible sections.** Page sections (Team, Tasks, Projects, People, roles)
+  open and close from their heading, remembered per device (`src/components/Section.tsx`).
 
 ## Repository layout
 

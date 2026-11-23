@@ -54,8 +54,19 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
       grid.on(name, forwarders[name]);
     }
 
+    // A pick-list editor saves as soon as something is picked, instead of waiting
+    // for Enter or for focus to move away.
+    const container = containerRef.current;
+    const onChange = (e: Event) => {
+      const t = e.target as HTMLElement;
+      const g = grid as unknown as { editing?: { input?: unknown } | null; stopEdit?: (commit: boolean) => boolean };
+      if (t.tagName === 'SELECT' && t.classList.contains('lg-editor') && g.editing?.input === t) g.stopEdit?.(true);
+    };
+    container.addEventListener('change', onChange);
+
     onReady?.(grid);
     return () => {
+      container.removeEventListener('change', onChange);
       grid.destroy();
       gridRef.current = null;
     };
