@@ -167,7 +167,7 @@ export function TaskTree({ projectId, companyId, team, canManage }: {
     const columns = [
       ...(view ? [
         // A flat list needs the task's own name, and its parent for sub-tasks.
-        { field: 'title', header: 'Task', width: window.innerWidth < 640 ? 170 : 240, pinned: 'left' },
+        { field: 'title', header: 'Task', width: window.innerWidth < 640 ? 170 : 240 },
         { field: 'parent', header: 'Sub-task of', width: 160 },
       ] : []),
       {
