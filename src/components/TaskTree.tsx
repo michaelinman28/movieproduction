@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { LatticeGrid } from './LatticeGrid';
+import { TagPicker } from './TagPicker';
 import { TaskNotes } from './TaskNotes';
-import { api, type DayPart, type ProjectMember, type Task, type TaskInput, type TaskPriority, type TaskStatus } from '../lib/api';
+import {
+  api, type DayPart, type ProjectMember, type Task, type TaskCategory, type TaskInput, type TaskPriority, type TaskStatus, type TaskTag,
+} from '../lib/api';
 import {
   DAY_PARTS, HALF_HOURS, TASK_PRIORITIES, TASK_STATUSES, displayName, dueWhen, errorText, isOverdue, labelOf, timeLabel, valueOf,
 } from '../lib/format';
@@ -16,9 +19,12 @@ interface TaskRow {
   due: string;
   when: string;
   subtasks: string;
+  category: string;
+  tags: string;
 }
 
 const UNASSIGNED = 'Unassigned';
+const NO_CATEGORY = 'No category';
 const ANY_TIME = 'Any time';
 // Choices for the grid's Time cell: a part of the day, or a half hour.
 const WHEN_OPTIONS = [ANY_TIME, ...DAY_PARTS.map((p) => p.label), ...HALF_HOURS.map(timeLabel)];
@@ -56,8 +62,12 @@ function subtree(id: string, kids: Map<string, Task[]>): Set<string> {
 
 const pill = (text: string, tone: string) => `<span class="task-pill task-pill-${tone}">${text}</span>`;
 
-export function TaskTree({ projectId, team, canManage }: { projectId: string; team: ProjectMember[]; canManage: boolean }) {
+export function TaskTree({ projectId, companyId, team, canManage }: {
+  projectId: string; companyId: string; team: ProjectMember[]; canManage: boolean;
+}) {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [categories, setCategories] = useState<TaskCategory[]>([]);
+  const [tags, setTags] = useState<TaskTag[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,9 +76,14 @@ export function TaskTree({ projectId, team, canManage }: { projectId: string; te
   const gridRef = useRef<LatticeGridInstance<TaskRow> | null>(null);
 
   const load = useCallback(async () => {
-    try { setTasks(await api.tasks(projectId)); } catch (e) { setError(errorText(e)); }
+    try {
+      const [t, c, g] = await Promise.all([api.tasks(projectId), api.taskCategories(companyId), api.taskTags(companyId)]);
+      setTasks(t);
+      setCategories(c);
+      setTags(g);
+    } catch (e) { setError(errorText(e)); }
     setLoaded(true);
-  }, [projectId]);
+  }, [projectId, companyId]);
   useEffect(() => { load(); }, [load]);
 
   const run = async (fn: () => Promise<unknown>, ok?: string) => {
@@ -83,6 +98,8 @@ export function TaskTree({ projectId, team, canManage }: { projectId: string; te
   const people = useMemo(() => team.map((m) => ({ id: m.user_id, name: displayName(m.profile) }))
     .sort((a, b) => a.name.localeCompare(b.name)), [team]);
   const nameOf = useMemo(() => new Map(people.map((p) => [p.id, p.name])), [people]);
+  const categoryName = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
+  const tagName = useMemo(() => new Map(tags.map((t) => [t.id, t.name])), [tags]);
   const kids = useMemo(() => childrenOf(tasks), [tasks]);
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
 
@@ -104,13 +121,15 @@ export function TaskTree({ projectId, team, canManage }: { projectId: string; te
           due: t.due_date ?? '',
           when: dueWhen(t),
           subtasks: sub.length ? `${sub.filter((s) => s.status === 'done').length} of ${sub.length} done` : '',
+          category: t.category_id ? categoryName.get(t.category_id) ?? '' : '',
+          tags: t.tag_ids.map((id) => tagName.get(id)).filter(Boolean).sort().join(', '),
         });
         walk(t.id, path);
       }
     };
     walk('', []);
     return out;
-  }, [kids, nameOf]);
+  }, [kids, nameOf, categoryName, tagName]);
 
   const options = useMemo(() => ({
     rowId: (r: TaskRow) => r.id,
@@ -124,6 +143,10 @@ export function TaskTree({ projectId, team, canManage }: { projectId: string; te
     groupPanel: false, statusBar: false,
     emptyMessage: 'No tasks yet. Add one above.',
     columns: [
+      {
+        field: 'category', header: 'Category', width: 140, editable: true, editor: 'select',
+        editorOptions: [NO_CATEGORY, ...categories.map((c) => c.name)],
+      },
       {
         field: 'status', header: 'Status', width: 120, editable: true, editor: 'select',
         editorOptions: TASK_STATUSES.map((s) => s.label),
@@ -154,9 +177,10 @@ export function TaskTree({ projectId, team, canManage }: { projectId: string; te
           return value ? (t && isOverdue(t) ? `<span class="task-overdue">${value}</span>` : value) : '';
         },
       },
+      { field: 'tags', header: 'Tags', width: 200 },
       { field: 'subtasks', header: 'Sub-tasks', width: 120 },
     ],
-  }), [people]);
+  }), [people, categories]);
 
   // The due-date renderer reads the latest tasks without rebuilding the grid.
   const byIdRef = useRef(byId);
@@ -171,6 +195,7 @@ export function TaskTree({ projectId, team, canManage }: { projectId: string; te
       // Clearing the date clears its time too.
       : e.column === 'due' ? (v ? { due_date: v } : { due_date: null, due_part: null, due_time: null })
       : e.column === 'when' ? parseWhen(v)
+      : e.column === 'category' ? { category_id: v === NO_CATEGORY || !v ? null : categories.find((c) => c.name === v)?.id }
       : null;
     if (!patch || Object.values(patch).some((x) => x === undefined)) { await load(); return; }
     await run(() => api.updateTask(e.data.id, patch));
@@ -199,7 +224,7 @@ export function TaskTree({ projectId, team, canManage }: { projectId: string; te
       <h2>Tasks</h2>
       <p className="hint mt-1">
         {tasks.length ? `${done} of ${tasks.length} done. ` : ''}
-        Double-click (or tap twice) a status, priority, person, due date or time to change it. Select a task to edit its description, add notes or sub-tasks, or move it.
+        Double-click (or tap twice) a category, status, priority, person, due date or time to change it. Select a task to edit its description, tags and notes, add sub-tasks, or move it.
       </p>
       <form className="form-row my-2" onSubmit={addTask}>
         <input className="field" placeholder="New task, e.g. Scout locations" value={newTitle} maxLength={200}
@@ -228,6 +253,9 @@ export function TaskTree({ projectId, team, canManage }: { projectId: string; te
             tasks={tasks}
             kids={kids}
             canManage={canManage}
+            companyId={companyId}
+            categories={categories}
+            tags={tags}
             run={run}
             onDeleted={() => setSelectedId(null)}
             onAdded={(id) => setSelectedId(id)}
@@ -242,8 +270,9 @@ export function TaskTree({ projectId, team, canManage }: { projectId: string; te
   );
 }
 
-function TaskPanel({ task, projectId, tasks, kids, canManage, run, onDeleted, onAdded }: {
-  task: Task; projectId: string; tasks: Task[]; kids: Map<string, Task[]>; canManage: boolean;
+function TaskPanel({ task, projectId, companyId, tasks, kids, categories, tags, canManage, run, onDeleted, onAdded }: {
+  task: Task; projectId: string; companyId: string; tasks: Task[]; kids: Map<string, Task[]>;
+  categories: TaskCategory[]; tags: TaskTag[]; canManage: boolean;
   run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
   onDeleted: () => void; onAdded: (id: string) => void;
 }) {
@@ -255,6 +284,7 @@ function TaskPanel({ task, projectId, tasks, kids, canManage, run, onDeleted, on
   const [dueTime, setDueTime] = useState(task.due_time?.slice(0, 5) ?? '');
   const [subTitle, setSubTitle] = useState('');
   const below = useMemo(() => subtree(task.id, kids), [task.id, kids]);
+  const children = kids.get(task.id) ?? [];
   const parents = tasks.filter((t) => !below.has(t.id)).sort((a, b) => a.title.localeCompare(b.title));
   const due: Pick<TaskInput, 'due_date' | 'due_part' | 'due_time'> = !dueDate
     ? { due_date: null, due_part: null, due_time: null }
@@ -281,6 +311,16 @@ function TaskPanel({ task, projectId, tasks, kids, canManage, run, onDeleted, on
       setSubTitle('');
       if (id) onAdded(id);
     }
+  }
+
+  async function setTags(ids: string[]) {
+    await run(() => api.updateTask(task.id, { tag_ids: ids }));
+  }
+
+  async function createTag(name: string) {
+    let made: TaskTag | null = null;
+    await run(async () => { made = await api.createTaskTag(companyId, name); });
+    return made;
   }
 
   async function move(parentId: string) {
@@ -318,7 +358,37 @@ function TaskPanel({ task, projectId, tasks, kids, canManage, run, onDeleted, on
         <button type="submit" className="btn" disabled={!changed}>Save</button>
       </form>
 
+      <label className="label">Category
+        <select className="field" value={task.category_id ?? ''}
+          onChange={(e) => run(() => api.updateTask(task.id, { category_id: e.target.value || null }))}>
+          <option value="">{NO_CATEGORY}</option>
+          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
+      <div className="label">Tags
+        <TagPicker tags={tags} selected={task.tag_ids} onChange={setTags} onCreate={createTag} />
+      </div>
+
       <TaskNotes taskId={task.id} canManage={canManage} />
+
+      <section className="flex flex-col gap-2" aria-label="Sub-tasks">
+        <h4>Sub-tasks{children.length ? ` (${children.filter((c) => c.status === 'done').length} of ${children.length} done)` : ''}</h4>
+        {children.length > 0 && (
+          <ul className="flex flex-col">
+            {children.map((c) => (
+              <li key={c.id} className="flex items-center gap-2 border-b border-line py-1 last:border-b-0">
+                <input type="checkbox" className="h-5 w-5 shrink-0 cursor-pointer accent-accent" checked={c.status === 'done'} aria-label={`Mark ${c.title} done`}
+                  onChange={(e) => run(() => api.updateTask(c.id, { status: e.target.checked ? 'done' : 'todo' }))} />
+                <button type="button" className={`btn-link min-w-0 flex-1 truncate text-left ${c.status === 'done' ? 'line-through text-muted' : ''}`}
+                  title="Open this sub-task" onClick={() => onAdded(c.id)}>
+                  {c.title}
+                </button>
+                <span className={`task-pill task-pill-${c.status}`}>{labelOf(TASK_STATUSES, c.status)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <form className="flex flex-col gap-2" onSubmit={addSub}>
         <label className="label">Add a sub-task

@@ -2,7 +2,7 @@
 // writes all data through the API; Supabase is used here only to keep the user
 // signed in and supply their access token.
 import { supabase } from './supabase';
-import type { DayPart, ProjectStatus, Role, Task, TaskPriority, TaskStatus } from './database.types';
+import type { DayPart, ProjectStatus, Role, Task as TaskRow, TaskPriority, TaskStatus } from './database.types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://localhost:8787';
 
@@ -40,8 +40,11 @@ export interface ProjectDetail extends Project { company: { id: string; name: st
 export interface ProjectMember { user_id: string; joined_at: string; profile: Profile; role_ids: string[] }
 export type ProjectInput = Partial<Pick<Project, 'name' | 'logline' | 'description' | 'status' | 'start_date' | 'end_date'>>;
 
-export type { DayPart, Task, TaskPriority, TaskStatus };
-export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'assignee_id' | 'due_date' | 'due_part' | 'due_time' | 'parent_id' | 'sort_order'>>;
+export type { DayPart, TaskPriority, TaskStatus };
+export interface Task extends TaskRow { tag_ids: string[] }
+export interface TaskCategory { id: string; company_id: string; name: string; sort_order: number; tasks: number }
+export interface TaskTag { id: string; company_id: string; name: string; tasks: number }
+export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'assignee_id' | 'due_date' | 'due_part' | 'due_time' | 'parent_id' | 'sort_order' | 'category_id' | 'tag_ids'>>;
 
 export interface TaskNote { id: string; task_id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
 
@@ -86,6 +89,14 @@ export const api = {
   createTask: (projectId: string, b: TaskInput & { title: string }) => call<Task>('POST', `/projects/${enc(projectId)}/tasks`, b),
   updateTask: (id: string, b: TaskInput) => call<Task>('PATCH', `/tasks/${enc(id)}`, b),
   deleteTask: (id: string) => call<void>('DELETE', `/tasks/${enc(id)}`),
+  taskCategories: (companyId: string) => call<TaskCategory[]>('GET', `/companies/${enc(companyId)}/task-categories`),
+  createTaskCategory: (companyId: string, name: string) => call<TaskCategory>('POST', `/companies/${enc(companyId)}/task-categories`, { name }),
+  updateTaskCategory: (id: string, b: { name?: string; sort_order?: number }) => call<TaskCategory>('PATCH', `/task-categories/${enc(id)}`, b),
+  deleteTaskCategory: (id: string) => call<void>('DELETE', `/task-categories/${enc(id)}`),
+  taskTags: (companyId: string) => call<TaskTag[]>('GET', `/companies/${enc(companyId)}/task-tags`),
+  createTaskTag: (companyId: string, name: string) => call<TaskTag>('POST', `/companies/${enc(companyId)}/task-tags`, { name }),
+  updateTaskTag: (id: string, name: string) => call<TaskTag>('PATCH', `/task-tags/${enc(id)}`, { name }),
+  deleteTaskTag: (id: string) => call<void>('DELETE', `/task-tags/${enc(id)}`),
   taskNotes: (taskId: string) => call<TaskNote[]>('GET', `/tasks/${enc(taskId)}/notes`),
   addTaskNote: (taskId: string, body: string) => call<TaskNote>('POST', `/tasks/${enc(taskId)}/notes`, { body }),
   updateTaskNote: (id: string, body: string) => call<TaskNote>('PATCH', `/task-notes/${enc(id)}`, { body }),

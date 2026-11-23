@@ -7,6 +7,7 @@ import { CompanyPage } from './pages/CompanyPage';
 import { ProjectPage } from './pages/ProjectPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
+import { TaskSettingsPage } from './pages/TaskSettingsPage';
 import { ThemeSwitch } from './components/ThemeSwitch';
 
 export function App() {
@@ -39,6 +40,7 @@ export function App() {
         <Routes>
           <Route path="/companies/:companyId" element={<CompanyPage />} />
           <Route path="/companies/:companyId/roles" element={<RolesPage />} />
+          <Route path="/companies/:companyId/task-settings" element={<TaskSettingsPage />} />
           <Route path="/projects/:projectId" element={<ProjectPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<Home />} />

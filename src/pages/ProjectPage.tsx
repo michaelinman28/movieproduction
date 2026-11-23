@@ -199,7 +199,7 @@ export function ProjectPage() {
         {!selected && teamRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and set their project roles' : ''}.</p>}
       </div>
 
-      <TaskTree projectId={projectId} team={team} canManage={isAdmin} />
+      <TaskTree projectId={projectId} companyId={project.company_id} team={team} canManage={isAdmin} />
 
       <p className="hint mt-2">The project journal is coming in the next step.</p>
     </section>

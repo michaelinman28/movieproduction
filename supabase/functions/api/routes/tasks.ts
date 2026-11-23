@@ -9,12 +9,35 @@ const tags = ['Tasks'];
 // deno-lint-ignore no-explicit-any
 type Row = any;
 
-// Leave out fields that weren't sent; turn empty strings into null.
+// Leave out fields that weren't sent (and tag_ids, which live in their own table);
+// turn empty strings into null.
 const clean = (b: Record<string, unknown>) => {
   const patch: Row = {};
-  for (const [k, v] of Object.entries(b)) if (v !== undefined) patch[k] = v === '' ? null : v;
+  for (const [k, v] of Object.entries(b)) if (v !== undefined && k !== 'tag_ids') patch[k] = v === '' ? null : v;
   return patch;
 };
+
+/** Add tag_ids to each task. */
+// deno-lint-ignore no-explicit-any
+async function withTags(db: any, rows: Row[]) {
+  if (!rows.length) return rows;
+  const links = must<{ task_id: string; tag_id: string }[]>(
+    await db.from('task_tag_links').select('task_id, tag_id').in('task_id', rows.map((r) => r.id)));
+  const map = new Map<string, string[]>();
+  for (const l of links) map.set(l.task_id, [...(map.get(l.task_id) ?? []), l.tag_id]);
+  return rows.map((r) => ({ ...r, tag_ids: map.get(r.id) ?? [] }));
+}
+
+/** Make a task's tags exactly tagIds. */
+// deno-lint-ignore no-explicit-any
+async function setTags(db: any, taskId: string, tagIds: string[]) {
+  const have = new Set(must<{ tag_id: string }[]>(await db.from('task_tag_links').select('tag_id').eq('task_id', taskId)).map((l) => l.tag_id));
+  const want = new Set(tagIds);
+  const remove = [...have].filter((id) => !want.has(id));
+  const add = [...want].filter((id) => !have.has(id));
+  if (remove.length) must(await db.from('task_tag_links').delete().eq('task_id', taskId).in('tag_id', remove));
+  if (add.length) must(await db.from('task_tag_links').insert(add.map((tag_id) => ({ task_id: taskId, tag_id }))));
+}
 
 tasks.openapi(createRoute({
   method: 'get', path: '/projects/{id}/tasks', tags, security: secured,
@@ -25,7 +48,8 @@ tasks.openapi(createRoute({
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  return send(c, must(await db.from('tasks').select('*').eq('project_id', id).order('sort_order').order('created_at')), 200);
+  const rows = must<Row[]>(await db.from('tasks').select('*').eq('project_id', id).order('sort_order').order('created_at'));
+  return send(c, await withTags(db, rows), 200);
 });
 
 tasks.openapi(createRoute({
@@ -37,7 +61,10 @@ tasks.openapi(createRoute({
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  return send(c, must(await db.from('tasks').insert({ ...clean(c.req.valid('json')), project_id: id }).select('*').single()), 201);
+  const input = c.req.valid('json');
+  const row = must<Row>(await db.from('tasks').insert({ ...clean(input), project_id: id }).select('*').single());
+  if (input.tag_ids?.length) await setTags(db, row.id, input.tag_ids);
+  return send(c, (await withTags(db, [row]))[0], 201);
 });
 
 tasks.openapi(createRoute({
@@ -48,7 +75,7 @@ tasks.openapi(createRoute({
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  return send(c, must(await db.from('tasks').select('*').eq('id', id).single()), 200);
+  return send(c, (await withTags(db, [must<Row>(await db.from('tasks').select('*').eq('id', id).single())]))[0], 200);
 });
 
 tasks.openapi(createRoute({
@@ -60,7 +87,13 @@ tasks.openapi(createRoute({
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  return send(c, found(must<Row[]>(await db.from('tasks').update(clean(c.req.valid('json'))).eq('id', id).select('*'))), 200);
+  const input = c.req.valid('json');
+  const patch = clean(input);
+  const row = Object.keys(patch).length
+    ? found(must<Row[]>(await db.from('tasks').update(patch).eq('id', id).select('*')))
+    : must<Row>(await db.from('tasks').select('*').eq('id', id).single());
+  if (input.tag_ids) await setTags(db, id, input.tag_ids);
+  return send(c, (await withTags(db, [row]))[0], 200);
 });
 
 tasks.openapi(createRoute({

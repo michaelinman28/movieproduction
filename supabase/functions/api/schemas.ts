@@ -165,6 +165,8 @@ export const Task = z.object({
   due_part: DayPart.nullable().openapi({ description: 'Due in the morning, afternoon or evening of the due date' }),
   due_time: time.nullable().openapi({ description: 'Due at this time on the due date (local time, HH:MM:SS)', example: '14:30:00' }),
   sort_order: z.number().int(),
+  category_id: Uuid.nullable().openapi({ description: 'One of the company\'s task categories' }),
+  tag_ids: z.array(Uuid).openapi({ description: 'The company tags on this task' }),
   created_by: Uuid,
   created_at: z.string(),
   updated_at: z.string(),
@@ -180,6 +182,8 @@ const taskFields = {
   due_part: DayPart.nullable().optional().openapi({ description: 'Morning, afternoon or evening. Needs a due date; send due_time null with it' }),
   due_time: time.nullable().optional().openapi({ description: 'Exact time (24-hour). Needs a due date; send due_part null with it' }),
   sort_order: z.number().int().optional(),
+  category_id: Uuid.nullable().optional().openapi({ description: 'One of the company\'s task categories, or null' }),
+  tag_ids: z.array(Uuid).optional().openapi({ description: 'Replaces the task\'s tags with exactly these company tags' }),
 };
 
 export const TaskCreate = z.object({
@@ -206,3 +210,31 @@ export const TaskNote = z.object({
 export const TaskNoteInput = z.object({
   body: z.string().trim().min(1).max(5000).openapi({ example: 'Called the venue; load-in moved to 7 AM.' }),
 }).openapi('TaskNoteInput');
+
+// ---- Task categories and tags ----------------------------------------------
+
+export const TaskCategory = z.object({
+  id: Uuid,
+  company_id: Uuid,
+  name: z.string().openapi({ example: 'Locations' }),
+  sort_order: z.number().int(),
+  tasks: z.number().int().openapi({ description: 'How many tasks use it' }),
+}).openapi('TaskCategory');
+
+export const TaskCategoryInput = z.object({
+  name: z.string().trim().min(1).max(60).openapi({ example: 'Stunts' }),
+  sort_order: z.number().int().optional(),
+}).openapi('TaskCategoryInput');
+
+export const TaskCategoryUpdate = TaskCategoryInput.partial().openapi('TaskCategoryUpdate');
+
+export const TaskTag = z.object({
+  id: Uuid,
+  company_id: Uuid,
+  name: z.string().openapi({ example: 'night shoot' }),
+  tasks: z.number().int().openapi({ description: 'How many tasks use it' }),
+}).openapi('TaskTag');
+
+export const TaskTagInput = z.object({
+  name: z.string().trim().min(1).max(40).openapi({ example: 'night shoot' }),
+}).openapi('TaskTagInput');
