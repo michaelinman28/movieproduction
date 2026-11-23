@@ -27,7 +27,9 @@ export function TaskCalendar({ tasks, selectedId, day, onDay, onOpen, onMove, na
   selectedId: string | null;
   /** The chosen day, 'YYYY-MM-DD'. New tasks are added on it. */
   day: string;
-  onDay: (day: string) => void;
+  /** Chooses a day; false when it was refused (e.g. unsaved changes kept). */
+  onDay: (day: string) => boolean;
+  /** Opens a task in the panel, choosing its day too. */
   onOpen: (id: string) => void;
   onMove: (id: string, day: string) => void;
   nameOf: Map<string, string>;
@@ -60,12 +62,10 @@ export function TaskCalendar({ tasks, selectedId, day, onDay, onOpen, onMove, na
   const shift = (n: number) => setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1));
   function goToday() {
     const d = new Date();
-    setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
-    onDay(today);
+    if (onDay(today)) setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }
   function pick(d: Date) {
-    onDay(isoDate(d));
-    if (d.getMonth() !== month.getMonth()) setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    if (onDay(isoDate(d)) && d.getMonth() !== month.getMonth()) setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }
 
   function drop(e: DragEvent, iso: string) {
@@ -128,7 +128,7 @@ export function TaskCalendar({ tasks, selectedId, day, onDay, onOpen, onMove, na
                     title={`${t.title}${dueWhen(t) ? `, ${dueWhen(t)}` : ''} (${labelOf(TASK_STATUSES, t.status)}). Drag to another day to move it.`}
                     onDragStart={(e) => { e.dataTransfer.setData('text/x-task-id', t.id); e.dataTransfer.effectAllowed = 'move'; }}
                     onDragEnd={() => setDragOver(null)}
-                    onClick={(e) => { e.stopPropagation(); onDay(iso); onOpen(t.id); }}>
+                    onClick={(e) => { e.stopPropagation(); onOpen(t.id); }}>
                     {t.due_time && <span className="text-muted">{dueWhen(t)} </span>}{t.title}
                   </button>
                 ))}

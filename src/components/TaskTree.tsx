@@ -362,6 +362,26 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
     }
   }
 
+  /** Calendar: choosing another day closes the open task unless it's due that day. */
+  function chooseDay(d: string) {
+    if (d === day) return true;
+    const sel = selectedId ? byId.get(selectedId) : null;
+    if (sel && sel.due_date !== d) {
+      if (!confirmDiscard()) return false;
+      setSelectedId(null);
+    }
+    setDay(d);
+    return true;
+  }
+  /** Calendar: opens a task and moves the chosen day to its due date. */
+  function openOnCalendar(id: string) {
+    if (id !== selectedId && !confirmDiscard()) return;
+    const due = byId.get(id)?.due_date;
+    if (due) setDay(due);
+    setSelectedId(id);
+    scrollToForm(id);
+  }
+
   // Group header rows take space too when the list is grouped.
   const groupCount = groupBy ? new Set(rows.map((r) => r[groupBy as keyof TaskRow] as string)).size : 0;
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
@@ -394,8 +414,8 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
           in the middle of a double-click. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {!loaded ? <p className="text-muted">Loading tasks…</p> : calendar ? (
-          <TaskCalendar tasks={tasks} selectedId={selectedId} day={day} onDay={setDay} nameOf={nameOf}
-            onOpen={(id) => { if (id === selectedId || confirmDiscard()) { setSelectedId(id); scrollToForm(id); } }}
+          <TaskCalendar tasks={tasks} selectedId={selectedId} day={day} onDay={chooseDay} nameOf={nameOf}
+            onOpen={openOnCalendar}
             onMove={(id, to) => run(() => api.updateTask(id, { due_date: to }), `Moved "${byId.get(id)?.title}" to ${dayName(to)}.`)} />
         ) : (
           <LatticeGrid

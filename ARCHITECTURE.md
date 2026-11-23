@@ -32,7 +32,7 @@ day to day.
   columns can be dragged into the grouping bar). The choice is remembered on the device.
 - **Calendar** (`src/components/TaskCalendar.tsx`): a month of tasks by due date, in
   order of the day. Click a day to list its tasks below the month (phones show a count
-  per day instead of names); click a task to open its panel. Tasks added while the
+  per day instead of names); click a task to open its panel (choosing another day closes it, unless the task is due that day). Tasks added while the
   calendar shows are due on the chosen day. On a computer, drag a task to another day
   to move its due date (saved at once, like a table cell). Tasks without a due date are
   counted under the month.
