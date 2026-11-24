@@ -7,8 +7,9 @@ import { useLocation } from 'react-router-dom';
  * Mark a button with `data-pin` (or `data-pin="2"` to take priority, like a form's
  * Save over the section's Add). When a marked button scrolls up past the top while
  * the section or panel it belongs to (`data-pin-scope`) is still on screen, a copy of
- * it is pinned under the header. A priority button (an open form's Save) is pinned as
- * soon as it is enabled, wherever it is, so it replaces the section's Add right away.
+ * it is pinned under the header. A priority button (an open form's Save) is pinned for as
+ * long as its form is open, wherever the form is on the page, disabled until there's
+ * something to save; it replaces the section's Add. The same on every page.
  * Only one button is pinned at a time: the highest priority, then the one nearest the top. The copy clicks the real button, and
  * mirrors its label and whether it is disabled.
  */
@@ -26,17 +27,19 @@ export function PinnedAction() {
       const bottom = window.innerHeight;
       let best: { el: HTMLButtonElement; prio: number; dist: number } | null = null;
       for (const el of document.querySelectorAll<HTMLButtonElement>('main button[data-pin]')) {
-        // Hidden or disabled buttons (a Save with nothing to save) aren't worth the space.
-        if (!el.offsetParent || el.disabled) continue;
+        // Hidden buttons (a form that isn't open) never pin.
+        if (!el.offsetParent) continue;
+        const prio = Number(el.dataset.pin) || 1;
         const scope = el.closest<HTMLElement>('[data-pin-scope]');
         const s = scope?.getBoundingClientRect();
-        // The section must still fill some of the screen below the header.
-        if (s && (s.bottom < top + 48 || s.top > bottom - 48)) continue;
-        const prio = Number(el.dataset.pin) || 1;
         const r = el.getBoundingClientRect();
-        // An open form's Save (priority 2) takes the spot as soon as there's something to
-        // save, wherever it is, so the pinned button always says Save while changes wait.
+        // An open form's Save (priority 2) always takes the spot, disabled or not and
+        // wherever the form is, so Save is always at the top while a form is open.
         if (prio < 2) {
+          // A disabled ordinary button isn't worth the space.
+          if (el.disabled) continue;
+          // The section must still fill some of the screen below the header.
+          if (s && (s.bottom < top + 48 || s.top > bottom - 48)) continue;
           // An ordinary button pins once it has scrolled up past the top of the screen
           // (or of its scrolling panel).
           const box = scope && scope.scrollHeight > scope.clientHeight + 1 ? s! : null;

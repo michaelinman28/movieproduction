@@ -9,6 +9,7 @@ import { projects } from './routes/projects.ts';
 import { tasks } from './routes/tasks.ts';
 import { labels } from './routes/labels.ts';
 import { locations } from './routes/locations.ts';
+import { people } from './routes/people.ts';
 
 export const API_VERSION = '0.1.0';
 
@@ -40,6 +41,7 @@ export function createApp(config: ApiConfig) {
   api.route('/', tasks);
   api.route('/', labels);
   api.route('/', locations);
+  api.route('/', people);
 
   api.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http', scheme: 'bearer', bearerFormat: 'JWT',
@@ -68,6 +70,7 @@ export function createApp(config: ApiConfig) {
       { name: 'Task notes', description: 'Any number of notes on a task' },
       { name: 'Task categories', description: 'Each company\'s list of task categories, set up by its admins' },
       { name: 'Task tags', description: 'Free-form task tags, shared across a company' },
+      { name: 'People', description: 'People\'s names, phones and extra contacts. Admins look after the people in their company; only the person changes their sign-in email' },
       { name: 'Locations', description: 'A project\'s locations, with address and on-site contact; tasks can be assigned to one' },
     ],
   }));

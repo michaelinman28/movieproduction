@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { LatticeGrid } from '../../components/LatticeGrid';
 import { Section } from '../../components/Section';
 import { RolePicker } from '../../components/RolePicker';
+import { PersonContacts } from '../../components/PersonContacts';
 import { api, type ProjectMember } from '../../lib/api';
 import { displayName, errorText, roleIdsFor, roleNames } from '../../lib/format';
 import type { Role } from '../../lib/database.types';
@@ -125,6 +126,7 @@ export function ProjectTeam() {
             <TeamPanel
               key={selected.user_id}
               projectId={projectId}
+              companyId={project.company_id}
               member={selected}
               roles={roles}
               isAdmin={isAdmin}
@@ -140,8 +142,8 @@ export function ProjectTeam() {
   );
 }
 
-function TeamPanel({ projectId, member, roles, isAdmin, run, onRemoved }: {
-  projectId: string; member: ProjectMember; roles: Role[]; isAdmin: boolean; run: Run; onRemoved: () => void;
+function TeamPanel({ projectId, companyId, member, roles, isAdmin, run, onRemoved }: {
+  projectId: string; companyId: string; member: ProjectMember; roles: Role[]; isAdmin: boolean; run: Run; onRemoved: () => void;
 }) {
   const name = displayName(member.profile);
   const roleIds = new Set(member.role_ids);
@@ -165,8 +167,10 @@ function TeamPanel({ projectId, member, roles, isAdmin, run, onRemoved }: {
 
   return (
     <aside data-pin-scope data-form-for={member.user_id} className="card gap-2">
-      <h3>{name}</h3>
+      {/* The person's name opens them on the company's People list, with all their details. */}
+      <h3><Link to={`/companies/${companyId}?person=${member.user_id}`} title={`Open ${name} in the company's people`}>{name}</Link></h3>
       <p className="hint mt-2">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
+      <PersonContacts userId={member.user_id} name={name} canEdit={false} />
       {isAdmin ? (
         <>
           <form className="flex flex-col gap-2" onSubmit={save}>

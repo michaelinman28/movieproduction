@@ -98,6 +98,7 @@ confirmation emails link back to the app.
 ## Who can see and change what
 
 - You see the companies you belong to, and the profiles of people in them.
+- You change your own name, phone and sign-in email (a new email is confirmed by a link first). A company admin can change the name and phone of anyone in their company, and add or remove their other email addresses and phone numbers; only the person changes their sign-in email.
 - You see a project if you're assigned to it, or if you're an admin of its company.
 - Company admins manage people, projects, custom roles and task categories.
 - Everyone on a project (and company admins) can add and edit its tasks and add notes.

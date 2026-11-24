@@ -214,8 +214,8 @@ Every screen is designed for a phone first, then enhanced for larger screens.
 - **One pinned action button (standard).** While scrolling, the main action of the
   section on screen (Add task, Add location, Create project…) pins under the header
   once it scrolls past the top, so it's always one tap away on a phone. An open
-  form's Save (`data-pin="2"`) takes the spot the moment there's something to save,
-  wherever the Save itself is on the page. Only one button is pinned at a time
+  form's Save (`data-pin="2"`) takes the spot for as long as the form is open, on every
+  page and wherever the form is (disabled until there's something to save). Only one button is pinned at a time
   (`src/components/PinnedAction.tsx`). Mark buttons with `data-pin`; the section or
   panel they belong to has `data-pin-scope`.
 - **Forms wait for Save; tables save as you go (standard).** In a form or side panel,
@@ -240,8 +240,12 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   pick. Free text uses the text or `textarea` editor. Lists of names (roles, tags) are
   typed comma-separated in the table and ticked or picked in the panel. A row that is
   also a link gets a separate Open link column when its name is editable. Fields that
-  belong to someone else's record, such as a person's name, email and phone (their own
-  profile), stay read-only there.
+  belong to someone else's record stay read-only outside their home: a person's name
+  and phone are edited on the company's People list (admins, in the table and the
+  form) or on their own profile, along with their other emails and phones
+  (`person_contacts`); the sign-in email is changed only by the person, on their
+  profile, after confirming the new address. A person's name in a project's team form links to
+  them on the company's People list (`/companies/:id?person=<user id>`).
 
 ## Repository layout
 
