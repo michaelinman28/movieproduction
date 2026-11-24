@@ -266,6 +266,12 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   that starts closed unless it has a ticked role.
   When someone is added to a project, their project roles start as a copy of their
   company roles (trigger `copy_company_roles_to_project`); admins can then change them.
+- **Start and due dates.** A task can have a start date (with a part of the day or an
+  exact time) as well as a due date (migration `20261124050000_task_start.sql`; the
+  due date can't be before the start). On the calendar (`TaskCalendar.tsx`) a task with
+  both shows as a bar across every day from start to due; dragging any part of it
+  moves both dates by the same number of days. The day list says "Starts…", "Day 2
+  of 4" or "Due…".
 - **Task summaries.** The task table has tick boxes (lattice-grid `selection: 'multiple'`;
   ticking a parent ticks its sub-tasks). Ticked tasks show a bar to **Email summary**
   (opens the person's own email app via `mailto:`, optionally addressed to the people

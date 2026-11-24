@@ -297,5 +297,12 @@ await db.query(`insert into auth.users (id,email,raw_user_meta_data) values ($1,
 await expect('already-confirmed sign-up claims at once', () => as(Y, `select count(*) n from company_members where user_id=$1 and company_id=$2`, [Y, coP.id]), r => Number(r[0].n) === 1);
 await db.query(`delete from auth.users where id=$1`, [Y]);
 await expect('deleting an account deletes its profile', () => db.query(`select * from profiles where id=$1`, [Y]).then(r => r.rows), len(0));
+// start dates
+const [st] = await as(U.a, `insert into tasks (project_id,title,start_date,start_part,due_date) values ($1,'Build set','2026-12-01','morning','2026-12-04') returning *`, [pjP.id]);
+await expect('task with a start and due date', () => Promise.resolve([st]), r => r[0].start_date && r[0].start_part === 'morning');
+await expect('due before start refused', () => as(U.a, `update tasks set due_date='2026-11-30' where id=$1`, [st.id]), e => isErr(e) && /before the start/.test(e.message));
+await expect('start part and time together refused', () => as(U.a, `update tasks set start_time='09:00' where id=$1`, [st.id]), isErr);
+await expect('clearing the start clears its time', () => as(U.a, `update tasks set start_date=null where id=$1 returning start_part`, [st.id]), r => r[0]?.start_part === null);
+await expect('start on the due day is fine', () => as(U.a, `update tasks set start_date='2026-12-04', start_time='08:00' where id=$1 returning start_time`, [st.id]), r => r[0]?.start_time?.startsWith('08:00'));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

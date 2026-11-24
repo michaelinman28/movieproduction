@@ -915,6 +915,27 @@
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
             "description": "Someone on the project"
           },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "example": "2027-01-10",
+            "description": "When work on the task starts. A task from its start to its due date covers each of those days"
+          },
+          "start_part": {
+            "$ref": "#/components/schemas/DayPart"
+          },
+          "start_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+            "example": "09:00:00",
+            "description": "Starts at this time on the start date (local time, HH:MM:SS)"
+          },
           "due_date": {
             "type": [
               "string",
@@ -924,7 +945,14 @@
             "example": "2027-01-10"
           },
           "due_part": {
-            "$ref": "#/components/schemas/DayPart"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DayPart"
+              },
+              {
+                "description": "Due in the morning, afternoon or evening of the due date"
+              }
+            ]
           },
           "due_time": {
             "type": [
@@ -986,6 +1014,9 @@
           "status",
           "priority",
           "assignee_id",
+          "start_date",
+          "start_part",
+          "start_time",
           "due_date",
           "due_part",
           "due_time",
@@ -1027,7 +1058,7 @@
           "evening",
           null
         ],
-        "description": "Due in the morning, afternoon or evening of the due date"
+        "description": "Starts in the morning, afternoon or evening of the start date"
       },
       "TaskCreate": {
         "type": "object",
@@ -1058,6 +1089,37 @@
             ],
             "format": "uuid",
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "example": "2027-01-10",
+            "description": "Not after the due date. Clearing it clears its part of the day or time"
+          },
+          "start_part": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "morning",
+              "afternoon",
+              "evening",
+              null
+            ],
+            "description": "Morning, afternoon or evening. Needs a start date; send start_time null with it"
+          },
+          "start_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+            "example": "14:30",
+            "description": "Exact time (24-hour). Needs a start date; send start_part null with it"
           },
           "due_date": {
             "type": [
@@ -1162,6 +1224,37 @@
             ],
             "format": "uuid",
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "example": "2027-01-10",
+            "description": "Not after the due date. Clearing it clears its part of the day or time"
+          },
+          "start_part": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "morning",
+              "afternoon",
+              "evening",
+              null
+            ],
+            "description": "Morning, afternoon or evening. Needs a start date; send start_time null with it"
+          },
+          "start_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+            "example": "14:30",
+            "description": "Exact time (24-hour). Needs a start date; send start_part null with it"
           },
           "due_date": {
             "type": [
