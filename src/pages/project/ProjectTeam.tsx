@@ -161,6 +161,7 @@ export function ProjectTeam() {
         {/* The form opens under the table, which keeps the full width. */}
         <div className="flex flex-col gap-4">
           <LatticeGrid
+            stateId="project.team"
             options={teamOptions}
             rows={teamRows}
             reveal={reveal}

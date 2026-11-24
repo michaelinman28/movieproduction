@@ -1,8 +1,10 @@
-import { useEffect, useRef, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../lib/theme';
 import { confirmDiscard } from '../lib/unsaved';
 import { mapsUrl, openMaps } from '../lib/maps';
+import { readHiddenColumns, saveHiddenColumns } from '../lib/gridColumns';
+import { ColumnChooser, type ChooserColumn } from './ColumnChooser';
 import '../vendor/lattice-grid/lattice-grid.js';
 import '../vendor/lattice-grid/lattice-grid.css';
 import type {
@@ -13,6 +15,11 @@ import type {
 type Handlers = Record<string, (payload: any) => void>;
 
 interface Props<Row> {
+  /**
+   * Names this table (e.g. "project.tasks") so the columns the person picks with the
+   * Columns button stay picked for the rest of their browser session, across pages.
+   */
+  stateId: string;
   /** Grid options. The grid is rebuilt when this object changes, so memoize it. */
   options: LatticeGridOptions<Row>;
   /** Rows to show. Updating this prop calls setRows without rebuilding the grid. */
@@ -35,7 +42,7 @@ interface Props<Row> {
 const MIN_GRID_HEIGHT = 240;
 
 /** React wrapper around Michael's lattice-grid library. */
-export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, className, reveal }: Props<Row>) {
+export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height = 480, className, reveal }: Props<Row>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<LatticeGridInstance<Row> | null>(null);
   const { theme } = useTheme();
@@ -45,6 +52,10 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
   rowsRef.current = rows;
   const handlersRef = useRef<Handlers | undefined>(on);
   handlersRef.current = on;
+  const stateIdRef = useRef(stateId);
+  stateIdRef.current = stateId;
+  // The table's own columns (not the tree or tick-box columns) for the Columns button.
+  const [chooser, setChooser] = useState<ChooserColumn[]>([]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -117,6 +128,32 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
       }
       gi._afterModelChange?.();
     };
+    // Columns the person hid earlier this session. `cols`, `setColumnVisible` and
+    // `resetColumns` (lattice-grid's own Hide column / Reset columns menu items) are
+    // wrapped so every way of showing or hiding a column is remembered.
+    const gc = grid as unknown as {
+      cols?: { id: string; header?: string; hidden?: boolean; special?: string }[];
+      setColumnVisible: (id: string, visible: boolean) => void; resetColumns: () => void;
+    };
+    const userCols = () => (gc.cols ?? []).filter((c) => !c.special);
+    const sync = () => setChooser(userCols().map((c) => ({
+      id: c.id, hidden: !!c.hidden,
+      header: c.header || c.id.replace(/_/g, ' ').replace(/^./, (x) => x.toUpperCase()),
+    })));
+    const remember = () => { saveHiddenColumns(stateIdRef.current, userCols()); sync(); };
+    const saved = readHiddenColumns(stateIdRef.current);
+    if (saved) {
+      const cols = userCols();
+      for (const c of cols) if (c.id in saved) c.hidden = saved[c.id];
+      if (cols.length && cols.every((c) => c.hidden)) cols[0].hidden = false;
+      gi._afterModelChange?.();
+    }
+    const setVisible = gc.setColumnVisible.bind(grid);
+    gc.setColumnVisible = (id, visible) => { setVisible(id, visible); remember(); };
+    const reset = gc.resetColumns.bind(grid);
+    gc.resetColumns = () => { reset(); if (phone.matches) applyPins(); remember(); };
+    sync();
+
     if (phone.matches) applyPins();
     phone.addEventListener('change', applyPins);
 
@@ -156,6 +193,8 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
     if (r >= 0) { g._setRange?.({ r, c }, { r, c }); g.ensureVisible?.(r, c); } else g._renderRows?.();
   }, [rows, reveal]);
 
+  const columnApi = () => gridRef.current as unknown as { setColumnVisible: (id: string, visible: boolean) => void } | null;
+
   // Follow the app's light/dark switch.
   useEffect(() => {
     if (!options.theme) gridRef.current?.setTheme(theme);
@@ -185,9 +224,14 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
   }
 
   return (
-    <div ref={containerRef} className={className}
-      style={{ height: typeof height === 'number' ? Math.max(height, MIN_GRID_HEIGHT) : height }}
-      onMouseDownCapture={onMouseDown} onClick={onClick} />
+    <div className="flex flex-col">
+      <ColumnChooser columns={chooser}
+        onToggle={(id, visible) => columnApi()?.setColumnVisible(id, visible)}
+        onShowAll={() => chooser.filter((c) => c.hidden).forEach((c) => columnApi()?.setColumnVisible(c.id, true))} />
+      <div ref={containerRef} className={className}
+        style={{ height: typeof height === 'number' ? Math.max(height, MIN_GRID_HEIGHT) : height }}
+        onMouseDownCapture={onMouseDown} onClick={onClick} />
+    </div>
   );
 }
 

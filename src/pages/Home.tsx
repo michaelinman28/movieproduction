@@ -71,7 +71,7 @@ export function Home() {
       </form>
       {error && <p className="error">{error}</p>}
       {companies.some(isAdminRow) && <p className="hint">Double-click the name or description of a company you're an admin of to change it.</p>}
-      <LatticeGrid options={options} rows={companies} height={Math.min(80 + companies.length * 34, 400)}
+      <LatticeGrid stateId="home.companies" options={options} rows={companies} height={Math.min(80 + companies.length * 34, 400)}
         on={{ cellValueChanged: saveCell }} />
       <p className="hint">
         Waiting to be added to a company? Ask its admin to add you with the email you signed up with.

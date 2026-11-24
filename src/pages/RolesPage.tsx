@@ -189,7 +189,7 @@ export function RolesPage() {
         )}
         {/* The form opens under the table, which keeps the full width. */}
         <div className="flex flex-col gap-4">
-          <LatticeGrid options={customOptions} rows={custom} height={Math.min(100 + custom.length * 34, 400)} reveal={reveal}
+          <LatticeGrid stateId="roles.custom" options={customOptions} rows={custom} height={Math.min(100 + custom.length * 34, 400)} reveal={reveal}
             on={{
               cellValueChanged: saveEdit,
               selectionChanged: (rows: RoleRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
@@ -226,7 +226,7 @@ export function RolesPage() {
       </Section>
 
       <Section id="roles.standard" title="Standard roles" summary={standard.length}>
-        <LatticeGrid options={standardOptions} rows={standard} height={360} />
+        <LatticeGrid stateId="roles.standard" options={standardOptions} rows={standard} height={360} />
       </Section>
     </section>
   );

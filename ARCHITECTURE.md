@@ -279,6 +279,11 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   `src/components/TaskSummaryBar.tsx`). Like invites, no email server is involved.
 - **Tables on phones.** Under 640px `LatticeGrid.tsx` unpins every column (including the
   tree, group and tick-box columns), so the whole row scrolls sideways together.
+- **Choosing columns.** Every table has a **Columns** button above it to tick which
+  columns show. `LatticeGrid` needs a `stateId` (e.g. `"project.tasks"`) and keeps the
+  choice in sessionStorage for the browser session (`src/lib/gridColumns.ts`), so it
+  holds across pages and reloads; the grid's own Hide column / Reset columns menu items
+  are remembered too. The tree / task-name column always shows.
 - **Phones and emails.** Phone numbers are stored as `###-###-####` (10 digits, or 11
   starting with 1), or `+` and digits for other countries; anything else is refused.
   Emails need a full address (`name@example.com`). The database enforces this

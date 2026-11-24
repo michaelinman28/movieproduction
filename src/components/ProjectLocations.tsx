@@ -137,7 +137,7 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
       {notice && <p className="notice">{notice}</p>}
       {/* The form opens under the table, which keeps the full width. */}
       <div className="flex flex-col gap-4">
-        <LatticeGrid options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)} reveal={reveal}
+        <LatticeGrid stateId="project.locations" options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)} reveal={reveal}
           on={{ cellValueChanged: saveCell, selectionChanged: (r: LocationRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); } }} />
         {selected && (
           <LocationPanel key={selected.id} location={selected} run={run}
