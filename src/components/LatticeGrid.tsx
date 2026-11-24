@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../lib/theme';
 import { confirmDiscard } from '../lib/unsaved';
 import { mapsUrl, openMaps } from '../lib/maps';
-import { readHiddenColumns, saveHiddenColumns } from '../lib/gridColumns';
+import { readGridView, saveGridView } from '../lib/gridView';
 import { ColumnChooser, type ChooserColumn } from './ColumnChooser';
 import '../vendor/lattice-grid/lattice-grid.js';
 import '../vendor/lattice-grid/lattice-grid.css';
@@ -16,8 +16,9 @@ type Handlers = Record<string, (payload: any) => void>;
 
 interface Props<Row> {
   /**
-   * Names this table (e.g. "project.tasks") so the columns the person picks with the
-   * Columns button stay picked for the rest of their browser session, across pages.
+   * Names this table (e.g. "project.tasks") so the person's view of it (columns shown
+   * with the Columns button, widths, order, sort) is kept for the rest of their browser
+   * session, across pages.
    */
   stateId: string;
   /** Grid options. The grid is rebuilt when this object changes, so memoize it. */
@@ -128,30 +129,56 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
       }
       gi._afterModelChange?.();
     };
-    // Columns the person hid earlier this session. `cols`, `setColumnVisible` and
-    // `resetColumns` (lattice-grid's own Hide column / Reset columns menu items) are
-    // wrapped so every way of showing or hiding a column is remembered.
+    // The view the person set up earlier this session: columns shown, widths, order
+    // and sort. Saved whenever any of them changes, including through lattice-grid's
+    // own menu (Hide column, Reset columns, Autosize). `cols`, `sorts`, `_groupCol`,
+    // `refresh` and the wrapped methods are lattice-grid internals.
+    type Col = { id: string; header?: string; hidden?: boolean; width: number; flex: number; special?: string };
     const gc = grid as unknown as {
-      cols?: { id: string; header?: string; hidden?: boolean; special?: string }[];
+      cols: Col[]; sorts: { id: string; dir: 'asc' | 'desc' }[]; _groupCol?: { width: number; flex: number };
+      colMap: Map<string, Col>; refresh: () => void;
       setColumnVisible: (id: string, visible: boolean) => void; resetColumns: () => void;
+      autoSizeColumn: (id: string, skipRender?: boolean) => void; autoSizeAll: () => void;
     };
-    const userCols = () => (gc.cols ?? []).filter((c) => !c.special);
+    const userCols = () => gc.cols.filter((c) => !c.special);
     const sync = () => setChooser(userCols().map((c) => ({
       id: c.id, hidden: !!c.hidden,
       header: c.header || c.id.replace(/_/g, ' ').replace(/^./, (x) => x.toUpperCase()),
     })));
-    const remember = () => { saveHiddenColumns(stateIdRef.current, userCols()); sync(); };
-    const saved = readHiddenColumns(stateIdRef.current);
+    const remember = () => {
+      saveGridView(stateIdRef.current, {
+        order: gc.cols.map((c) => c.id),
+        cols: Object.fromEntries(gc.cols.map((c) => [c.id, { hidden: !!c.hidden, width: c.width, flex: c.flex }])),
+        group: gc._groupCol ? { width: gc._groupCol.width, flex: gc._groupCol.flex } : undefined,
+        sorts: gc.sorts.map((x) => ({ id: x.id, dir: x.dir })),
+      });
+      sync();
+    };
+    const saved = readGridView(stateIdRef.current);
     if (saved) {
+      const at = new Map(saved.order.map((id, i) => [id, i]));
+      const start = new Map(gc.cols.map((c, i) => [c.id, i]));
+      // Saved order first; columns new since then keep their place relative to the end.
+      gc.cols.sort((x, y) => (at.get(x.id) ?? 1e6 + start.get(x.id)!) - (at.get(y.id) ?? 1e6 + start.get(y.id)!));
+      for (const c of gc.cols) {
+        const v = saved.cols[c.id];
+        if (v) { c.hidden = v.hidden; c.width = v.width; c.flex = v.flex; }
+      }
       const cols = userCols();
-      for (const c of cols) if (c.id in saved) c.hidden = saved[c.id];
       if (cols.length && cols.every((c) => c.hidden)) cols[0].hidden = false;
-      gi._afterModelChange?.();
+      if (saved.group && gc._groupCol) Object.assign(gc._groupCol, saved.group);
+      gc.sorts = (saved.sorts ?? []).filter((x) => gc.colMap.has(x.id) || x.id === '__group');
+      gc.refresh();
     }
+    for (const name of ['columnResized', 'columnMoved', 'sortChanged']) grid.on(name, () => remember());
     const setVisible = gc.setColumnVisible.bind(grid);
     gc.setColumnVisible = (id, visible) => { setVisible(id, visible); remember(); };
     const reset = gc.resetColumns.bind(grid);
     gc.resetColumns = () => { reset(); if (phone.matches) applyPins(); remember(); };
+    const autoSize = gc.autoSizeColumn.bind(grid);
+    gc.autoSizeColumn = (id, skipRender) => { autoSize(id, skipRender); if (!skipRender) remember(); };
+    const autoSizeAll = gc.autoSizeAll.bind(grid);
+    gc.autoSizeAll = () => { autoSizeAll(); remember(); };
     sync();
 
     if (phone.matches) applyPins();
