@@ -23,8 +23,10 @@ tasks, sub-tasks and (next) a project journal.
 | Locations | Each project's locations with a status (Considering, Confirmed, Not using), description, address (opens in your phone's or computer's maps app) and contact (name, email, phone); tasks can be assigned to one |
 | Journal | Coming next: private, shared and public entries per project |
 
-People create their own account first. A company admin then adds them to the company
-and assigns them to projects.
+A company admin adds people by email. Someone who hasn't signed up yet is added with
+their name, can be put on projects and given tasks straight away, and joins
+automatically when they sign up with that email. Invites go out from the admin's own
+email app (or are copied to send another way).
 
 ## How it fits together
 

@@ -10,9 +10,11 @@ import type { Role } from '../../lib/database.types';
 import type { Run } from '../CompanyPage';
 import { confirmDiscard, useUnsaved } from '../../lib/unsaved';
 import { scrollToForm } from '../../lib/reveal';
+import { emailProblem, formatPhone, phoneOrThrow } from '../../lib/contact';
+import { InviteButtons } from '../../components/InviteButtons';
 import { useProject } from './ProjectLayout';
 
-interface TeamRow { id: string; name: string; nickname: string; roles: string; email: string; phone: string; joined: string }
+interface TeamRow { id: string; name: string; nickname: string; roles: string; email: string; phone: string; joined: string; account: string }
 
 /** The project's team: who's assigned, and their project roles. */
 export function ProjectTeam() {
@@ -59,9 +61,33 @@ export function ProjectTeam() {
     }
   }
 
+  // Someone not in the company yet: added to the company and the project at once,
+  // even without an account (they join when they sign up with that email).
+  const [newPerson, setNewPerson] = useState({ email: '', name: '', phone: '' });
+  async function addNew(e: FormEvent) {
+    e.preventDefault();
+    const problem = emailProblem(newPerson.email);
+    if (problem) { setError(problem); return; }
+    if (!confirmDiscard()) return;
+    const who = newPerson.name.trim() || newPerson.email.trim();
+    let r: { user_id: string; result: string } | null = null;
+    const ok = await run(async () => {
+      r = await api.addProjectPerson(projectId, { email: newPerson.email.trim(), name: newPerson.name.trim() || null, phone: phoneOrThrow(newPerson.phone) });
+    });
+    if (!ok || !r) return;
+    const { user_id: id, result } = r;
+    setNotice(result === 'already_member' ? `${who} is already on this project.`
+      : result === 'invited' ? `Added ${who} to the company and this project. They don't have an account yet, so send them an invite from their form.`
+      : `Added ${who} to this project.`);
+    setNewPerson({ email: '', name: '', phone: '' });
+    setSelectedId(id);
+    setReveal({ id, n: Date.now() });
+    scrollToForm(id);
+  }
+
   const teamRows = useMemo<TeamRow[]>(() => team.map((t) => ({
     id: t.user_id, name: displayName(t.profile), nickname: t.profile.nickname ?? '', email: t.profile.email ?? '', phone: t.profile.phone ?? '',
-    roles: roleNames(t.role_ids, roles), joined: t.joined_at.slice(0, 10),
+    roles: roleNames(t.role_ids, roles), joined: t.joined_at.slice(0, 10), account: t.profile.has_account === false ? 'Not yet' : 'Yes',
   })).sort((a, b) => a.name.localeCompare(b.name)), [team, roles]);
 
   const teamOptions = useMemo(() => ({
@@ -79,6 +105,8 @@ export function ProjectTeam() {
       },
       { field: 'email', header: 'Email', width: 220 },
       { field: 'phone', header: 'Phone', width: 140 },
+      { field: 'account', header: 'Account', width: 100, filter: 'set',
+        tooltip: (r: TeamRow) => r.account === 'Yes' ? 'Signed up' : 'Added before signing up. They join when they sign up with this email.' },
       { field: 'joined', header: 'Assigned', type: 'date', width: 120 },
     ],
   }), [isAdmin]);
@@ -112,11 +140,23 @@ export function ProjectTeam() {
               <button type="submit" className="btn" data-pin>Assign to project</button>
             </form>
           ) : (
-            <p className="hint mt-2">
-              Everyone in the company is on this project. To assign someone new, first add them on the{' '}
-              <Link to={`/companies/${project.company_id}`}>company page</Link>.
-            </p>
+            <p className="hint mt-2">Everyone in the company is on this project.</p>
           )
+        )}
+        {isAdmin && (
+          <details className="mb-2" open={!available.length}>
+            <summary className="flex min-h-11 cursor-pointer items-center text-accent">Add someone who isn't in the company yet</summary>
+            <form className="form-row mt-1" onSubmit={addNew}>
+              <input className="field" type="email" placeholder="Email" aria-label="Email" value={newPerson.email} maxLength={254} required
+                onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} />
+              <input className="field" placeholder="Name" aria-label="Name" value={newPerson.name} maxLength={120}
+                onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })} />
+              <input className="field" type="tel" placeholder="Phone (optional)" aria-label="Phone" value={newPerson.phone} maxLength={40}
+                onChange={(e) => setNewPerson({ ...newPerson, phone: e.target.value })} onBlur={() => setNewPerson((n) => ({ ...n, phone: formatPhone(n.phone) }))} />
+              <button type="submit" className="btn btn-secondary">Add to project</button>
+            </form>
+            <p className="hint mt-1">They're added to {project.company?.name ?? 'the company'} and this project. They don't need an account yet: you can give them tasks now, and they join when they sign up with this email.</p>
+          </details>
         )}
         {/* The form opens under the table, which keeps the full width. */}
         <div className="flex flex-col gap-4">
@@ -132,6 +172,8 @@ export function ProjectTeam() {
               key={selected.user_id}
               projectId={projectId}
               companyId={project.company_id}
+              companyName={project.company?.name ?? ''}
+              projectName={project.name}
               member={selected}
               roles={roles}
               isAdmin={isAdmin}
@@ -147,8 +189,8 @@ export function ProjectTeam() {
   );
 }
 
-function TeamPanel({ projectId, companyId, member, roles, isAdmin, run, onRemoved }: {
-  projectId: string; companyId: string; member: ProjectMember; roles: Role[]; isAdmin: boolean; run: Run; onRemoved: () => void;
+function TeamPanel({ projectId, companyId, companyName, projectName, member, roles, isAdmin, run, onRemoved }: {
+  projectId: string; companyId: string; companyName: string; projectName: string; member: ProjectMember; roles: Role[]; isAdmin: boolean; run: Run; onRemoved: () => void;
 }) {
   const name = displayName(member.profile);
   const roleIds = new Set(member.role_ids);
@@ -175,6 +217,9 @@ function TeamPanel({ projectId, companyId, member, roles, isAdmin, run, onRemove
       {/* The person's name opens them on the company's People list, with all their details. */}
       <h3><Link to={`/companies/${companyId}?person=${member.user_id}`} title={`Open ${name} in the company's people`}>{name}</Link></h3>
       <p className="hint mt-2">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
+      {member.profile.has_account === false && isAdmin && (
+        <InviteButtons info={{ name, email: member.profile.email ?? '', company: companyName, project: projectName }} />
+      )}
       <PersonContacts userId={member.user_id} name={name} canEdit={false} />
       {isAdmin ? (
         <>

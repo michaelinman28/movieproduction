@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
+import { emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { PersonContacts } from '../components/PersonContacts';
@@ -19,6 +20,8 @@ export function ProfilePage() {
     e.preventDefault();
     const address = newEmail.trim().toLowerCase();
     if (!address || address === email.toLowerCase()) return;
+    const problem = emailProblem(address);
+    if (problem) { setEmailMessage({ kind: 'error', text: problem }); return; }
     setEmailMessage(null);
     const { error } = await supabase.auth.updateUser({ email: address }, { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL });
     if (error) { setEmailMessage({ kind: 'error', text: error.message }); return; }
@@ -37,7 +40,9 @@ export function ProfilePage() {
     e.preventDefault();
     setMessage(null);
     try {
-      await api.updateMe({ full_name: form.full_name.trim(), nickname: form.nickname.trim() || null, phone: form.phone.trim() || null });
+      const phone = phoneOrThrow(form.phone);
+      await api.updateMe({ full_name: form.full_name.trim(), nickname: form.nickname.trim() || null, phone });
+      setForm((f) => ({ ...f, phone: phone ?? '' }));
       setMessage({ kind: 'info', text: 'Profile saved.' });
     } catch (err) { setMessage({ kind: 'error', text: errorText(err) }); }
   }
@@ -50,7 +55,7 @@ export function ProfilePage() {
         <label className="label">Full name<input className="field" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required autoComplete="name" /></label>
         <label className="label">Nickname<input className="field" value={form.nickname} maxLength={60} onChange={(e) => setForm({ ...form, nickname: e.target.value })} autoComplete="nickname" placeholder="Optional" /></label>
         <label className="label">Email<input className="field" value={email} disabled /></label>
-        <label className="label">Phone number<input className="field" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} autoComplete="tel" placeholder="Optional" /></label>
+        <label className="label">Phone number<input className="field" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} onBlur={() => setForm((f) => ({ ...f, phone: formatPhone(f.phone) }))} autoComplete="tel" placeholder="Optional, e.g. 404-555-0123" /></label>
         <p className="hint">Your name, email and phone are visible to people in the companies you belong to.</p>
         {message && <p className={message.kind === 'error' ? 'error' : 'notice'}>{message.text}</p>}
         <div><button type="submit" className="btn">Save profile</button></div>

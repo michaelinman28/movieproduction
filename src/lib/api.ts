@@ -27,7 +27,9 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return json as T;
 }
 
-export interface Profile { id: string; full_name: string | null; nickname: string | null; email: string | null; phone: string | null }
+export interface Profile { id: string; full_name: string | null; nickname: string | null; email: string | null; phone: string | null; has_account: boolean }
+/** The outcome of adding someone: 'invited' means they have no account yet and join when they sign up with that email. */
+export interface AddPersonResult { user_id: string; result: 'added' | 'already_member' | 'invited' }
 /** An extra email address or phone number for someone, e.g. a work email. */
 export interface PersonContact { id: string; user_id: string; kind: 'email' | 'phone'; value: string; label: string | null; created_by: string | null; created_at: string }
 export interface Company { id: string; name: string; description: string | null; created_by: string; created_at: string; is_admin: boolean }
@@ -66,7 +68,7 @@ export const api = {
   me: () => call<Profile>('GET', '/me'),
   updateMe: (b: { full_name?: string; nickname?: string | null; phone?: string | null }) => call<Profile>('PATCH', '/me', b),
   /** A company admin changes a member's name or phone (or you, your own). */
-  updatePerson: (userId: string, b: { full_name?: string; nickname?: string | null; phone?: string | null }) => call<Profile>('PATCH', `/people/${enc(userId)}`, b),
+  updatePerson: (userId: string, b: { full_name?: string; nickname?: string | null; phone?: string | null; email?: string }) => call<Profile>('PATCH', `/people/${enc(userId)}`, b),
   contacts: (userId: string) => call<PersonContact[]>('GET', `/people/${enc(userId)}/contacts`),
   addContact: (userId: string, b: { kind: 'email' | 'phone'; value: string; label?: string | null }) =>
     call<PersonContact>('POST', `/people/${enc(userId)}/contacts`, b),
@@ -84,8 +86,8 @@ export const api = {
   deleteRole: (id: string) => call<void>('DELETE', `/roles/${enc(id)}`),
 
   members: (companyId: string) => call<CompanyMember[]>('GET', `/companies/${enc(companyId)}/members`),
-  addMember: (companyId: string, b: { email: string; is_admin?: boolean; title?: string | null }) =>
-    call<{ result: 'added' | 'already_member' }>('POST', `/companies/${enc(companyId)}/members`, b),
+  addMember: (companyId: string, b: { email: string; name?: string | null; phone?: string | null; is_admin?: boolean; title?: string | null }) =>
+    call<AddPersonResult>('POST', `/companies/${enc(companyId)}/members`, b),
   updateMember: (companyId: string, userId: string, b: { is_admin?: boolean; title?: string | null }) =>
     call<unknown>('PATCH', `/companies/${enc(companyId)}/members/${enc(userId)}`, b),
   removeMember: (companyId: string, userId: string) => call<void>('DELETE', `/companies/${enc(companyId)}/members/${enc(userId)}`),
@@ -100,6 +102,8 @@ export const api = {
 
   team: (projectId: string) => call<ProjectMember[]>('GET', `/projects/${enc(projectId)}/members`),
   assign: (projectId: string, userId: string) => call<unknown>('POST', `/projects/${enc(projectId)}/members`, { user_id: userId }),
+  addProjectPerson: (projectId: string, b: { email: string; name?: string | null; phone?: string | null }) =>
+    call<AddPersonResult>('POST', `/projects/${enc(projectId)}/people`, b),
   unassign: (projectId: string, userId: string) => call<void>('DELETE', `/projects/${enc(projectId)}/members/${enc(userId)}`),
   setTeamRoles: (projectId: string, userId: string, roleIds: string[]) =>
     call<unknown>('PUT', `/projects/${enc(projectId)}/members/${enc(userId)}/roles`, { role_ids: roleIds }),

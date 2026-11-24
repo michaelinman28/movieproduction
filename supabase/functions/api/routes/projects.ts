@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { authed, fail, found, must } from '../context.ts';
 import {
-  IdParam, MemberParams, Project, ProjectCreate, ProjectDetail, ProjectMember, ProjectMemberAdd, ProjectUpdate, RoleIds,
+  AddPersonResult, IdParam, MemberParams, Project, ProjectCreate, ProjectDetail, ProjectMember, ProjectMemberAdd, ProjectPersonAdd, ProjectUpdate, RoleIds,
 } from '../schemas.ts';
 import { body, errors, ok, send, profileFields, rolesByUser, router, secured, setRoles } from './common.ts';
 
@@ -101,7 +101,7 @@ projects.openapi(createRoute({
   const profiles = ids.length ? must<{ id: string }[]>(await db.from('profiles').select(profileFields).in('id', ids)) : [];
   const byId = new Map(profiles.map((p) => [p.id, p]));
   return send(c, members.map((x) => ({
-    ...x, profile: byId.get(x.user_id) ?? { id: x.user_id, full_name: null, nickname: null, email: null, phone: null },
+    ...x, profile: byId.get(x.user_id) ?? { id: x.user_id, full_name: null, nickname: null, email: null, phone: null, has_account: true },
     role_ids: roles.get(x.user_id) ?? [],
   })), 200);
 });
@@ -116,6 +116,23 @@ projects.openapi(createRoute({
   const { id } = c.req.valid('param');
   const { user_id } = c.req.valid('json');
   return send(c, must(await db.from('project_members').insert({ project_id: id, user_id }).select('user_id, joined_at').single()), 201);
+});
+
+projects.openapi(createRoute({
+  method: 'post', path: '/projects/{id}/people', tags: team, security: secured,
+  summary: 'Add someone to a project by email (admins), adding them to the company too if needed',
+  description: 'For an email nobody has signed up with yet, give their name (and phone): they are added now, without an account, and join when they sign up with that email. Their project roles start as their company roles.',
+  request: { params: IdParam, ...body(ProjectPersonAdd) },
+  responses: { 201: ok(AddPersonResult, 'Added, invited (no account yet), or already on the project'), 400: errors[400], 401: errors[401] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const { id } = c.req.valid('param');
+  const b = c.req.valid('json');
+  const { data, error } = await db.rpc('add_project_person', {
+    pid: id, member_email: b.email, member_name: b.name ?? null, member_phone: b.phone ?? null,
+  });
+  if (error) fail({ ...error, code: 'P0001' });
+  return send(c, data as z.infer<typeof AddPersonResult>, 201);
 });
 
 projects.openapi(createRoute({

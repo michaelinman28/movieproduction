@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { authed, fail, found, must } from '../context.ts';
 import {
-  Company, CompanyCreate, CompanyMember, CompanyMemberAdd, CompanyMemberUpdate, CompanyUpdate,
+  AddPersonResult, Company, CompanyCreate, CompanyMember, CompanyMemberAdd, CompanyMemberUpdate, CompanyUpdate,
   IdParam, MemberParams, Role, RoleCreate, RoleIds, RoleUpdate, RoleWithUsage,
 } from '../schemas.ts';
 import { body, errors, ok, send, profileFields, rolesByUser, router, secured, setRoles } from './common.ts';
@@ -167,7 +167,7 @@ companies.openapi(createRoute({
   const profiles = ids.length ? must<{ id: string }[]>(await db.from('profiles').select(profileFields).in('id', ids)) : [];
   const byId = new Map(profiles.map((p) => [p.id, p]));
   return send(c, members.map(({ user_id, ...rest }) => ({
-    user_id, ...rest, profile: byId.get(user_id) ?? { id: user_id, full_name: null, nickname: null, email: null, phone: null },
+    user_id, ...rest, profile: byId.get(user_id) ?? { id: user_id, full_name: null, nickname: null, email: null, phone: null, has_account: true },
     role_ids: roles.get(user_id) ?? [],
   })), 200);
 });
@@ -175,21 +175,22 @@ companies.openapi(createRoute({
 companies.openapi(createRoute({
   method: 'post', path: '/companies/{id}/members', tags: people, security: secured,
   summary: 'Add someone to a company by email (admins)',
-  description: 'The person must already have an account and have confirmed their email.',
+  description: 'Someone with an account is added straight away. For an email nobody has signed up with yet, give their name (and phone): they are added now, without an account, and join when they sign up with that email.',
   request: { params: IdParam, ...body(CompanyMemberAdd) },
   responses: {
-    201: ok(z.object({ result: z.enum(['added', 'already_member']) }), 'Added (or already a member)'),
+    201: ok(AddPersonResult, 'Added, invited (no account yet), or already a member'),
     400: errors[400], 401: errors[401],
   },
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
   const b = c.req.valid('json');
-  const { data, error } = await db.rpc('add_company_member', {
-    cid: id, member_email: b.email, make_admin: b.is_admin ?? false, member_title: b.title ?? null,
+  const { data, error } = await db.rpc('add_company_person', {
+    cid: id, member_email: b.email, member_name: b.name ?? null, member_phone: b.phone ?? null,
+    make_admin: b.is_admin ?? false, member_title: b.title ?? null,
   });
   if (error) fail({ ...error, code: 'P0001' });
-  return send(c, { result: data as 'added' | 'already_member' }, 201);
+  return send(c, data as z.infer<typeof AddPersonResult>, 201);
 });
 
 companies.openapi(createRoute({

@@ -8,11 +8,13 @@ import { useAuth } from '../lib/auth';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 import { scrollToForm } from '../lib/reveal';
 import { api, type Company, type CompanyMember, type Project } from '../lib/api';
+import { emailOrThrow, emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
+import { InviteButtons } from '../components/InviteButtons';
 import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, statusLabel, statusValue } from '../lib/format';
 import type { Role } from '../lib/database.types';
 
 interface PersonRow {
-  id: string; name: string; nickname: string; email: string; phone: string; title: string; roles: string; admin: boolean;
+  id: string; name: string; nickname: string; email: string; phone: string; title: string; roles: string; admin: boolean; account: string; pending: boolean;
 }
 interface ProjectRow { id: string; name: string; status: string; start_date: string; end_date: string; logline: string; description: string }
 
@@ -140,7 +142,7 @@ export function CompanyPage() {
   }
 
   // ---- People --------------------------------------------------------------
-  const [newPerson, setNewPerson] = useState({ email: '', title: '', admin: false });
+  const [newPerson, setNewPerson] = useState({ email: '', name: '', phone: '', title: '', admin: false });
   const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
   // A link such as ?person=<id> (from a project's team) opens that person's form.
   const [params, setParams] = useSearchParams();
@@ -155,16 +157,25 @@ export function CompanyPage() {
   async function addPerson(e: FormEvent) {
     e.preventDefault();
     const email = newPerson.email.trim();
+    const problem = emailProblem(email);
+    if (problem) { setError(problem); return; }
     if (!confirmDiscard()) return;
     let result = '';
     let userId = '';
+    const who = newPerson.name.trim() || email;
     const ok = await run(async () => {
-      result = (await api.addMember(companyId, { email, is_admin: newPerson.admin, title: newPerson.title.trim() || null })).result;
-      userId = (await api.members(companyId)).find((m) => m.profile.email?.toLowerCase() === email.toLowerCase())?.user_id ?? '';
+      const r = await api.addMember(companyId, {
+        email, name: newPerson.name.trim() || null, phone: phoneOrThrow(newPerson.phone),
+        is_admin: newPerson.admin, title: newPerson.title.trim() || null,
+      });
+      result = r.result;
+      userId = r.user_id;
     });
     if (ok) {
-      setNotice(result === 'already_member' ? `${email} is already in this company.` : `Added ${email}. Pick their roles in the form.`);
-      setNewPerson({ email: '', title: '', admin: false });
+      setNotice(result === 'already_member' ? `${email} is already in this company.`
+        : result === 'invited' ? `Added ${who}. They don't have an account yet, so send them an invite from their form. Pick their roles there too.`
+        : `Added ${who}. Pick their roles in the form.`);
+      setNewPerson({ email: '', name: '', phone: '', title: '', admin: false });
       // Open the person's form, to pick their roles.
       if (userId) { setSelectedId(userId); setReveal({ id: userId, n: Date.now() }); scrollToForm(userId); }
     }
@@ -174,6 +185,7 @@ export function CompanyPage() {
     .map((m) => ({
       id: m.user_id, name: displayName(m.profile), nickname: m.profile.nickname ?? '', email: m.profile.email ?? '', phone: m.profile.phone ?? '',
       title: m.title ?? '', roles: roleNames(m.role_ids, roles), admin: m.is_admin,
+      account: m.profile.has_account === false ? 'Not yet' : 'Yes', pending: m.profile.has_account === false,
     }))
     .sort((a, b) => a.name.localeCompare(b.name)), [members, roles]);
 
@@ -182,7 +194,8 @@ export function CompanyPage() {
     toolbar: false, groupPanel: false, statusBar: false,
     selection: 'single', rowClickSelection: true, readOnly: !isAdmin,
     // Admins change a person's name and phone; the email is their sign-in, which only
-    // they change (on their profile).
+    // they change (on their profile). Someone without an account yet has no sign-in,
+    // so an admin can correct their email.
     columns: [
       { field: 'name', header: 'Name', width: 200, editable: true },
       { field: 'nickname', header: 'Nickname', width: 130, editable: true },
@@ -191,7 +204,10 @@ export function CompanyPage() {
         field: 'roles', header: 'Company roles', width: 240, editable: true, filter: 'set', filterSplit: ',',
         tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
       },
-      { field: 'email', header: 'Email', width: 220 },
+      { field: 'email', header: 'Email', width: 220, editable: (r: PersonRow) => r.pending,
+        tooltip: (r: PersonRow) => r.pending ? 'No account yet: double-click to correct the email they\'ll sign up with.' : 'Their sign-in email. Only they can change it.' },
+      { field: 'account', header: 'Account', width: 100, filter: 'set',
+        tooltip: (r: PersonRow) => r.pending ? 'Added before signing up. They join when they sign up with this email.' : 'Signed up' },
       { field: 'phone', header: 'Phone', width: 140, editable: true },
       { field: 'admin', header: 'Admin', type: 'boolean', width: 90, editable: true },
     ],
@@ -209,9 +225,12 @@ export function CompanyPage() {
     } else if (e.column === 'nickname') {
       const v = String(e.newValue ?? '').trim();
       await run(() => api.updatePerson(userId, { nickname: v || null }));
+    } else if (e.column === 'email') {
+      const v = String(e.newValue ?? '');
+      await run(() => { const email = emailOrThrow(v); if (!email) throw new Error('An email is needed, so they can be invited'); return api.updatePerson(userId, { email }); });
     } else if (e.column === 'phone') {
-      const v = String(e.newValue ?? '').trim();
-      await run(() => api.updatePerson(userId, { phone: v || null }));
+      const v = String(e.newValue ?? '');
+      await run(() => api.updatePerson(userId, { phone: phoneOrThrow(v) }));
     } else if (e.column === 'admin') {
       await run(() => api.updateMember(companyId, userId, { is_admin: Boolean(e.newValue) }));
     } else if (e.column === 'roles') {
@@ -277,8 +296,12 @@ export function CompanyPage() {
       <Section id="company.people" title="People" summary={peopleRows.length}>
         {isAdmin && (
           <form className="form-row mb-2" onSubmit={addPerson}>
-            <input className="field" type="email" placeholder="Their account email" value={newPerson.email}
+            <input className="field" type="email" placeholder="Email" aria-label="Email" value={newPerson.email}
               onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} required />
+            <input className="field" placeholder="Name (if they haven't signed up)" aria-label="Name" value={newPerson.name} maxLength={120}
+              onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })} />
+            <input className="field" type="tel" placeholder="Phone (optional)" aria-label="Phone" value={newPerson.phone} maxLength={40}
+              onChange={(e) => setNewPerson({ ...newPerson, phone: e.target.value })} onBlur={() => setNewPerson((n) => ({ ...n, phone: formatPhone(n.phone) }))} />
             <input className="field" placeholder="Title (optional)" value={newPerson.title}
               onChange={(e) => setNewPerson({ ...newPerson, title: e.target.value })} />
             <label className="check-field">
@@ -289,7 +312,7 @@ export function CompanyPage() {
             <button type="submit" className="btn" data-pin>Add person</button>
           </form>
         )}
-        {isAdmin && <p className="hint mt-2">People need to create their own account first. Then add them here with the email they signed up with.</p>}
+        {isAdmin && <p className="hint mt-2">Add someone by email. If they haven't signed up yet, add their name too: they're added now, you can give them tasks, and they join automatically when they sign up with that email. Their form has an invite you can send.</p>}
         {/* The form opens under the table, which keeps the full width. */}
         <div className="flex flex-col gap-4">
           <LatticeGrid
@@ -303,6 +326,7 @@ export function CompanyPage() {
             <MemberPanel
               key={selected.user_id}
               companyId={companyId}
+              companyName={company?.name ?? ''}
               member={selected}
               roles={roles}
               isAdmin={isAdmin}
@@ -318,18 +342,20 @@ export function CompanyPage() {
   );
 }
 
-function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }: {
-  companyId: string; member: CompanyMember; roles: Role[]; isAdmin: boolean; isMe: boolean; run: Run; onRemoved: () => void;
+function MemberPanel({ companyId, companyName, member, roles, isAdmin, isMe, run, onRemoved }: {
+  companyId: string; companyName: string; member: CompanyMember; roles: Role[]; isAdmin: boolean; isMe: boolean; run: Run; onRemoved: () => void;
 }) {
   const name = displayName(member.profile);
+  const pending = member.profile.has_account === false;
   const roleIds = new Set(member.role_ids);
   // Name, phone, title, admin and roles are held until Save.
   const initial = useMemo(() => ({
     name: member.profile.full_name ?? '', nickname: member.profile.nickname ?? '', phone: member.profile.phone ?? '',
-    title: member.title ?? '', admin: member.is_admin, roles: [...member.role_ids].sort(),
+    email: member.profile.email ?? '', title: member.title ?? '', admin: member.is_admin, roles: [...member.role_ids].sort(),
   }), [member]);
   const [draft, setDraft] = useState(initial);
-  const profileChanged = draft.name.trim() !== initial.name || draft.nickname.trim() !== initial.nickname || draft.phone.trim() !== initial.phone;
+  const profileChanged = draft.name.trim() !== initial.name || draft.nickname.trim() !== initial.nickname || draft.phone.trim() !== initial.phone
+    || (pending && draft.email.trim().toLowerCase() !== initial.email);
   const titleChanged = draft.title.trim() !== initial.title || draft.admin !== initial.admin;
   const rolesChanged = draft.roles.join() !== initial.roles.join();
   const changed = profileChanged || titleChanged || rolesChanged;
@@ -345,13 +371,14 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
     const ok = await run(async () => {
       if (profileChanged) {
         await api.updatePerson(member.user_id, {
-          ...(draft.name.trim() ? { full_name: draft.name.trim() } : {}), nickname: draft.nickname.trim() || null, phone: draft.phone.trim() || null,
+          ...(draft.name.trim() ? { full_name: draft.name.trim() } : {}), nickname: draft.nickname.trim() || null, phone: phoneOrThrow(draft.phone),
+          ...(pending && draft.email.trim().toLowerCase() !== initial.email ? { email: emailOrThrow(draft.email) ?? '' } : {}),
         });
       }
       if (titleChanged) await api.updateMember(companyId, member.user_id, { title: draft.title.trim() || null, is_admin: draft.admin });
       if (rolesChanged) await api.setMemberRoles(companyId, member.user_id, draft.roles);
     }, `Saved ${name}.`);
-    if (ok) setDraft((d) => ({ ...d, name: d.name.trim(), nickname: d.nickname.trim(), phone: d.phone.trim(), title: d.title.trim() }));
+    if (ok) setDraft((d) => ({ ...d, name: d.name.trim(), nickname: d.nickname.trim(), phone: formatPhone(d.phone), email: d.email.trim().toLowerCase(), title: d.title.trim() }));
   }
 
   async function remove() {
@@ -368,22 +395,32 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
         {member.profile.email && <a href={`mailto:${member.profile.email}`}>{member.profile.email}</a>}
         {member.profile.phone ? <><br /><a href={`tel:${member.profile.phone.replace(/[^\d+]/g, '')}`}>{member.profile.phone}</a></> : null}
       </p>
-      <p className="hint">
-        {isMe
-          ? <>Your sign-in email is changed on <Link to="/profile">your profile</Link>.</>
-          : <>The email is {name}'s sign-in, so only they can change it, on their profile.</>}
-      </p>
+      {pending ? (
+        <InviteButtons info={{ name, email: member.profile.email ?? '', company: companyName }} />
+      ) : (
+        <p className="hint">
+          {isMe
+            ? <>Your sign-in email is changed on <Link to="/profile">your profile</Link>.</>
+            : <>The email is {name}'s sign-in, so only they can change it, on their profile.</>}
+        </p>
+      )}
       {isAdmin ? (
         <>
           <form className="flex flex-col gap-2" onSubmit={save}>
             <label className="label">Name
               <input className="field" value={draft.name} required={!!initial.name} maxLength={120} autoComplete="off" onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
             </label>
+            {pending && (
+              <label className="label">Email <span className="text-muted">(they'll sign up with this)</span>
+                <input className="field" type="email" value={draft.email} required maxLength={254} autoComplete="off" onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
+              </label>
+            )}
             <label className="label">Nickname
               <input className="field" value={draft.nickname} maxLength={60} autoComplete="off" placeholder="Optional, e.g. Avi" onChange={(e) => setDraft({ ...draft, nickname: e.target.value })} />
             </label>
             <label className="label">Phone
-              <input className="field" type="tel" value={draft.phone} maxLength={40} autoComplete="off" placeholder="Optional" onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
+              <input className="field" type="tel" value={draft.phone} maxLength={40} autoComplete="off" placeholder="Optional, e.g. 404-555-0123" onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+                onBlur={() => setDraft((d) => ({ ...d, phone: formatPhone(d.phone) }))} />
             </label>
             <label className="label">Title
               <input className="field" placeholder="e.g. Line producer" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />

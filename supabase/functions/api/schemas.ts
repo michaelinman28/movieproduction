@@ -16,7 +16,8 @@ export const Profile = z.object({
   full_name: nullableText.openapi({ example: 'Ava Martinez' }),
   nickname: nullableText.openapi({ example: 'Avi' }),
   email: nullableText.openapi({ example: 'ava@example.com' }),
-  phone: nullableText.openapi({ example: '+1 404 555 0101' }),
+  phone: nullableText.openapi({ example: '404-555-0101' }),
+  has_account: z.boolean().openapi({ description: 'False for someone added by an admin who hasn\'t signed up yet. They join when they sign up with this email.' }),
 }).openapi('Profile');
 
 export const ProfileUpdate = z.object({
@@ -24,6 +25,15 @@ export const ProfileUpdate = z.object({
   nickname: z.string().trim().max(60).nullable().optional(),
   phone: z.string().trim().max(40).nullable().optional(),
 }).openapi('ProfileUpdate');
+
+export const PersonUpdate = ProfileUpdate.extend({
+  email: z.string().trim().max(254).optional().openapi({ description: 'Only for someone without an account yet (to correct the address they\'ll sign up with).' }),
+}).openapi('PersonUpdate');
+
+export const AddPersonResult = z.object({
+  user_id: Uuid,
+  result: z.enum(['added', 'already_member', 'invited']).openapi({ description: '"invited" means they have no account yet; they join when they sign up with this email.' }),
+}).openapi('AddPersonResult');
 
 export const ContactKind = z.enum(['email', 'phone']).openapi('ContactKind');
 
@@ -116,7 +126,9 @@ export const CompanyMember = z.object({
 }).openapi('CompanyMember');
 
 export const CompanyMemberAdd = z.object({
-  email: z.email().openapi({ description: 'The email the person signed up with', example: 'cody@example.com' }),
+  email: z.string().trim().max(254).openapi({ description: 'Their email. If nobody has an account with it yet, give their name too.', example: 'cody@example.com' }),
+  name: z.string().trim().max(120).nullable().optional().openapi({ description: 'Needed for someone without an account yet' }),
+  phone: z.string().trim().max(40).nullable().optional(),
   is_admin: z.boolean().optional(),
   title: z.string().trim().nullable().optional(),
 }).openapi('CompanyMemberAdd');
@@ -169,6 +181,12 @@ export const ProjectMember = z.object({
 }).openapi('ProjectMember');
 
 export const ProjectMemberAdd = z.object({ user_id: Uuid }).openapi('ProjectMemberAdd');
+
+export const ProjectPersonAdd = z.object({
+  email: z.string().trim().max(254).openapi({ example: 'cody@example.com' }),
+  name: z.string().trim().max(120).nullable().optional().openapi({ description: 'Needed for someone without an account yet' }),
+  phone: z.string().trim().max(40).nullable().optional(),
+}).openapi('ProjectPersonAdd');
 
 // ---- Tasks ------------------------------------------------------------------
 

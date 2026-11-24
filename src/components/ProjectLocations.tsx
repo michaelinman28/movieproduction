@@ -3,6 +3,11 @@ import { LatticeGrid, gridDropdown, gridEsc, gridMapLink } from './LatticeGrid';
 import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
 import { api, type Location, type LocationInput, type LocationStatus } from '../lib/api';
+import { emailOrThrow, emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
+
+/** A location field ready to save: phones in the standard format, emails checked; blank is null. */
+const tidyContact = (f: string, v: string): string | null =>
+  f === 'contact_phone' ? phoneOrThrow(v) : f === 'contact_email' ? emailOrThrow(v) : v.trim() || null;
 import { useAuth } from '../lib/auth';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 import { scrollToForm } from '../lib/reveal';
@@ -96,7 +101,7 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
       return;
     }
     if (!FIELDS.includes(e.column as Field) || (e.column === 'name' && !v)) { await onChanged(); return; }
-    await run(() => api.updateLocation(e.data.id, { [e.column]: v || null }));
+    await run(() => api.updateLocation(e.data.id, { [e.column]: tidyContact(e.column, v) }));
   }
 
   async function add(e: FormEvent) {
@@ -163,10 +168,12 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
   async function save(e: FormEvent) {
     e.preventDefault();
     const patch: LocationInput = {};
-    for (const f of FIELDS) if (draft[f].trim() !== initial[f]) patch[f] = draft[f].trim() || (f === 'name' ? undefined : null) as never;
-    if (draft.status !== initial.status) patch.status = draft.status as LocationStatus;
-    if (await run(() => api.updateLocation(location.id, patch), `Saved ${draft.name.trim()}.`)) {
-      setDraft((d) => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])) as typeof d);
+    if (await run(() => {
+      for (const f of FIELDS) if (draft[f].trim() !== initial[f]) patch[f] = (f === 'name' ? draft[f].trim() || undefined : tidyContact(f, draft[f])) as never;
+      if (draft.status !== initial.status) patch.status = draft.status as LocationStatus;
+      return api.updateLocation(location.id, patch);
+    }, `Saved ${draft.name.trim()}.`)) {
+      setDraft((d) => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, typeof v === 'string' ? ((patch as Record<string, unknown>)[k] as string | null | undefined) ?? v.trim() : v])) as typeof d);
     }
   }
 
@@ -201,10 +208,12 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
           <input className="field" value={draft.contact_name} maxLength={120} onChange={set('contact_name')} />
         </label>
         <label className="label">Contact email
-          <input className="field" type="email" value={draft.contact_email} maxLength={254} onChange={set('contact_email')} />
+          <input className="field" type="email" value={draft.contact_email} maxLength={254} onChange={set('contact_email')} placeholder="name@example.com" />
+          {draft.contact_email.trim() && draft.contact_email.trim() !== initial.contact_email && emailProblem(draft.contact_email) && <span className="error text-sm font-normal">Enter a full email address, like name@example.com</span>}
         </label>
         <label className="label">Contact phone
-          <input className="field" type="tel" value={draft.contact_phone} maxLength={40} onChange={set('contact_phone')} />
+          <input className="field" type="tel" value={draft.contact_phone} maxLength={40} onChange={set('contact_phone')} placeholder="404-555-0123"
+            onBlur={() => setDraft((d) => ({ ...d, contact_phone: formatPhone(d.contact_phone) }))} />
         </label>
         <div className="flex gap-2 md:col-span-2">
           <button type="submit" className="btn flex-1 md:flex-none" disabled={!changed} data-pin="2">Save</button>

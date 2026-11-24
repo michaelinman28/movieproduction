@@ -58,9 +58,25 @@ day to day.
 
 ### How people join
 
-1. A person creates their own account and confirms their email.
-2. A company admin adds them to the company using that email.
-3. The admin assigns them to projects and picks their roles.
+1. A company admin adds someone by email, on the company's People list or a project's
+   Team page. If they already have an account they're added straight away.
+2. If nobody has signed up with that email yet, the admin gives their name (and phone)
+   and they're added anyway, as a profile with `has_account = false`. They can be put
+   on projects, given roles and assigned tasks right away.
+3. The admin sends an invite from the person's form. There's no email server: **Email
+   invite** opens the admin's own email app (`mailto:`) with the message filled in, and
+   **Copy invite** copies it to paste anywhere (`src/lib/invite.ts`,
+   `src/components/InviteButtons.tsx`). The link opens sign-up with their name and
+   email filled in (`?invite=1&email=…`).
+4. When someone signs up with that email and confirms it, the waiting profile becomes
+   theirs (`claim_pending_profile`, run by triggers on `auth.users`): its id changes to
+   their account id, and every link to it (companies, projects, roles, tasks) follows,
+   since those foreign keys are `on update cascade`. Profiles no longer reference
+   `auth.users` directly; deleting an account deletes its profile by trigger.
+5. Until then an admin can correct their email. Removing a waiting person from their
+   last company deletes them. People can also sign up first and be added later.
+   Database: migration `20261124040000_people_without_accounts.sql`
+   (`add_company_person`, `add_project_person`).
 
 ## Architecture
 
@@ -250,6 +266,12 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   that starts closed unless it has a ticked role.
   When someone is added to a project, their project roles start as a copy of their
   company roles (trigger `copy_company_roles_to_project`); admins can then change them.
+- **Phones and emails.** Phone numbers are stored as `###-###-####` (10 digits, or 11
+  starting with 1), or `+` and digits for other countries; anything else is refused.
+  Emails need a full address (`name@example.com`). The database enforces this
+  (`format_phone`, `is_valid_email`/`check_email`, migration `20261124030000`), and
+  `src/lib/contact.ts` applies the same rules in the app: phone fields tidy themselves
+  when you leave them, and Save/Add says what's wrong before sending.
 
 ## Repository layout
 
