@@ -100,8 +100,29 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
       }, 0);
     });
 
+    // Phones: no pinned (frozen) columns, so the whole table scrolls sideways together
+    // and the first column doesn't take up the narrow screen. Larger screens keep them.
+    // `cols`, the special columns and `_afterModelChange` are lattice-grid internals.
+    const phone = window.matchMedia('(max-width: 639px)');
+    const gi = grid as unknown as {
+      cols?: { pinned?: string | null }[]; _groupCol?: { pinned?: string | null }; _selCol?: { pinned?: string | null };
+      _dragCol?: { pinned?: string | null }; _afterModelChange?: () => void;
+    };
+    const ownPin = new Map<object, string | null | undefined>();
+    const applyPins = () => {
+      for (const c of [...(gi.cols ?? []), gi._groupCol, gi._selCol, gi._dragCol]) {
+        if (!c) continue;
+        if (!ownPin.has(c)) ownPin.set(c, c.pinned);
+        c.pinned = phone.matches ? null : ownPin.get(c) ?? null;
+      }
+      gi._afterModelChange?.();
+    };
+    if (phone.matches) applyPins();
+    phone.addEventListener('change', applyPins);
+
     onReady?.(grid);
     return () => {
+      phone.removeEventListener('change', applyPins);
       container.removeEventListener('change', onChange);
       container.removeEventListener('pointerdown', onPointer, true);
       grid.destroy();
@@ -128,7 +149,7 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
     const node = g.nodeById?.get(String(reveal.id));
     if (!node) return; // not loaded yet; tries again when rows change
     revealed.current = reveal;
-    if (g.o?.selection && g.selected) { g.selected.clear(); g.selected.add(node.id); }
+    if (g.o?.selection === 'single' && g.selected) { g.selected.clear(); g.selected.add(node.id); }
     // In tree mode the display wraps rows in tree nodes, so match on the row itself.
     const r = g.display?.findIndex((e) => e.node === node || (e.node?.data !== undefined && e.node.data === node.data)) ?? -1;
     const c = Math.max(0, g.visible?.findIndex((col) => !col.special || col.special === 'group') ?? 0);

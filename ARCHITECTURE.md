@@ -266,6 +266,13 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   that starts closed unless it has a ticked role.
   When someone is added to a project, their project roles start as a copy of their
   company roles (trigger `copy_company_roles_to_project`); admins can then change them.
+- **Task summaries.** The task table has tick boxes (lattice-grid `selection: 'multiple'`;
+  ticking a parent ticks its sub-tasks). Ticked tasks show a bar to **Email summary**
+  (opens the person's own email app via `mailto:`, optionally addressed to the people
+  assigned) or **Copy summary** to paste anywhere (`src/lib/taskSummary.ts`,
+  `src/components/TaskSummaryBar.tsx`). Like invites, no email server is involved.
+- **Tables on phones.** Under 640px `LatticeGrid.tsx` unpins every column (including the
+  tree, group and tick-box columns), so the whole row scrolls sideways together.
 - **Phones and emails.** Phone numbers are stored as `###-###-####` (10 digits, or 11
   starting with 1), or `+` and digits for other countries; anything else is refused.
   Emails need a full address (`name@example.com`). The database enforces this
