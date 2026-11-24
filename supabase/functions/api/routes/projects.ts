@@ -101,7 +101,7 @@ projects.openapi(createRoute({
   const profiles = ids.length ? must<{ id: string }[]>(await db.from('profiles').select(profileFields).in('id', ids)) : [];
   const byId = new Map(profiles.map((p) => [p.id, p]));
   return send(c, members.map((x) => ({
-    ...x, profile: byId.get(x.user_id) ?? { id: x.user_id, full_name: null, email: null, phone: null },
+    ...x, profile: byId.get(x.user_id) ?? { id: x.user_id, full_name: null, nickname: null, email: null, phone: null },
     role_ids: roles.get(x.user_id) ?? [],
   })), 200);
 });

@@ -240,12 +240,14 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   pick. Free text uses the text or `textarea` editor. Lists of names (roles, tags) are
   typed comma-separated in the table and ticked or picked in the panel. A row that is
   also a link gets a separate Open link column when its name is editable. Fields that
-  belong to someone else's record stay read-only outside their home: a person's name
-  and phone are edited on the company's People list (admins, in the table and the
+  belong to someone else's record stay read-only outside their home: a person's name,
+  nickname (optional, shown beside their name) and phone are edited on the company's People list (admins, in the table and the
   form) or on their own profile, along with their other emails and phones
   (`person_contacts`); the sign-in email is changed only by the person, on their
   profile, after confirming the new address. A person's name in a project's team form links to
-  them on the company's People list (`/companies/:id?person=<user id>`).
+  them on the company's People list (`/companies/:id?person=<user id>`). Role pickers
+  group roles by department (plus Custom roles), each group a collapsible `Section`
+  that starts closed unless it has a ticked role.
 
 ## Repository layout
 

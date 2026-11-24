@@ -12,7 +12,7 @@ import { confirmDiscard, useUnsaved } from '../../lib/unsaved';
 import { scrollToForm } from '../../lib/reveal';
 import { useProject } from './ProjectLayout';
 
-interface TeamRow { id: string; name: string; roles: string; email: string; phone: string; joined: string }
+interface TeamRow { id: string; name: string; nickname: string; roles: string; email: string; phone: string; joined: string }
 
 /** The project's team: who's assigned, and their project roles. */
 export function ProjectTeam() {
@@ -56,7 +56,7 @@ export function ProjectTeam() {
   }
 
   const teamRows = useMemo<TeamRow[]>(() => team.map((t) => ({
-    id: t.user_id, name: displayName(t.profile), email: t.profile.email ?? '', phone: t.profile.phone ?? '',
+    id: t.user_id, name: displayName(t.profile), nickname: t.profile.nickname ?? '', email: t.profile.email ?? '', phone: t.profile.phone ?? '',
     roles: roleNames(t.role_ids, roles), joined: t.joined_at.slice(0, 10),
   })).sort((a, b) => a.name.localeCompare(b.name)), [team, roles]);
 
@@ -68,6 +68,7 @@ export function ProjectTeam() {
     // Name, email and phone belong to each person's own profile.
     columns: [
       { field: 'name', header: 'Name', width: 200 },
+      { field: 'nickname', header: 'Nickname', width: 130 },
       {
         field: 'roles', header: 'Project roles', width: 280, editable: true, filter: 'set', filterSplit: ',',
         tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
@@ -174,8 +175,9 @@ function TeamPanel({ projectId, companyId, member, roles, isAdmin, run, onRemove
       {isAdmin ? (
         <>
           <form className="flex flex-col gap-2" onSubmit={save}>
-            <h4>Project roles</h4>
-            <RolePicker roles={roles} selected={new Set(draft)} onToggle={toggleRole} />
+            <Section id="project.person.roles" title="Project roles" level="h4" summary={draft.length ? `${draft.length} picked` : 'None'}>
+              <RolePicker id="project.person.roles" roles={roles} selected={new Set(draft)} onToggle={toggleRole} />
+            </Section>
             <div className="flex gap-2">
               <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>
               <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>

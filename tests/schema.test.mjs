@@ -226,5 +226,11 @@ await expect('duplicate extra contact refused', () => as(U.a, `insert into perso
 await expect('contact cannot move to another person', () => as(U.a, `update person_contacts set user_id=$1 where id=$2 returning user_id`, [U.d, pc1.id]), r => r[0]?.user_id === U.b);
 await expect('non-admin cannot delete others contacts', () => as(U.d, `delete from person_contacts where id=$1 returning id`, [pc1.id]), len(0));
 await expect('admin deletes a member contact', () => as(U.a, `delete from person_contacts where id=$1 returning id`, [pc1.id]), len(1));
+// nicknames
+await expect('admin sets a member nickname, tidied', () => as(U.a, `update profiles set nickname='  Bee ' where id=$1 returning nickname`, [U.b]), r => r[0]?.nickname === 'Bee');
+await expect('you set your own nickname', () => as(U.d, `update profiles set nickname='Dee' where id=$1 returning nickname`, [U.d]), r => r[0]?.nickname === 'Dee');
+await expect('non-admin cannot set another nickname', () => as(U.d, `update profiles set nickname='X' where id=$1 returning id`, [U.b]), len(0));
+await expect('blank nickname is cleared', () => as(U.b, `update profiles set nickname='  ' where id=$1 returning nickname`, [U.b]), r => r[0]?.nickname === null);
+await expect('overlong nickname refused', () => as(U.b, `update profiles set nickname=repeat('x', 61) where id=$1`, [U.b]), isErr);
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

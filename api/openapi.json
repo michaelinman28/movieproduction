@@ -200,6 +200,13 @@
             ],
             "example": "Ava Martinez"
           },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Avi"
+          },
           "email": {
             "type": [
               "string",
@@ -218,6 +225,7 @@
         "required": [
           "id",
           "full_name",
+          "nickname",
           "email",
           "phone"
         ]
@@ -228,6 +236,13 @@
           "full_name": {
             "type": "string",
             "minLength": 1
+          },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 60
           },
           "phone": {
             "type": [

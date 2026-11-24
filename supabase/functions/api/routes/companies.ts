@@ -167,7 +167,7 @@ companies.openapi(createRoute({
   const profiles = ids.length ? must<{ id: string }[]>(await db.from('profiles').select(profileFields).in('id', ids)) : [];
   const byId = new Map(profiles.map((p) => [p.id, p]));
   return send(c, members.map(({ user_id, ...rest }) => ({
-    user_id, ...rest, profile: byId.get(user_id) ?? { id: user_id, full_name: null, email: null, phone: null },
+    user_id, ...rest, profile: byId.get(user_id) ?? { id: user_id, full_name: null, nickname: null, email: null, phone: null },
     role_ids: roles.get(user_id) ?? [],
   })), 200);
 });

@@ -12,7 +12,7 @@ import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, status
 import type { Role } from '../lib/database.types';
 
 interface PersonRow {
-  id: string; name: string; email: string; phone: string; title: string; roles: string; admin: boolean;
+  id: string; name: string; nickname: string; email: string; phone: string; title: string; roles: string; admin: boolean;
 }
 interface ProjectRow { id: string; name: string; status: string; start_date: string; end_date: string; logline: string; description: string }
 
@@ -172,7 +172,7 @@ export function CompanyPage() {
 
   const peopleRows = useMemo<PersonRow[]>(() => members
     .map((m) => ({
-      id: m.user_id, name: displayName(m.profile), email: m.profile.email ?? '', phone: m.profile.phone ?? '',
+      id: m.user_id, name: displayName(m.profile), nickname: m.profile.nickname ?? '', email: m.profile.email ?? '', phone: m.profile.phone ?? '',
       title: m.title ?? '', roles: roleNames(m.role_ids, roles), admin: m.is_admin,
     }))
     .sort((a, b) => a.name.localeCompare(b.name)), [members, roles]);
@@ -185,6 +185,7 @@ export function CompanyPage() {
     // they change (on their profile).
     columns: [
       { field: 'name', header: 'Name', width: 200, editable: true },
+      { field: 'nickname', header: 'Nickname', width: 130, editable: true },
       { field: 'title', header: 'Title', width: 170, editable: true },
       {
         field: 'roles', header: 'Company roles', width: 240, editable: true, filter: 'set', filterSplit: ',',
@@ -205,6 +206,9 @@ export function CompanyPage() {
       const v = String(e.newValue ?? '').trim();
       if (v) await run(() => api.updatePerson(userId, { full_name: v }));
       else await load();
+    } else if (e.column === 'nickname') {
+      const v = String(e.newValue ?? '').trim();
+      await run(() => api.updatePerson(userId, { nickname: v || null }));
     } else if (e.column === 'phone') {
       const v = String(e.newValue ?? '').trim();
       await run(() => api.updatePerson(userId, { phone: v || null }));
@@ -321,11 +325,11 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
   const roleIds = new Set(member.role_ids);
   // Name, phone, title, admin and roles are held until Save.
   const initial = useMemo(() => ({
-    name: member.profile.full_name ?? '', phone: member.profile.phone ?? '',
+    name: member.profile.full_name ?? '', nickname: member.profile.nickname ?? '', phone: member.profile.phone ?? '',
     title: member.title ?? '', admin: member.is_admin, roles: [...member.role_ids].sort(),
   }), [member]);
   const [draft, setDraft] = useState(initial);
-  const profileChanged = draft.name.trim() !== initial.name || draft.phone.trim() !== initial.phone;
+  const profileChanged = draft.name.trim() !== initial.name || draft.nickname.trim() !== initial.nickname || draft.phone.trim() !== initial.phone;
   const titleChanged = draft.title.trim() !== initial.title || draft.admin !== initial.admin;
   const rolesChanged = draft.roles.join() !== initial.roles.join();
   const changed = profileChanged || titleChanged || rolesChanged;
@@ -339,11 +343,15 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
   async function save(e: FormEvent) {
     e.preventDefault();
     const ok = await run(async () => {
-      if (profileChanged) await api.updatePerson(member.user_id, { full_name: draft.name.trim(), phone: draft.phone.trim() || null });
+      if (profileChanged) {
+        await api.updatePerson(member.user_id, {
+          ...(draft.name.trim() ? { full_name: draft.name.trim() } : {}), nickname: draft.nickname.trim() || null, phone: draft.phone.trim() || null,
+        });
+      }
       if (titleChanged) await api.updateMember(companyId, member.user_id, { title: draft.title.trim() || null, is_admin: draft.admin });
       if (rolesChanged) await api.setMemberRoles(companyId, member.user_id, draft.roles);
     }, `Saved ${name}.`);
-    if (ok) setDraft((d) => ({ ...d, name: d.name.trim(), phone: d.phone.trim(), title: d.title.trim() }));
+    if (ok) setDraft((d) => ({ ...d, name: d.name.trim(), nickname: d.nickname.trim(), phone: d.phone.trim(), title: d.title.trim() }));
   }
 
   async function remove() {
@@ -355,7 +363,7 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
 
   return (
     <aside data-pin-scope data-form-for={member.user_id} className="card gap-2">
-      <h3>{name}</h3>
+      <h3>{name}{member.profile.nickname ? <span className="font-normal text-muted"> ({member.profile.nickname})</span> : null}</h3>
       <p className="hint mt-2">
         {member.profile.email && <a href={`mailto:${member.profile.email}`}>{member.profile.email}</a>}
         {member.profile.phone ? <><br /><a href={`tel:${member.profile.phone.replace(/[^\d+]/g, '')}`}>{member.profile.phone}</a></> : null}
@@ -371,6 +379,9 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
             <label className="label">Name
               <input className="field" value={draft.name} required={!!initial.name} maxLength={120} autoComplete="off" onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
             </label>
+            <label className="label">Nickname
+              <input className="field" value={draft.nickname} maxLength={60} autoComplete="off" placeholder="Optional, e.g. Avi" onChange={(e) => setDraft({ ...draft, nickname: e.target.value })} />
+            </label>
             <label className="label">Phone
               <input className="field" type="tel" value={draft.phone} maxLength={40} autoComplete="off" placeholder="Optional" onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
             </label>
@@ -381,8 +392,9 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
               <input type="checkbox" checked={draft.admin} onChange={(e) => setDraft({ ...draft, admin: e.target.checked })} />
               Company admin
             </label>
-            <h4>Company roles</h4>
-            <RolePicker roles={roles} selected={new Set(draft.roles)} onToggle={toggleRole} />
+            <Section id="company.person.roles" title="Company roles" level="h4" summary={draft.roles.length ? `${draft.roles.length} picked` : 'None'}>
+              <RolePicker id="company.person.roles" roles={roles} selected={new Set(draft.roles)} onToggle={toggleRole} />
+            </Section>
             <div className="flex gap-2">
               <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>
               <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>

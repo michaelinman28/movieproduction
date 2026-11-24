@@ -118,7 +118,7 @@ async function withAuthors(db: any, notes: Row[]) {
   const ids = [...new Set(notes.map((n) => n.author_id))];
   const profiles = ids.length ? must<Row[]>(await db.from('profiles').select(profileFields).in('id', ids)) : [];
   const byId = new Map(profiles.map((p: Row) => [p.id, p]));
-  return notes.map((n) => ({ ...n, author: byId.get(n.author_id) ?? { id: n.author_id, full_name: null, email: null, phone: null } }));
+  return notes.map((n) => ({ ...n, author: byId.get(n.author_id) ?? { id: n.author_id, full_name: null, nickname: null, email: null, phone: null } }));
 }
 
 tasks.openapi(createRoute({
