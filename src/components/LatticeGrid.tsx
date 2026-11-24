@@ -146,9 +146,19 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
       header: c.header || c.id.replace(/_/g, ' ').replace(/^./, (x) => x.toUpperCase()),
     })));
     const remember = () => {
+      // Keep what's saved for columns this view doesn't have (e.g. the Task column,
+      // which only the flat task views show), so switching views doesn't lose it.
+      const before = readGridView(stateIdRef.current);
+      const ids = gc.cols.map((c) => c.id);
+      const order = [...ids];
+      (before?.order ?? []).forEach((id, i, all) => {
+        if (order.includes(id)) return;
+        const prev = i > 0 ? order.indexOf(all[i - 1]) : -1;
+        order.splice(prev + 1, 0, id);
+      });
       saveGridView(stateIdRef.current, {
-        order: gc.cols.map((c) => c.id),
-        cols: Object.fromEntries(gc.cols.map((c) => [c.id, { hidden: !!c.hidden, width: c.width, flex: c.flex }])),
+        order,
+        cols: { ...before?.cols, ...Object.fromEntries(gc.cols.map((c) => [c.id, { hidden: !!c.hidden, width: c.width, flex: c.flex }])) },
         group: gc._groupCol ? { width: gc._groupCol.width, flex: gc._groupCol.flex } : undefined,
         sorts: gc.sorts.map((x) => ({ id: x.id, dir: x.dir })),
       });
@@ -156,10 +166,17 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
     };
     const saved = readGridView(stateIdRef.current);
     if (saved) {
-      const at = new Map(saved.order.map((id, i) => [id, i]));
-      const start = new Map(gc.cols.map((c, i) => [c.id, i]));
-      // Saved order first; columns new since then keep their place relative to the end.
-      gc.cols.sort((x, y) => (at.get(x.id) ?? 1e6 + start.get(x.id)!) - (at.get(y.id) ?? 1e6 + start.get(y.id)!));
+      // Saved order, then each column the saved view doesn't know (one added since, or
+      // one only some views have, like the Task column outside the task tree) goes back
+      // next to its default neighbour, so it isn't pushed to the end.
+      const byId = new Map(gc.cols.map((c) => [c.id, c]));
+      const order = saved.order.filter((id) => byId.has(id));
+      gc.cols.forEach((c, i) => {
+        if (order.includes(c.id)) return;
+        const before = i > 0 ? order.indexOf(gc.cols[i - 1].id) : -1;
+        order.splice(before + 1, 0, c.id);
+      });
+      gc.cols.sort((x, y) => order.indexOf(x.id) - order.indexOf(y.id));
       for (const c of gc.cols) {
         const v = saved.cols[c.id];
         if (v) { c.hidden = v.hidden; c.width = v.width; c.flex = v.flex; }
