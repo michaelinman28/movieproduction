@@ -113,6 +113,7 @@
 .cell-dd > .cell-dd-caret { color: var(--color-muted); font-size: 0.75rem; }
 
 /* The one action button kept in reach under the header while scrolling (PinnedAction). */
+:root { overflow-anchor: none; } /* PinnedAction keeps the view still itself. */
 .pinned-action {
   position: fixed; left: 0; right: 0; z-index: 9; padding: 0.5rem 0;
   background: color-mix(in srgb, var(--color-surface) 92%, transparent);

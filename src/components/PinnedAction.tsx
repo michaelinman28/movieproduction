@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /**
@@ -12,11 +12,28 @@ import { useLocation } from 'react-router-dom';
  * something to save; it replaces the section's Add. The same on every page.
  * Only one button is pinned at a time: the highest priority, then the one nearest the top. The copy clicks the real button, and
  * mirrors its label and whether it is disabled.
+ *
+ * While a button is pinned, a spacer of the bar's height sits in the page above `main`,
+ * so the bar never covers the top of the page. When the bar appears or goes away while
+ * scrolled down, the page scrolls by the same amount, so what's on screen stays put.
  */
 export function PinnedAction() {
   const [pin, setPin] = useState<{ label: string; disabled: boolean; className: string; top: number } | null>(null);
   const target = useRef<HTMLButtonElement | null>(null);
   const { pathname } = useLocation();
+  const bar = useRef<HTMLDivElement | null>(null);
+  const [space, setSpace] = useState(0);
+  const shown = useRef(0);
+
+  // Keep the spacer the bar's height, and keep the view still when it changes.
+  useLayoutEffect(() => {
+    const h = pin && bar.current ? bar.current.offsetHeight : 0;
+    const delta = h - shown.current;
+    if (!delta) return;
+    shown.current = h;
+    setSpace(h);
+    if (window.scrollY > 0) window.scrollBy(0, delta);
+  }, [pin]);
 
   useEffect(() => {
     let frame = 0;
@@ -88,14 +105,18 @@ export function PinnedAction() {
     el.click();
   }
 
-  if (!pin) return null;
   return (
-    <div className="pinned-action" style={{ top: pin.top }}>
+    <>
+      <div aria-hidden="true" style={{ height: space }} />
+      {pin && (
+    <div ref={bar} className="pinned-action" style={{ top: pin.top }}>
       <div className="mx-auto flex w-full max-w-screen-2xl justify-end px-4">
         <button type="button" className={`${pin.className} w-full sm:w-auto`} disabled={pin.disabled} onClick={click}>
           {pin.label}
         </button>
       </div>
     </div>
+      )}
+    </>
   );
 }
