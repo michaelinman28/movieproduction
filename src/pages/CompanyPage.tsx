@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { LatticeGrid, gridDropdown, gridEsc, gridLink } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { RolePicker } from '../components/RolePicker';
@@ -141,6 +141,16 @@ export function CompanyPage() {
   // ---- People --------------------------------------------------------------
   const [newPerson, setNewPerson] = useState({ email: '', title: '', admin: false });
   const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
+  // A link such as ?person=<id> (from a project's team) opens that person's form.
+  const [params, setParams] = useSearchParams();
+  const linkedPerson = params.get('person');
+  useEffect(() => {
+    if (!linkedPerson || !members.some((m) => m.user_id === linkedPerson)) return;
+    setSelectedId(linkedPerson);
+    setReveal({ id: linkedPerson, n: Date.now() });
+    scrollToForm(linkedPerson);
+    setParams({}, { replace: true });
+  }, [linkedPerson, members]); // eslint-disable-line react-hooks/exhaustive-deps
   async function addPerson(e: FormEvent) {
     e.preventDefault();
     const email = newPerson.email.trim();
@@ -333,8 +343,12 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
     <aside data-pin-scope data-form-for={member.user_id} className="card gap-2">
       <h3>{name}</h3>
       <p className="hint mt-2">
-        {member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}
+        {member.profile.email && <a href={`mailto:${member.profile.email}`}>{member.profile.email}</a>}
+        {member.profile.phone ? <><br /><a href={`tel:${member.profile.phone.replace(/[^\d+]/g, '')}`}>{member.profile.phone}</a></> : null}
       </p>
+      {isMe
+        ? <p className="hint"><Link to="/profile">Change your name or phone on your profile</Link>.</p>
+        : <p className="hint">{name} changes their own name, email and phone on their profile.</p>}
       {isAdmin ? (
         <>
           <form className="flex flex-col gap-2" onSubmit={save}>
