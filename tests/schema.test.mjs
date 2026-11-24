@@ -206,5 +206,25 @@ await expect('location from another project refused', () => as(U.b, `insert into
 const [loc2] = await as(U.a, `insert into project_locations (project_id,name) values ($1,'Studio B') returning id`, [lp.id]);
 await expect('only the creator or an admin deletes a location', () => as(U.b, `delete from project_locations where id=$1 returning id`, [loc2.id]), len(0));
 await expect('deleting a location clears it from tasks', async () => { await as(U.b, `delete from project_locations where id=$1`, [loc.id]); return as(U.b, `select location_id from tasks where id=$1`, [lt.id]); }, r => r[0]?.location_id === null);
+// people's details: admins edit name and phone and add contacts; only you change your email
+await expect('admin edits a member name and phone', () => as(U.a, `update profiles set full_name=' Bea B ', phone='555 0100' where id=$1 returning full_name, phone`, [U.b]), r => r[0]?.full_name === 'Bea B' && r[0]?.phone === '555 0100');
+await expect('non-admin cannot edit another member', () => as(U.b, `update profiles set full_name='Hacked' where id=$1 returning id`, [U.d]), len(0));
+await expect('outsider cannot edit a member', () => as(E, `update profiles set full_name='Hacked' where id=$1 returning id`, [U.b]), len(0));
+await expect('admin cannot change a member email', () => as(U.a, `update profiles set email='new@x.com' where id=$1`, [U.b]), isErr);
+await expect('you cannot change your profile email directly', () => as(U.b, `update profiles set email='new@x.com' where id=$1`, [U.b]), isErr);
+await expect('you edit your own phone', () => as(U.b, `update profiles set phone='555 0199' where id=$1 returning phone`, [U.b]), r => r[0]?.phone === '555 0199');
+await expect('sign-in email change still reaches the profile', async () => { await db.query(`update auth.users set email='b2@x.com' where id=$1`, [U.b]); return as(U.b, `select email from profiles where id=$1`, [U.b]); }, r => r[0]?.email === 'b2@x.com');
+const [pc1] = await as(U.a, `insert into person_contacts (user_id,kind,value,label) values ($1,'email','  Bea@Work.COM ',' Work ') returning *`, [U.b]);
+await expect('admin adds an email for a member, tidied', () => Promise.resolve([pc1]), r => r[0].value === 'bea@work.com' && r[0].label === 'Work' && r[0].created_by === U.a);
+await expect('the person sees their contacts', () => as(U.b, `select * from person_contacts where user_id=$1`, [U.b]), len(1));
+await expect('company colleague sees the contacts', () => as(U.d, `select * from person_contacts where user_id=$1`, [U.b]), len(1));
+await expect('outsider cannot see the contacts', () => as(E, `select * from person_contacts`), len(0));
+await expect('non-admin cannot add contacts for others', () => as(U.d, `insert into person_contacts (user_id,kind,value) values ($1,'phone','555 0101')`, [U.b]), isErr);
+await expect('you add your own phone', () => as(U.b, `insert into person_contacts (user_id,kind,value,label) values ($1,'phone','555 0102','Home') returning id`, [U.b]), len(1));
+await expect('bad extra email refused', () => as(U.a, `insert into person_contacts (user_id,kind,value) values ($1,'email','nope')`, [U.b]), isErr);
+await expect('duplicate extra contact refused', () => as(U.a, `insert into person_contacts (user_id,kind,value) values ($1,'email','BEA@work.com')`, [U.b]), isErr);
+await expect('contact cannot move to another person', () => as(U.a, `update person_contacts set user_id=$1 where id=$2 returning user_id`, [U.d, pc1.id]), r => r[0]?.user_id === U.b);
+await expect('non-admin cannot delete others contacts', () => as(U.d, `delete from person_contacts where id=$1 returning id`, [pc1.id]), len(0));
+await expect('admin deletes a member contact', () => as(U.a, `delete from person_contacts where id=$1 returning id`, [pc1.id]), len(1));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

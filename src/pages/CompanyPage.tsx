@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { LatticeGrid, gridDropdown, gridEsc, gridLink } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
+import { PersonContacts } from '../components/PersonContacts';
 import { RolePicker } from '../components/RolePicker';
 import { useAuth } from '../lib/auth';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
@@ -180,16 +181,17 @@ export function CompanyPage() {
     rowId: (r: PersonRow) => r.id,
     toolbar: false, groupPanel: false, statusBar: false,
     selection: 'single', rowClickSelection: true, readOnly: !isAdmin,
-    // Name, email and phone belong to each person's own profile, so only they change them.
+    // Admins change a person's name and phone; the email is their sign-in, which only
+    // they change (on their profile).
     columns: [
-      { field: 'name', header: 'Name', width: 200 },
+      { field: 'name', header: 'Name', width: 200, editable: true },
       { field: 'title', header: 'Title', width: 170, editable: true },
       {
         field: 'roles', header: 'Company roles', width: 240, editable: true, filter: 'set', filterSplit: ',',
         tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
       },
       { field: 'email', header: 'Email', width: 220 },
-      { field: 'phone', header: 'Phone', width: 140 },
+      { field: 'phone', header: 'Phone', width: 140, editable: true },
       { field: 'admin', header: 'Admin', type: 'boolean', width: 90, editable: true },
     ],
   }), [isAdmin]);
@@ -199,6 +201,13 @@ export function CompanyPage() {
     if (e.column === 'title') {
       const v = String(e.newValue ?? '').trim();
       await run(() => api.updateMember(companyId, userId, { title: v || null }));
+    } else if (e.column === 'name') {
+      const v = String(e.newValue ?? '').trim();
+      if (v) await run(() => api.updatePerson(userId, { full_name: v }));
+      else await load();
+    } else if (e.column === 'phone') {
+      const v = String(e.newValue ?? '').trim();
+      await run(() => api.updatePerson(userId, { phone: v || null }));
     } else if (e.column === 'admin') {
       await run(() => api.updateMember(companyId, userId, { is_admin: Boolean(e.newValue) }));
     } else if (e.column === 'roles') {
@@ -310,12 +319,16 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
 }) {
   const name = displayName(member.profile);
   const roleIds = new Set(member.role_ids);
-  // Title, admin and roles are held until Save.
-  const initial = useMemo(() => ({ title: member.title ?? '', admin: member.is_admin, roles: [...member.role_ids].sort() }), [member]);
+  // Name, phone, title, admin and roles are held until Save.
+  const initial = useMemo(() => ({
+    name: member.profile.full_name ?? '', phone: member.profile.phone ?? '',
+    title: member.title ?? '', admin: member.is_admin, roles: [...member.role_ids].sort(),
+  }), [member]);
   const [draft, setDraft] = useState(initial);
+  const profileChanged = draft.name.trim() !== initial.name || draft.phone.trim() !== initial.phone;
   const titleChanged = draft.title.trim() !== initial.title || draft.admin !== initial.admin;
   const rolesChanged = draft.roles.join() !== initial.roles.join();
-  const changed = titleChanged || rolesChanged;
+  const changed = profileChanged || titleChanged || rolesChanged;
   useUnsaved(changed);
   useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -326,10 +339,11 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
   async function save(e: FormEvent) {
     e.preventDefault();
     const ok = await run(async () => {
+      if (profileChanged) await api.updatePerson(member.user_id, { full_name: draft.name.trim(), phone: draft.phone.trim() || null });
       if (titleChanged) await api.updateMember(companyId, member.user_id, { title: draft.title.trim() || null, is_admin: draft.admin });
       if (rolesChanged) await api.setMemberRoles(companyId, member.user_id, draft.roles);
     }, `Saved ${name}.`);
-    if (ok) setDraft((d) => ({ ...d, title: d.title.trim() }));
+    if (ok) setDraft((d) => ({ ...d, name: d.name.trim(), phone: d.phone.trim(), title: d.title.trim() }));
   }
 
   async function remove() {
@@ -346,12 +360,20 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
         {member.profile.email && <a href={`mailto:${member.profile.email}`}>{member.profile.email}</a>}
         {member.profile.phone ? <><br /><a href={`tel:${member.profile.phone.replace(/[^\d+]/g, '')}`}>{member.profile.phone}</a></> : null}
       </p>
-      {isMe
-        ? <p className="hint"><Link to="/profile">Change your name or phone on your profile</Link>.</p>
-        : <p className="hint">{name} changes their own name, email and phone on their profile.</p>}
+      <p className="hint">
+        {isMe
+          ? <>Your sign-in email is changed on <Link to="/profile">your profile</Link>.</>
+          : <>The email is {name}'s sign-in, so only they can change it, on their profile.</>}
+      </p>
       {isAdmin ? (
         <>
           <form className="flex flex-col gap-2" onSubmit={save}>
+            <label className="label">Name
+              <input className="field" value={draft.name} required={!!initial.name} maxLength={120} autoComplete="off" onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            </label>
+            <label className="label">Phone
+              <input className="field" type="tel" value={draft.phone} maxLength={40} autoComplete="off" placeholder="Optional" onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
+            </label>
             <label className="label">Title
               <input className="field" placeholder="e.g. Line producer" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
             </label>
@@ -367,12 +389,14 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
             </div>
             {changed && <p className="hint">Unsaved changes.</p>}
           </form>
+          <PersonContacts userId={member.user_id} name={name} canEdit />
           <button className="btn btn-danger" onClick={remove}>{isMe ? 'Leave company' : 'Remove from company'}</button>
         </>
       ) : (
         <>
           {member.title && <p>{member.title}</p>}
           <p>{roleNames(roleIds, roles) || <span className="text-muted">No company roles</span>}</p>
+          <PersonContacts userId={member.user_id} name={name} canEdit={isMe} />
           {isMe && <button className="btn btn-danger" onClick={remove}>Leave company</button>}
         </>
       )}

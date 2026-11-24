@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { LatticeGrid } from '../../components/LatticeGrid';
 import { Section } from '../../components/Section';
 import { RolePicker } from '../../components/RolePicker';
+import { PersonContacts } from '../../components/PersonContacts';
 import { api, type ProjectMember } from '../../lib/api';
 import { displayName, errorText, roleIdsFor, roleNames } from '../../lib/format';
 import type { Role } from '../../lib/database.types';
@@ -169,6 +170,7 @@ function TeamPanel({ projectId, companyId, member, roles, isAdmin, run, onRemove
       {/* The person's name opens them on the company's People list, with all their details. */}
       <h3><Link to={`/companies/${companyId}?person=${member.user_id}`} title={`Open ${name} in the company's people`}>{name}</Link></h3>
       <p className="hint mt-2">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
+      <PersonContacts userId={member.user_id} name={name} canEdit={false} />
       {isAdmin ? (
         <>
           <form className="flex flex-col gap-2" onSubmit={save}>

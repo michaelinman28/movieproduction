@@ -1,5 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
+import { PersonContacts } from '../components/PersonContacts';
+import { Section } from '../components/Section';
 import { errorText } from '../lib/format';
 
 export function ProfilePage() {
@@ -7,6 +11,20 @@ export function ProfilePage() {
   const [email, setEmail] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
+  const me = useAuth().session?.user.id ?? '';
+  // Changing your sign-in email: only you can, and the new address must be confirmed.
+  const [newEmail, setNewEmail] = useState('');
+  const [emailMessage, setEmailMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
+  async function changeEmail(e: FormEvent) {
+    e.preventDefault();
+    const address = newEmail.trim().toLowerCase();
+    if (!address || address === email.toLowerCase()) return;
+    setEmailMessage(null);
+    const { error } = await supabase.auth.updateUser({ email: address }, { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL });
+    if (error) { setEmailMessage({ kind: 'error', text: error.message }); return; }
+    setNewEmail('');
+    setEmailMessage({ kind: 'info', text: `Check ${address} (and your current inbox) for a confirmation link. Your email changes once you confirm it.` });
+  }
 
   useEffect(() => {
     api.me()
@@ -36,6 +54,15 @@ export function ProfilePage() {
         {message && <p className={message.kind === 'error' ? 'error' : 'notice'}>{message.text}</p>}
         <div><button type="submit" className="btn">Save profile</button></div>
       </form>
+      <Section id="profile.email" title="Sign-in email">
+      <form className="card w-full max-w-xl" onSubmit={changeEmail}>
+        <p className="hint m-0">Only you can change this. We send a link to confirm the new address first.</p>
+        <label className="label">New email<input className="field" type="email" value={newEmail} required autoComplete="email" onChange={(e) => setNewEmail(e.target.value)} /></label>
+        {emailMessage && <p className={emailMessage.kind === 'error' ? 'error' : 'notice'}>{emailMessage.text}</p>}
+        <div><button type="submit" className="btn btn-secondary">Send confirmation</button></div>
+      </form>
+      </Section>
+      {me && <div className="card w-full max-w-xl"><PersonContacts userId={me} name="you" canEdit /></div>}
     </section>
   );
 }

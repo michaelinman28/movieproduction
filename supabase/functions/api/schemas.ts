@@ -23,6 +23,29 @@ export const ProfileUpdate = z.object({
   phone: z.string().trim().max(40).nullable().optional(),
 }).openapi('ProfileUpdate');
 
+export const ContactKind = z.enum(['email', 'phone']).openapi('ContactKind');
+
+export const PersonContact = z.object({
+  id: Uuid,
+  user_id: Uuid,
+  kind: ContactKind,
+  value: z.string().openapi({ example: 'ava@studio.com' }),
+  label: nullableText.openapi({ example: 'Work' }),
+  created_by: Uuid.nullable(),
+  created_at: z.string(),
+}).openapi('PersonContact');
+
+export const PersonContactInput = z.object({
+  kind: ContactKind,
+  value: z.string().trim().min(3).max(254),
+  label: z.string().trim().max(40).nullable().optional(),
+}).openapi('PersonContactInput');
+
+export const PersonContactUpdate = z.object({
+  value: z.string().trim().min(3).max(254).optional(),
+  label: z.string().trim().max(40).nullable().optional(),
+}).openapi('PersonContactUpdate');
+
 export const Session = z.object({
   access_token: z.string(),
   refresh_token: z.string(),
