@@ -14,6 +14,8 @@ Read ARCHITECTURE.md first. These are the standards every change follows.
 - **Dropdown filters for fixed values.** Any column whose values come from a fixed set (pick-lists, statuses, departments, yes/no, "You are") filters with a dropdown of tick boxes and counts (`filter: 'set'`; pick-list columns get it automatically from the wrapper). Columns holding a list of names (roles, tags) add `filterSplit: ','` so each name is its own choice. Free text, dates and numbers keep the typed filter.
 - **Every field is editable in both the table and the form.** Anything a person may change is editable in place in its table and in the page's form or side panel; adding a field means adding it to both. Lists of names (roles, tags) are comma-separated in the table and picked in the panel. If a row's name is editable, give the link its own Open column. Fields owned by another record stay read-only outside their home: a person's name, nickname and phone are edited on the company's People list (by admins) or the person's profile, and the sign-in email only by the person on their profile.
 
+- **Phones and emails** use `src/lib/contact.ts`: `phoneOrThrow`/`formatPhone` (stored as ###-###-####, or + and digits) and `emailOrThrow`/`emailProblem`; any new phone or email field uses them and the database's `format_phone`/`check_email`.
+
 ## Data and API
 - The app reads and writes data only through the API client in `src/lib/api.ts`.
 - API routes live in `supabase/functions/api/routes/`, with zod schemas in `schemas.ts`; run `npm run api:spec` after changing them.

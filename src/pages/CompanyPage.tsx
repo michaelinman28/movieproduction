@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 import { scrollToForm } from '../lib/reveal';
 import { api, type Company, type CompanyMember, type Project } from '../lib/api';
+import { emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
 import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, statusLabel, statusValue } from '../lib/format';
 import type { Role } from '../lib/database.types';
 
@@ -155,6 +156,8 @@ export function CompanyPage() {
   async function addPerson(e: FormEvent) {
     e.preventDefault();
     const email = newPerson.email.trim();
+    const problem = emailProblem(email);
+    if (problem) { setError(problem); return; }
     if (!confirmDiscard()) return;
     let result = '';
     let userId = '';
@@ -210,8 +213,8 @@ export function CompanyPage() {
       const v = String(e.newValue ?? '').trim();
       await run(() => api.updatePerson(userId, { nickname: v || null }));
     } else if (e.column === 'phone') {
-      const v = String(e.newValue ?? '').trim();
-      await run(() => api.updatePerson(userId, { phone: v || null }));
+      const v = String(e.newValue ?? '');
+      await run(() => api.updatePerson(userId, { phone: phoneOrThrow(v) }));
     } else if (e.column === 'admin') {
       await run(() => api.updateMember(companyId, userId, { is_admin: Boolean(e.newValue) }));
     } else if (e.column === 'roles') {
@@ -345,13 +348,13 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
     const ok = await run(async () => {
       if (profileChanged) {
         await api.updatePerson(member.user_id, {
-          ...(draft.name.trim() ? { full_name: draft.name.trim() } : {}), nickname: draft.nickname.trim() || null, phone: draft.phone.trim() || null,
+          ...(draft.name.trim() ? { full_name: draft.name.trim() } : {}), nickname: draft.nickname.trim() || null, phone: phoneOrThrow(draft.phone),
         });
       }
       if (titleChanged) await api.updateMember(companyId, member.user_id, { title: draft.title.trim() || null, is_admin: draft.admin });
       if (rolesChanged) await api.setMemberRoles(companyId, member.user_id, draft.roles);
     }, `Saved ${name}.`);
-    if (ok) setDraft((d) => ({ ...d, name: d.name.trim(), nickname: d.nickname.trim(), phone: d.phone.trim(), title: d.title.trim() }));
+    if (ok) setDraft((d) => ({ ...d, name: d.name.trim(), nickname: d.nickname.trim(), phone: formatPhone(d.phone), title: d.title.trim() }));
   }
 
   async function remove() {
@@ -383,7 +386,8 @@ function MemberPanel({ companyId, member, roles, isAdmin, isMe, run, onRemoved }
               <input className="field" value={draft.nickname} maxLength={60} autoComplete="off" placeholder="Optional, e.g. Avi" onChange={(e) => setDraft({ ...draft, nickname: e.target.value })} />
             </label>
             <label className="label">Phone
-              <input className="field" type="tel" value={draft.phone} maxLength={40} autoComplete="off" placeholder="Optional" onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
+              <input className="field" type="tel" value={draft.phone} maxLength={40} autoComplete="off" placeholder="Optional, e.g. 404-555-0123" onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+                onBlur={() => setDraft((d) => ({ ...d, phone: formatPhone(d.phone) }))} />
             </label>
             <label className="label">Title
               <input className="field" placeholder="e.g. Line producer" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />

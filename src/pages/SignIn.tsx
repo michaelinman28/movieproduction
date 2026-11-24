@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
+import { emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
 import { ThemeSwitch } from '../components/ThemeSwitch';
 
 export function SignIn() {
@@ -13,13 +14,19 @@ export function SignIn() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setMessage(null);
+    let cleanPhone: string | null = null;
+    if (mode === 'sign-up') {
+      const problem = emailProblem(email);
+      if (problem) { setMessage({ kind: 'error', text: problem }); return; }
+      try { cleanPhone = phoneOrThrow(phone); } catch (err) { setMessage({ kind: 'error', text: (err as Error).message }); return; }
+    }
+    setBusy(true);
     const { data, error } =
       mode === 'sign-in'
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({ email, password, options: {
-              data: { full_name: fullName.trim(), phone: phone.trim() },
+              data: { full_name: fullName.trim(), phone: cleanPhone ?? '' },
               // Send the confirmation link back to wherever the app is running.
               emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
             } });
@@ -44,7 +51,7 @@ export function SignIn() {
         {mode === 'sign-up' && (
           <label className="label">
             Phone number <span className="text-muted">(optional)</span>
-            <input className="field" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
+            <input className="field" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={() => setPhone(formatPhone(phone))} autoComplete="tel" placeholder="e.g. 404-555-0123" />
           </label>
         )}
         <label className="label">

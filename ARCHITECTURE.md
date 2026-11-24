@@ -250,6 +250,12 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   that starts closed unless it has a ticked role.
   When someone is added to a project, their project roles start as a copy of their
   company roles (trigger `copy_company_roles_to_project`); admins can then change them.
+- **Phones and emails.** Phone numbers are stored as `###-###-####` (10 digits, or 11
+  starting with 1), or `+` and digits for other countries; anything else is refused.
+  Emails need a full address (`name@example.com`). The database enforces this
+  (`format_phone`, `is_valid_email`/`check_email`, migration `20261124030000`), and
+  `src/lib/contact.ts` applies the same rules in the app: phone fields tidy themselves
+  when you leave them, and Save/Add says what's wrong before sending.
 
 ## Repository layout
 

@@ -100,11 +100,11 @@ await db.query(`update auth.users set email='renamed@x.com' where id=$1`, [N]);
 await expect('profile email follows sign-in email', () => as(U.a, `select email from profiles where id=$1`, [N]), r => r[0]?.email === 'renamed@x.com');
 // phone numbers
 const P='00000000-0000-0000-0000-0000000000dd';
-await db.query(`insert into auth.users (id,email,raw_user_meta_data) values ($1,'p@x.com',$2)`, [P, {full_name:'P', phone:' 555-0100 '}]);
-await expect('phone from sign-up', () => as(P, `select phone from profiles where id=$1`, [P]), r => r[0]?.phone === '555-0100');
-await expect('edit own phone', () => as(U.b, `update profiles set phone='555-0199' where id=$1 returning phone`, [U.b]), len(1));
-await expect('cannot edit others phone', () => as(U.b, `update profiles set phone='1' where id=$1 returning id`, [U.a]), len(0));
-await expect('co-member sees phone', () => as(U.a, `select phone from profiles where id=$1`, [U.b]), r => r[0]?.phone === '555-0199');
+await db.query(`insert into auth.users (id,email,raw_user_meta_data) values ($1,'p@x.com',$2)`, [P, {full_name:'P', phone:' 404 555 0100 '}]);
+await expect('phone from sign-up', () => as(P, `select phone from profiles where id=$1`, [P]), r => r[0]?.phone === '404-555-0100');
+await expect('edit own phone', () => as(U.b, `update profiles set phone='4045550199' where id=$1 returning phone`, [U.b]), len(1));
+await expect('cannot edit others phone', () => as(U.b, `update profiles set phone='4045550111' where id=$1 returning id`, [U.a]), len(0));
+await expect('co-member sees phone', () => as(U.a, `select phone from profiles where id=$1`, [U.b]), r => r[0]?.phone === '404-555-0199');
 // step 3: custom roles
 const [co3] = await as(U.a, `insert into companies (name) values ('Third Co') returning id`);
 const c3 = co3.id;
@@ -207,20 +207,20 @@ const [loc2] = await as(U.a, `insert into project_locations (project_id,name) va
 await expect('only the creator or an admin deletes a location', () => as(U.b, `delete from project_locations where id=$1 returning id`, [loc2.id]), len(0));
 await expect('deleting a location clears it from tasks', async () => { await as(U.b, `delete from project_locations where id=$1`, [loc.id]); return as(U.b, `select location_id from tasks where id=$1`, [lt.id]); }, r => r[0]?.location_id === null);
 // people's details: admins edit name and phone and add contacts; only you change your email
-await expect('admin edits a member name and phone', () => as(U.a, `update profiles set full_name=' Bea B ', phone='555 0100' where id=$1 returning full_name, phone`, [U.b]), r => r[0]?.full_name === 'Bea B' && r[0]?.phone === '555 0100');
+await expect('admin edits a member name and phone', () => as(U.a, `update profiles set full_name=' Bea B ', phone='(404) 555 0100' where id=$1 returning full_name, phone`, [U.b]), r => r[0]?.full_name === 'Bea B' && r[0]?.phone === '404-555-0100');
 await expect('non-admin cannot edit another member', () => as(U.b, `update profiles set full_name='Hacked' where id=$1 returning id`, [U.d]), len(0));
 await expect('outsider cannot edit a member', () => as(E, `update profiles set full_name='Hacked' where id=$1 returning id`, [U.b]), len(0));
 await expect('admin cannot change a member email', () => as(U.a, `update profiles set email='new@x.com' where id=$1`, [U.b]), isErr);
 await expect('you cannot change your profile email directly', () => as(U.b, `update profiles set email='new@x.com' where id=$1`, [U.b]), isErr);
-await expect('you edit your own phone', () => as(U.b, `update profiles set phone='555 0199' where id=$1 returning phone`, [U.b]), r => r[0]?.phone === '555 0199');
+await expect('you edit your own phone', () => as(U.b, `update profiles set phone='+1 404.555.0199' where id=$1 returning phone`, [U.b]), r => r[0]?.phone === '404-555-0199');
 await expect('sign-in email change still reaches the profile', async () => { await db.query(`update auth.users set email='b2@x.com' where id=$1`, [U.b]); return as(U.b, `select email from profiles where id=$1`, [U.b]); }, r => r[0]?.email === 'b2@x.com');
 const [pc1] = await as(U.a, `insert into person_contacts (user_id,kind,value,label) values ($1,'email','  Bea@Work.COM ',' Work ') returning *`, [U.b]);
 await expect('admin adds an email for a member, tidied', () => Promise.resolve([pc1]), r => r[0].value === 'bea@work.com' && r[0].label === 'Work' && r[0].created_by === U.a);
 await expect('the person sees their contacts', () => as(U.b, `select * from person_contacts where user_id=$1`, [U.b]), len(1));
 await expect('company colleague sees the contacts', () => as(U.d, `select * from person_contacts where user_id=$1`, [U.b]), len(1));
 await expect('outsider cannot see the contacts', () => as(E, `select * from person_contacts`), len(0));
-await expect('non-admin cannot add contacts for others', () => as(U.d, `insert into person_contacts (user_id,kind,value) values ($1,'phone','555 0101')`, [U.b]), isErr);
-await expect('you add your own phone', () => as(U.b, `insert into person_contacts (user_id,kind,value,label) values ($1,'phone','555 0102','Home') returning id`, [U.b]), len(1));
+await expect('non-admin cannot add contacts for others', () => as(U.d, `insert into person_contacts (user_id,kind,value) values ($1,'phone','404 555 0101')`, [U.b]), isErr);
+await expect('you add your own phone', () => as(U.b, `insert into person_contacts (user_id,kind,value,label) values ($1,'phone','404 555 0102','Home') returning id`, [U.b]), len(1));
 await expect('bad extra email refused', () => as(U.a, `insert into person_contacts (user_id,kind,value) values ($1,'email','nope')`, [U.b]), isErr);
 await expect('duplicate extra contact refused', () => as(U.a, `insert into person_contacts (user_id,kind,value) values ($1,'email','BEA@work.com')`, [U.b]), isErr);
 await expect('contact cannot move to another person', () => as(U.a, `update person_contacts set user_id=$1 where id=$2 returning user_id`, [U.d, pc1.id]), r => r[0]?.user_id === U.b);
@@ -243,5 +243,24 @@ await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2),(
 await expect('new project member gets their company roles', () => as(U.a, `select role_id from project_member_roles where project_id=$1 and user_id=$2`, [p7.id,U.b]), r => r.length === 2 && r.some(x => x.role_id === r7.id) && r.some(x => x.role_id === std.id));
 await expect('member with no company roles starts with none', () => as(U.a, `select * from project_member_roles where project_id=$1 and user_id=$2`, [p7.id,U.d]), len(0));
 await expect('project roles can then differ', async () => { await as(U.a, `delete from project_member_roles where project_id=$1 and user_id=$2 and role_id=$3`, [p7.id,U.b,std.id]); return as(U.a, `select * from company_member_roles where company_id=$1 and user_id=$2`, [co7.id,U.b]); }, len(2));
+// phone and email formats
+await expect('phone digits become ###-###-####', () => as(U.b, `update profiles set phone='404.555.0123' where id=$1 returning phone`, [U.b]), r => r[0]?.phone === '404-555-0123');
+await expect('leading 1 dropped', () => as(U.b, `update profiles set phone='1 (404) 555-0124' where id=$1 returning phone`, [U.b]), r => r[0]?.phone === '404-555-0124');
+await expect('international kept as + digits', () => as(U.b, `update profiles set phone='+44 20 7946 0958' where id=$1 returning phone`, [U.b]), r => r[0]?.phone === '+442079460958');
+await expect('short phone refused', () => as(U.b, `update profiles set phone='555-0100' where id=$1`, [U.b]), isErr);
+await expect('letters in phone refused', () => as(U.b, `update profiles set phone='404-CALL-NOW' where id=$1`, [U.b]), isErr);
+await expect('blank phone cleared', () => as(U.b, `update profiles set phone='  ' where id=$1 returning phone`, [U.b]), r => r[0]?.phone === null);
+await expect('contact phone formatted', () => as(U.b, `insert into person_contacts (user_id,kind,value) values ($1,'phone','4045550177') returning value`, [U.b]), r => r[0]?.value === '404-555-0177');
+await expect('contact email without dot refused', () => as(U.b, `insert into person_contacts (user_id,kind,value) values ($1,'email','bea@work')`, [U.b]), isErr);
+await expect('contact email with space refused', () => as(U.b, `insert into person_contacts (user_id,kind,value) values ($1,'email','bea smith@work.com')`, [U.b]), isErr);
+await expect('contact email double dot refused', () => as(U.b, `insert into person_contacts (user_id,kind,value) values ($1,'email','bea..b@work.com')`, [U.b]), isErr);
+await expect('good contact email kept, lowercased', () => as(U.b, `insert into person_contacts (user_id,kind,value) values ($1,'email',' Bea.O''Neil+films@Work.co.uk ') returning value`, [U.b]), r => r[0]?.value === "bea.o'neil+films@work.co.uk");
+const [locF] = await as(U.b, `insert into project_locations (project_id,name) values ($1,'Barn') returning id`, [lp.id]);
+await expect('location phone formatted', () => as(U.b, `update project_locations set contact_phone='404 555 0188' where id=$1 returning contact_phone`, [locF.id]), r => r[0]?.contact_phone === '404-555-0188');
+await expect('location bad phone refused', () => as(U.b, `update project_locations set contact_phone='12345' where id=$1`, [locF.id]), isErr);
+await expect('location email without domain ending refused', () => as(U.b, `update project_locations set contact_email='sam@mill.c' where id=$1`, [locF.id]), isErr);
+await expect('location edit leaves other fields alone', () => as(U.b, `update project_locations set name='Old Mill 2' where id=$1 returning contact_phone, contact_email`, [locF.id]), r => r[0]?.contact_phone === '404-555-0188' && r[0]?.contact_email === null);
+await db.query(`insert into auth.users (id,email,raw_user_meta_data) values ($1,'q@x.com',$2)`, ['00000000-0000-0000-0000-0000000000f1', {full_name:'Q', phone:'call me'}]);
+await expect('odd sign-up phone does not block sign-up', () => db.query(`select phone from profiles where id='00000000-0000-0000-0000-0000000000f1'`).then(r => r.rows), r => r[0]?.phone === 'call me');
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

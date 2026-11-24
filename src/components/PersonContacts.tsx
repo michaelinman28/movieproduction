@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Section } from './Section';
 import { api, type PersonContact } from '../lib/api';
+import { emailOrThrow, formatPhone, phoneOrThrow } from '../lib/contact';
 import { errorText } from '../lib/format';
 
 const telHref = (v: string) => `tel:${v.replace(/[^\d+]/g, '')}`;
@@ -24,7 +25,9 @@ export function PersonContacts({ userId, name, canEdit }: { userId: string; name
     e.preventDefault();
     setError(null);
     try {
-      await api.addContact(userId, { kind: draft.kind, value: draft.value.trim(), label: draft.label.trim() || null });
+      const value = draft.kind === 'phone' ? phoneOrThrow(draft.value) : emailOrThrow(draft.value);
+      if (!value) return;
+      await api.addContact(userId, { kind: draft.kind, value, label: draft.label.trim() || null });
       setDraft({ ...draft, value: '', label: '' });
     } catch (err) { setError(errorText(err)); }
     await load();
@@ -60,7 +63,8 @@ export function PersonContacts({ userId, name, canEdit }: { userId: string; name
           </label>
           <label className="label">{draft.kind === 'email' ? 'Email address' : 'Phone number'}
             <input className="field" type={draft.kind === 'email' ? 'email' : 'tel'} value={draft.value} required minLength={3} maxLength={254}
-              placeholder={draft.kind === 'email' ? 'e.g. ava@studio.com' : 'e.g. +1 404 555 0101'} onChange={(e) => setDraft({ ...draft, value: e.target.value })} />
+              placeholder={draft.kind === 'email' ? 'e.g. ava@studio.com' : 'e.g. 404-555-0101'} onChange={(e) => setDraft({ ...draft, value: e.target.value })}
+              onBlur={() => { if (draft.kind === 'phone') setDraft((d) => ({ ...d, value: formatPhone(d.value) })); }} />
           </label>
           <label className="label">Label
             <input className="field" value={draft.label} maxLength={40} placeholder="e.g. Work" onChange={(e) => setDraft({ ...draft, label: e.target.value })} />
