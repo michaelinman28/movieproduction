@@ -14,6 +14,8 @@ interface Props {
  * Checkboxes for every role, in groups: one per department of the standard roles,
  * and the company's custom roles. Each group opens and closes; groups with a ticked
  * role start open, the rest start closed, and the heading says how many are ticked.
+ * Groups are stepped in under the heading the picker sits in, and roles under their
+ * group, with a guide line, so the levels read as nested.
  */
 export function RolePicker({ roles, selected, onToggle, disabled, id }: Props) {
   const groups = new Map<string, Role[]>();
@@ -22,12 +24,12 @@ export function RolePicker({ roles, selected, onToggle, disabled, id }: Props) {
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   return (
-    <div className="flex flex-col gap-1">
+    <div className="ml-1.5 flex flex-col gap-1 border-l border-line pl-3 sm:pl-4">
       {[...groups].map(([group, list]) => {
         const ticked = list.filter((r) => selected.has(r.id)).length;
         return (
           <Section key={group} id={`${id}.${group.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} title={group} level="h4"
-            defaultCollapsed={ticked === 0} summary={ticked ? `${ticked} of ${list.length}` : String(list.length)} bodyClassName="flex flex-col">
+            defaultCollapsed={ticked === 0} summary={ticked ? `${ticked} of ${list.length}` : String(list.length)} bodyClassName="ml-1.5 flex flex-col border-l border-line pl-3 sm:pl-4">
             {list.map((r) => (
               <label key={r.id} className="check">
                 <input
