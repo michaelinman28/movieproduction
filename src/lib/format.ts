@@ -72,6 +72,10 @@ export function timeLabel(t: string) {
 export const dueWhen = (t: Pick<Task, 'due_part' | 'due_time'>) =>
   t.due_part ? labelOf(DAY_PARTS, t.due_part) : t.due_time ? timeLabel(t.due_time) : '';
 
+/** When on its start date a task starts: 'Morning', '9:00 AM', or ''. */
+export const startWhen = (t: Pick<Task, 'start_part' | 'start_time'>) =>
+  t.start_part ? labelOf(DAY_PARTS, t.start_part) : t.start_time ? timeLabel(t.start_time) : '';
+
 /** Every half hour of the day as 'HH:MM', for picking a due time. */
 export const HALF_HOURS = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
 

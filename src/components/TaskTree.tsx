@@ -13,7 +13,7 @@ import {
   api, type DayPart, type Location, type ProjectMember, type Task, type TaskCategory, type TaskInput, type TaskPriority, type TaskStatus, type TaskTag,
 } from '../lib/api';
 import {
-  DAY_PARTS, HALF_HOURS, TASK_PRIORITIES, TASK_STATUSES, displayName, dueWhen, errorText, isOverdue, labelOf, timeLabel, valueOf,
+  DAY_PARTS, HALF_HOURS, TASK_PRIORITIES, TASK_STATUSES, displayName, dueWhen, errorText, startWhen, isOverdue, labelOf, timeLabel, valueOf,
 } from '../lib/format';
 import type { LatticeGridInstance } from '../vendor/lattice-grid/lattice-grid';
 
@@ -26,6 +26,8 @@ interface TaskRow {
   status: string;
   priority: string;
   assignee: string;
+  start: string;
+  startWhen: string;
   due: string;
   when: string;
   subtasks: string;
@@ -187,6 +189,8 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
           status: labelOf(TASK_STATUSES, t.status),
           priority: labelOf(TASK_PRIORITIES, t.priority),
           assignee: t.assignee_id ? nameOf.get(t.assignee_id) ?? 'Left the project' : UNASSIGNED,
+          start: t.start_date ?? '',
+          startWhen: startWhen(t),
           due: t.due_date ?? '',
           when: dueWhen(t),
           subtasks: sub.length ? `${sub.filter((s) => s.status === 'done').length} of ${sub.length} done` : '',
@@ -262,6 +266,13 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
           return [NO_LOCATION, ...(d.location && !names.includes(d.location) ? [d.location] : []), ...names];
         },
         render: ({ value }: { value: string }) => dropdown(value ? esc(value) : '<span class="text-muted">None</span>'),
+      },
+      { field: 'start', header: 'Start', type: 'date', width: 120, editable: true },
+      {
+        // A part of the day or a time on the start date.
+        field: 'startWhen', header: 'Start time', width: 120, editor: 'select', editorOptions: WHEN_OPTIONS,
+        editable: (d: TaskRow) => !!d.start,
+        render: (a: { value: string; data: TaskRow }) => (a.data.start ? dropdown(esc(a.value || ANY_TIME)) : ''),
       },
       { field: 'due', header: 'Due', type: 'date', width: 120, editable: true, render: overdueText, ...(overdue || mine ? { sort: 'asc' } : {}) },
       {
@@ -358,6 +369,9 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
       // Clearing the date clears its time too.
       : e.column === 'due' ? (v ? { due_date: v } : { due_date: null, due_part: null, due_time: null })
       : e.column === 'when' ? parseWhen(v)
+      // Clearing the start date clears its time too.
+      : e.column === 'start' ? (v ? { start_date: v } : { start_date: null, start_part: null, start_time: null })
+      : e.column === 'startWhen' ? (({ due_part, due_time }) => ({ start_part: due_part, start_time: due_time }))(parseWhen(v))
       : e.column === 'category' ? { category_id: v === NO_CATEGORY || !v ? null : categories.find((c) => c.name === v)?.id }
       : e.column === 'location' ? { location_id: v === NO_LOCATION || !v ? null : locations.find((l) => l.name === v)?.id }
       : null;
@@ -394,7 +408,9 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
   function chooseDay(d: string) {
     if (d === day) return true;
     const sel = selectedId ? byId.get(selectedId) : null;
-    if (sel && sel.due_date !== d) {
+    // A task over several days stays open on any of its days.
+    const first = sel?.start_date ?? sel?.due_date, last = sel?.due_date ?? sel?.start_date;
+    if (sel && !(first && last && d >= first && d <= last)) {
       if (!confirmDiscard()) return false;
       setSelectedId(null);
     }
@@ -404,8 +420,10 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
   /** Calendar: opens a task and moves the chosen day to its due date. */
   function openOnCalendar(id: string) {
     if (id !== selectedId && !confirmDiscard()) return;
-    const due = byId.get(id)?.due_date;
-    if (due) setDay(due);
+    // The chosen day moves to the task's due date, unless the task already covers it.
+    const t = byId.get(id);
+    const first = t?.start_date ?? t?.due_date, last = t?.due_date ?? t?.start_date;
+    if (last && !(first && day >= first && day <= last)) setDay(last);
     setSelectedId(id);
     scrollToForm(id);
   }
@@ -435,7 +453,7 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
     <Section id="project.tasks" title="Tasks" summary={tasks.length ? `${done} of ${tasks.length} done` : undefined}>
       <p className="hint">
         {calendar
-          ? 'Tasks show on their due date. Click a day to list its tasks and add new ones on it, and click a task to open its form. On a computer, drag a task to another day to move it.'
+          ? 'Tasks show on their due date; a task with a start date too shows as a bar across each day until it is due. Click a day to list its tasks and add new ones on it, and click a task to open its form. On a computer, drag a task to another day to move it.'
           : 'Click a person, location, category, status, priority, time or parent task to pick from its list. Double-click a task name, due date, tags or description to type a change.'}
         {' '}Select a task to edit its description, tags and notes, add sub-tasks, or move it.
       </p>
@@ -464,7 +482,8 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
         {!loaded ? <p className="text-muted">Loading tasks…</p> : calendar ? (
           <TaskCalendar tasks={tasks} selectedId={selectedId} day={day} onDay={chooseDay} nameOf={nameOf}
             onOpen={openOnCalendar}
-            onMove={(id, to) => run(() => api.updateTask(id, { due_date: to }), `Moved "${byId.get(id)?.title}" to ${dayName(to)}.`)} />
+            onMove={(id, to) => run(() => api.updateTask(id, to),
+              to.start_date && to.due_date ? `Moved "${byId.get(id)?.title}" to ${dayName(to.start_date)} to ${dayName(to.due_date)}.` : `Moved "${byId.get(id)?.title}" to ${dayName((to.due_date ?? to.start_date)!)}.`)} />
         ) : (
           <LatticeGrid
             options={options}
@@ -516,6 +535,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
   // Every field here is held until Save (the table saves each cell as it changes).
   const fromTask = (t: Task) => ({
     title: t.title, description: t.description ?? '', dueDate: t.due_date ?? '',
+    startDate: t.start_date ?? '', startWhen: t.start_part ?? (t.start_time ? 'time' : 'any'), startTime: t.start_time?.slice(0, 5) ?? '',
     // 'any', a part of the day, or 'time' for an exact time.
     when: t.due_part ?? (t.due_time ? 'time' : 'any'), dueTime: t.due_time?.slice(0, 5) ?? '',
     status: t.status, priority: t.priority, assignee: t.assignee_id ?? '', location: t.location_id ?? '',
@@ -535,11 +555,15 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
   const dueOf = (d: Draft): Pick<TaskInput, 'due_date' | 'due_part' | 'due_time'> => !d.dueDate
     ? { due_date: null, due_part: null, due_time: null }
     : { due_date: d.dueDate, due_part: d.when === 'any' || d.when === 'time' ? null : d.when as DayPart, due_time: d.when === 'time' && d.dueTime ? d.dueTime : null };
+  const startOf = (d: Draft): Pick<TaskInput, 'start_date' | 'start_part' | 'start_time'> => !d.startDate
+    ? { start_date: null, start_part: null, start_time: null }
+    : { start_date: d.startDate, start_part: d.startWhen === 'any' || d.startWhen === 'time' ? null : d.startWhen as DayPart, start_time: d.startWhen === 'time' && d.startTime ? d.startTime : null };
   const sameTags = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
   function patchOf(d: Draft): TaskInput {
     const p: TaskInput = {};
     if (d.title.trim() !== base.title) p.title = d.title.trim();
     if (d.description.trim() !== base.description) p.description = d.description.trim() || null;
+    if (d.startDate !== base.startDate || d.startWhen !== base.startWhen || d.startTime !== base.startTime) Object.assign(p, startOf(d));
     if (d.dueDate !== base.dueDate || d.when !== base.when || d.dueTime !== base.dueTime) Object.assign(p, dueOf(d));
     if (d.status !== base.status) p.status = d.status;
     if (d.priority !== base.priority) p.priority = d.priority;
@@ -612,7 +636,24 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
             </select>
           </label>
         </div>
-        <label className="label">Due date<input className="field" type="date" value={draft.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></label>
+        <label className="label">Start date <span className="text-muted">(optional, for work over several days)</span>
+          <input className="field" type="date" value={draft.startDate} max={draft.dueDate || undefined} onChange={(e) => set('startDate', e.target.value)} />
+        </label>
+        {draft.startDate && (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="label">Start time of day
+              <select className="field" value={draft.startWhen} onChange={(e) => set('startWhen', e.target.value)}>
+                <option value="any">{ANY_TIME}</option>
+                {DAY_PARTS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                <option value="time">Exact time</option>
+              </select>
+            </label>
+            {draft.startWhen === 'time' && (
+              <label className="label">Start time<input className="field" type="time" value={draft.startTime} required onChange={(e) => set('startTime', e.target.value)} /></label>
+            )}
+          </div>
+        )}
+        <label className="label">Due date<input className="field" type="date" value={draft.dueDate} min={draft.startDate || undefined} onChange={(e) => set('dueDate', e.target.value)} /></label>
         {draft.dueDate && (
           <div className="grid grid-cols-2 gap-2">
             <label className="label">Time of day

@@ -48,7 +48,7 @@ export type { DayPart, TaskPriority, TaskStatus };
 export interface Task extends TaskRow { tag_ids: string[] }
 export interface TaskCategory { id: string; company_id: string; name: string; sort_order: number; tasks: number }
 export interface TaskTag { id: string; company_id: string; name: string; tasks: number }
-export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'assignee_id' | 'due_date' | 'due_part' | 'due_time' | 'parent_id' | 'sort_order' | 'category_id' | 'tag_ids' | 'location_id'>>;
+export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'assignee_id' | 'start_date' | 'start_part' | 'start_time' | 'due_date' | 'due_part' | 'due_time' | 'parent_id' | 'sort_order' | 'category_id' | 'tag_ids' | 'location_id'>>;
 
 export interface Location {
   id: string; project_id: string; name: string; description: string | null; address: string | null;

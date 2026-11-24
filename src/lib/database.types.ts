@@ -34,7 +34,8 @@ export type ProjectMember = { project_id: string; user_id: string; joined_at: st
 export type ProjectMemberRole = { project_id: string; user_id: string; role_id: string };
 export type Task = {
   id: string; project_id: string; parent_id: string | null; title: string; description: string | null;
-  status: TaskStatus; priority: TaskPriority; assignee_id: string | null; due_date: string | null;
+  status: TaskStatus; priority: TaskPriority; assignee_id: string | null;
+  start_date: string | null; start_part: DayPart | null; start_time: string | null; due_date: string | null;
   due_part: DayPart | null; due_time: string | null; category_id: string | null; location_id: string | null;
   sort_order: number; created_by: string; created_at: string; updated_at: string;
 };
