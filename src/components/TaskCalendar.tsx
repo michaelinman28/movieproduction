@@ -7,14 +7,14 @@ export function isoDate(d: Date) {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-const parseIso = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+export const parseIso = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 /** The date `n` days after 'YYYY-MM-DD'. */
-const addDays = (s: string, n: number) => { const d = parseIso(s); return isoDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)); };
+export const addDays = (s: string, n: number) => { const d = parseIso(s); return isoDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)); };
 /** Whole days from a to b. */
-const daysBetween = (a: string, b: string) => Math.round((parseIso(b).getTime() - parseIso(a).getTime()) / 86400000);
+export const daysBetween = (a: string, b: string) => Math.round((parseIso(b).getTime() - parseIso(a).getTime()) / 86400000);
 
 /** The first and last day a task covers: its start date (if any) to its due date. */
-function spanOf(t: Task): { first: string; last: string } | null {
+export function spanOf(t: Task): { first: string; last: string } | null {
   const first = t.start_date ?? t.due_date;
   const last = t.due_date ?? t.start_date;
   if (!first || !last) return null;

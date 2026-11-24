@@ -5,6 +5,7 @@ import { TagPicker } from './TagPicker';
 import { TaskNotes } from './TaskNotes';
 import { TaskSummaryBar } from './TaskSummaryBar';
 import { TaskCalendar, isoDate } from './TaskCalendar';
+import { TaskGantt, type GanttRow } from './TaskGantt';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 import { scrollToForm } from '../lib/reveal';
 import { useAuth } from '../lib/auth';
@@ -55,6 +56,9 @@ const VIEWS = [
   { value: 'mine', label: 'My tasks' },
 ] as const;
 const VIEW_KEY = 'mp-task-view';
+// The calendar shows a month, or a Gantt chart of every task over time.
+const CAL_MODE_KEY = 'mp-calendar-mode';
+const readCalMode = (): 'month' | 'gantt' => { try { return localStorage.getItem(CAL_MODE_KEY) === 'gantt' ? 'gantt' : 'month'; } catch { return 'month'; } };
 // A view that no longer exists (e.g. the old "Grouped by tags") falls back to the tree.
 const readView = () => { try { const v = localStorage.getItem(VIEW_KEY) ?? ''; return VIEWS.some((x) => x.value === v) ? v : ''; } catch { return ''; } };
 
@@ -207,6 +211,12 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
 
   const [view, setView] = useState<string>(readView);
   const calendar = view === 'calendar';
+  const [calMode, setCalModeState] = useState(readCalMode);
+  const gantt = calendar && calMode === 'gantt';
+  function setCalMode(m: 'month' | 'gantt') {
+    setCalModeState(m);
+    try { localStorage.setItem(CAL_MODE_KEY, m); } catch { /* storage unavailable */ }
+  }
   // Overdue: a flat list of only the tasks past their due time, oldest first.
   const overdue = view === 'overdue';
   // My tasks: a flat list of only the tasks assigned to you, soonest due first.
@@ -429,6 +439,14 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
     scrollToForm(id);
   }
 
+  /** Calendar and Gantt chart: a task dragged to other days. */
+  function moveOnCalendar(id: string, to: { due_date?: string; start_date?: string }) {
+    run(() => api.updateTask(id, to),
+      to.start_date && to.due_date ? `Moved "${byId.get(id)?.title}" to ${dayName(to.start_date)} to ${dayName(to.due_date)}.` : `Moved "${byId.get(id)?.title}" to ${dayName((to.due_date ?? to.start_date)!)}.`);
+  }
+  // The Gantt chart lists every task in sub-task tree order.
+  const ganttRows = useMemo<GanttRow[]>(() => rows.map((r) => ({ task: byId.get(r.id)!, depth: r.path.length - 1, kids: kids.get(r.id)?.length ?? 0 })).filter((r) => r.task), [rows, byId, kids]);
+
   // The overdue list shows only tasks past their due time.
   const overdueCount = tasks.filter(isOverdue).length;
   const myCount = tasks.filter((t) => t.assignee_id === me && t.status !== 'done').length;
@@ -453,7 +471,9 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
   return (
     <Section id="project.tasks" title="Tasks" summary={tasks.length ? `${done} of ${tasks.length} done` : undefined}>
       <p className="hint">
-        {calendar
+        {gantt
+          ? 'Each task has a row: a bar runs from its start date to its due date, and a diamond marks a task on one day. Click a task to open its form, and click a day to add new tasks on it. On a computer, drag a bar to move the task.'
+          : calendar
           ? 'Tasks show on their due date; a task with a start date too shows as a bar across each day until it is due. Click a day to list its tasks and add new ones on it, and click a task to open its form. On a computer, drag a task to another day to move it.'
           : 'Click a person, location, category, status, priority, time or parent task to pick from its list. Double-click a task name, due date, tags or description to type a change.'}
         {' '}Select a task to edit its description, tags and notes, add sub-tasks, or move it.
@@ -481,10 +501,22 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
       {/* The task's form opens under the table or calendar, which keeps the full width. */}
       <div className="flex flex-col gap-4">
         {!loaded ? <p className="text-muted">Loading tasks…</p> : calendar ? (
-          <TaskCalendar tasks={tasks} selectedId={selectedId} day={day} onDay={chooseDay} nameOf={nameOf}
-            onOpen={openOnCalendar}
-            onMove={(id, to) => run(() => api.updateTask(id, to),
-              to.start_date && to.due_date ? `Moved "${byId.get(id)?.title}" to ${dayName(to.start_date)} to ${dayName(to.due_date)}.` : `Moved "${byId.get(id)?.title}" to ${dayName((to.due_date ?? to.start_date)!)}.`)} />
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex rounded-md border border-line bg-surface p-0.5 sm:self-start" role="radiogroup" aria-label="Calendar layout">
+              {([['month', 'Month'], ['gantt', 'Gantt chart']] as const).map(([m, label]) => (
+                <button key={m} type="button" role="radio" aria-checked={calMode === m}
+                  className={`min-h-11 flex-1 rounded px-4 text-sm font-medium sm:flex-none ${calMode === m ? 'bg-accent text-accent-fg' : 'text-fg hover:bg-accent-soft'}`}
+                  onClick={() => setCalMode(m)}>{label}</button>
+              ))}
+            </div>
+            {gantt ? (
+              <TaskGantt rows={ganttRows} selectedId={selectedId} day={day} onDay={chooseDay} nameOf={nameOf}
+                onOpen={openOnCalendar} onMove={moveOnCalendar} />
+            ) : (
+              <TaskCalendar tasks={tasks} selectedId={selectedId} day={day} onDay={chooseDay} nameOf={nameOf}
+                onOpen={openOnCalendar} onMove={moveOnCalendar} />
+            )}
+          </div>
         ) : (
           <LatticeGrid
             stateId="project.tasks"
