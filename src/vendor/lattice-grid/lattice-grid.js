@@ -489,7 +489,8 @@
       this._groupCol = { special: 'group', id: '__group', header: this.o.treeData ? this.o.treeColumnHeader : this.o.groupColumnHeader, width: this.o.groupColumnWidth, minWidth: 100, flex: 0, pinned: 'left', resizable: true, sortable: true, filterType: null, def: {} };
       // movieproduction patch: with treeData, `treeColumnField` makes the tree column
       // editable as that field of each row (e.g. a task's title).
-      if (this.o.treeData && this.o.treeColumnField) { this._groupCol.field = this.o.treeColumnField; this._groupCol.def = { editable: true }; }
+      if (this.o.treeData && this.o.treeColumnField) { this._groupCol.field = this.o.treeColumnField; this._groupCol.def = { editable: true }; this._groupCol.filterType = 'text'; }
+      // movieproduction patch: ...and filterable by typing; a match keeps its parent rows.
 
       this._initColumns(this.o.columns);
       this._initialState = this.getState();
@@ -824,12 +825,16 @@
 
     _passes(n) {
       for (const [id, m] of this.filters) {
-        const c = this.colMap.get(id);
+        const c = this._colById(id); // movieproduction patch: includes the tree column
         if (c && !this._matchFilter(c, m, this._val(c, n.data))) return false;
       }
       if (this.o.externalFilter && !this.o.externalFilter(n.data)) return false;
       if (this.quickFilter) {
-        if (n._q == null) n._q = this.cols.map((c) => this._fmt(c, this._val(c, n.data), n.data)).join('\u0001').toLowerCase();
+        if (n._q == null) {
+          // movieproduction patch: the tree column's own field (e.g. a task's title) is searched too
+          const qcols = this._groupCol.field && this.o.treeData ? [this._groupCol].concat(this.cols) : this.cols;
+          n._q = qcols.map((c) => this._fmt(c, this._val(c, n.data), n.data)).join('\u0001').toLowerCase();
+        }
         for (const w of this._qWords) if (n._q.indexOf(w) < 0) return false;
       }
       return true;
@@ -1336,7 +1341,7 @@
       vis.forEach((c, i) => main.appendChild(this._headerCell(c, i)));
       H.appendChild(main);
       total += o.headerHeight;
-      if (o.floatingFilters && vis.some((c) => c.filterType && !c.special && !c.generated)) {
+      if (o.floatingFilters && vis.some((c) => c.filterType && (!c.special || c.special === 'group') && !c.generated)) { // movieproduction patch: tree column
         const ff = el('div', 'lg-hrow');
         ff.style.height = o.floatingFilterHeight + 'px';
         ff.style.width = this.totalWidth + 'px';
@@ -1413,7 +1418,7 @@
 
     _floatingCell(c) {
       const d = this._cellBase('lg-hcell lg-ffcell', c);
-      if (!c.filterType || c.special || c.generated) return d;
+      if (!c.filterType || (c.special && c.special !== 'group') || c.generated) return d; // movieproduction patch: tree column
       const m = this.filters.get(c.id);
       if (c.filterType === 'set') {
         const b = el('button', 'lg-btn lg-ff-set', m ? m.values.length + ' selected' : 'All');
