@@ -288,7 +288,7 @@ export function CompanyPage() {
           </form>
         )}
         {isAdmin && projectRows.length > 0 && <p className="hint mb-2">Double-click a cell to change it, or click a status to pick one.</p>}
-        <LatticeGrid options={projectOptions} rows={projectRows} height={Math.min(80 + projectRows.length * 34, 320)}
+        <LatticeGrid stateId="company.projects" options={projectOptions} rows={projectRows} height={Math.min(80 + projectRows.length * 34, 320)}
           on={{ cellValueChanged: saveProjectCell }} />
         {!isAdmin && <p className="hint mt-2">You see the projects you're assigned to. Company admins see all of them.</p>}
       </Section>
@@ -316,6 +316,7 @@ export function CompanyPage() {
         {/* The form opens under the table, which keeps the full width. */}
         <div className="flex flex-col gap-4">
           <LatticeGrid
+            stateId="company.people"
             options={peopleOptions}
             rows={peopleRows}
             reveal={reveal}

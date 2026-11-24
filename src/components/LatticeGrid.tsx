@@ -1,8 +1,10 @@
-import { useEffect, useRef, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../lib/theme';
 import { confirmDiscard } from '../lib/unsaved';
 import { mapsUrl, openMaps } from '../lib/maps';
+import { readGridView, saveGridView } from '../lib/gridView';
+import { ColumnChooser, type ChooserColumn } from './ColumnChooser';
 import '../vendor/lattice-grid/lattice-grid.js';
 import '../vendor/lattice-grid/lattice-grid.css';
 import type {
@@ -13,6 +15,12 @@ import type {
 type Handlers = Record<string, (payload: any) => void>;
 
 interface Props<Row> {
+  /**
+   * Names this table (e.g. "project.tasks") so the person's view of it (columns shown
+   * with the Columns button, widths, order, sort) is kept for the rest of their browser
+   * session, across pages.
+   */
+  stateId: string;
   /** Grid options. The grid is rebuilt when this object changes, so memoize it. */
   options: LatticeGridOptions<Row>;
   /** Rows to show. Updating this prop calls setRows without rebuilding the grid. */
@@ -35,7 +43,7 @@ interface Props<Row> {
 const MIN_GRID_HEIGHT = 240;
 
 /** React wrapper around Michael's lattice-grid library. */
-export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, className, reveal }: Props<Row>) {
+export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height = 480, className, reveal }: Props<Row>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<LatticeGridInstance<Row> | null>(null);
   const { theme } = useTheme();
@@ -45,6 +53,10 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
   rowsRef.current = rows;
   const handlersRef = useRef<Handlers | undefined>(on);
   handlersRef.current = on;
+  const stateIdRef = useRef(stateId);
+  stateIdRef.current = stateId;
+  // The table's own columns (not the tree or tick-box columns) for the Columns button.
+  const [chooser, setChooser] = useState<ChooserColumn[]>([]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -117,6 +129,58 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
       }
       gi._afterModelChange?.();
     };
+    // The view the person set up earlier this session: columns shown, widths, order
+    // and sort. Saved whenever any of them changes, including through lattice-grid's
+    // own menu (Hide column, Reset columns, Autosize). `cols`, `sorts`, `_groupCol`,
+    // `refresh` and the wrapped methods are lattice-grid internals.
+    type Col = { id: string; header?: string; hidden?: boolean; width: number; flex: number; special?: string };
+    const gc = grid as unknown as {
+      cols: Col[]; sorts: { id: string; dir: 'asc' | 'desc' }[]; _groupCol?: { width: number; flex: number };
+      colMap: Map<string, Col>; refresh: () => void;
+      setColumnVisible: (id: string, visible: boolean) => void; resetColumns: () => void;
+      autoSizeColumn: (id: string, skipRender?: boolean) => void; autoSizeAll: () => void;
+    };
+    const userCols = () => gc.cols.filter((c) => !c.special);
+    const sync = () => setChooser(userCols().map((c) => ({
+      id: c.id, hidden: !!c.hidden,
+      header: c.header || c.id.replace(/_/g, ' ').replace(/^./, (x) => x.toUpperCase()),
+    })));
+    const remember = () => {
+      saveGridView(stateIdRef.current, {
+        order: gc.cols.map((c) => c.id),
+        cols: Object.fromEntries(gc.cols.map((c) => [c.id, { hidden: !!c.hidden, width: c.width, flex: c.flex }])),
+        group: gc._groupCol ? { width: gc._groupCol.width, flex: gc._groupCol.flex } : undefined,
+        sorts: gc.sorts.map((x) => ({ id: x.id, dir: x.dir })),
+      });
+      sync();
+    };
+    const saved = readGridView(stateIdRef.current);
+    if (saved) {
+      const at = new Map(saved.order.map((id, i) => [id, i]));
+      const start = new Map(gc.cols.map((c, i) => [c.id, i]));
+      // Saved order first; columns new since then keep their place relative to the end.
+      gc.cols.sort((x, y) => (at.get(x.id) ?? 1e6 + start.get(x.id)!) - (at.get(y.id) ?? 1e6 + start.get(y.id)!));
+      for (const c of gc.cols) {
+        const v = saved.cols[c.id];
+        if (v) { c.hidden = v.hidden; c.width = v.width; c.flex = v.flex; }
+      }
+      const cols = userCols();
+      if (cols.length && cols.every((c) => c.hidden)) cols[0].hidden = false;
+      if (saved.group && gc._groupCol) Object.assign(gc._groupCol, saved.group);
+      gc.sorts = (saved.sorts ?? []).filter((x) => gc.colMap.has(x.id) || x.id === '__group');
+      gc.refresh();
+    }
+    for (const name of ['columnResized', 'columnMoved', 'sortChanged']) grid.on(name, () => remember());
+    const setVisible = gc.setColumnVisible.bind(grid);
+    gc.setColumnVisible = (id, visible) => { setVisible(id, visible); remember(); };
+    const reset = gc.resetColumns.bind(grid);
+    gc.resetColumns = () => { reset(); if (phone.matches) applyPins(); remember(); };
+    const autoSize = gc.autoSizeColumn.bind(grid);
+    gc.autoSizeColumn = (id, skipRender) => { autoSize(id, skipRender); if (!skipRender) remember(); };
+    const autoSizeAll = gc.autoSizeAll.bind(grid);
+    gc.autoSizeAll = () => { autoSizeAll(); remember(); };
+    sync();
+
     if (phone.matches) applyPins();
     phone.addEventListener('change', applyPins);
 
@@ -156,6 +220,8 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
     if (r >= 0) { g._setRange?.({ r, c }, { r, c }); g.ensureVisible?.(r, c); } else g._renderRows?.();
   }, [rows, reveal]);
 
+  const columnApi = () => gridRef.current as unknown as { setColumnVisible: (id: string, visible: boolean) => void } | null;
+
   // Follow the app's light/dark switch.
   useEffect(() => {
     if (!options.theme) gridRef.current?.setTheme(theme);
@@ -185,9 +251,14 @@ export function LatticeGrid<Row>({ options, rows, on, onReady, height = 480, cla
   }
 
   return (
-    <div ref={containerRef} className={className}
-      style={{ height: typeof height === 'number' ? Math.max(height, MIN_GRID_HEIGHT) : height }}
-      onMouseDownCapture={onMouseDown} onClick={onClick} />
+    <div className="flex flex-col">
+      <ColumnChooser columns={chooser}
+        onToggle={(id, visible) => columnApi()?.setColumnVisible(id, visible)}
+        onShowAll={() => chooser.filter((c) => c.hidden).forEach((c) => columnApi()?.setColumnVisible(c.id, true))} />
+      <div ref={containerRef} className={className}
+        style={{ height: typeof height === 'number' ? Math.max(height, MIN_GRID_HEIGHT) : height }}
+        onMouseDownCapture={onMouseDown} onClick={onClick} />
+    </div>
   );
 }
 

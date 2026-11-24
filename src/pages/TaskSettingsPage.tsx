@@ -151,7 +151,7 @@ export function TaskSettingsPage() {
               <button type="submit" className="btn" data-pin>Add category</button>
             </form>
           )}
-          <LatticeGrid options={catOptions} rows={catRows} height={Math.min(80 + catRows.length * 34, 480)} reveal={revealCat}
+          <LatticeGrid stateId="taskSettings.categories" options={catOptions} rows={catRows} height={Math.min(80 + catRows.length * 34, 480)} reveal={revealCat}
             on={{
               cellValueChanged: (e: { data: LabelRow; newValue: unknown }) =>
                 run(() => api.updateTaskCategory(e.data.id, { name: String(e.newValue ?? '').trim() })),
@@ -178,7 +178,7 @@ export function TaskSettingsPage() {
               onChange={(e) => setNewTag(e.target.value)} required />
             <button type="submit" className="btn btn-secondary" data-pin>Add tag</button>
           </form>
-          <LatticeGrid options={tagOptions} rows={tagRows} height={Math.min(80 + tagRows.length * 34, 480)} reveal={revealTag}
+          <LatticeGrid stateId="taskSettings.tags" options={tagOptions} rows={tagRows} height={Math.min(80 + tagRows.length * 34, 480)} reveal={revealTag}
             on={{
               cellValueChanged: (e: { data: LabelRow; newValue: unknown }) =>
                 run(() => api.updateTaskTag(e.data.id, String(e.newValue ?? '').trim())),

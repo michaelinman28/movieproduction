@@ -486,6 +486,7 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
               to.start_date && to.due_date ? `Moved "${byId.get(id)?.title}" to ${dayName(to.start_date)} to ${dayName(to.due_date)}.` : `Moved "${byId.get(id)?.title}" to ${dayName((to.due_date ?? to.start_date)!)}.`)} />
         ) : (
           <LatticeGrid
+            stateId="project.tasks"
             options={options}
             rows={shown}
             height={Math.min(160 + (shown.length + groupCount) * 34 + (flat ? 44 : 0), 640)}
