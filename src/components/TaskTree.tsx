@@ -3,6 +3,7 @@ import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
 import { Section } from './Section';
 import { TagPicker } from './TagPicker';
 import { TaskNotes } from './TaskNotes';
+import { TaskSummaryBar } from './TaskSummaryBar';
 import { TaskCalendar, isoDate } from './TaskCalendar';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
 import { scrollToForm } from '../lib/reveal';
@@ -98,8 +99,8 @@ function subtree(id: string, kids: Map<string, Task[]>): Set<string> {
 
 const pill = (text: string, tone: string) => `<span class="task-pill task-pill-${tone}">${text}</span>`;
 
-export function TaskTree({ projectId, companyId, team, locations, canManage, onTasksChanged }: {
-  projectId: string; companyId: string; team: ProjectMember[];
+export function TaskTree({ projectId, projectName = 'Project', companyId, team, locations, canManage, onTasksChanged }: {
+  projectId: string; projectName?: string; companyId: string; team: ProjectMember[];
   /** The project's locations, which a task can be assigned to. */
   locations: Location[];
   canManage: boolean;
@@ -111,6 +112,9 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
   const [tags, setTags] = useState<TaskTag[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Tasks ticked in the table, to email or copy a summary of.
+  const [picked, setPicked] = useState<string[]>([]);
+  const pickedRef = useRef<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
@@ -216,6 +220,9 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       if (!confirmDiscard()) return;
       setSelectedId(null);
     }
+    // Ticks belong to the list on screen, so a new view starts with none.
+    setPicked([]);
+    pickedRef.current = [];
     setView(v);
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* storage unavailable */ }
   }
@@ -285,6 +292,9 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       groupDefaultExpanded: -1,
       toolbar: { quickFilter: true, expandCollapse: true },
       statusBar: false,
+      // Tick boxes pick tasks to email or copy a summary of (ticking a parent ticks its
+      // sub-tasks too). Opening a task's form still follows the focused cell.
+      selection: 'multiple',
       emptyMessage: overdue ? 'Nothing is overdue.' : mine ? 'Nothing is assigned to you.' : 'No tasks yet. Add one above.',
       columns,
     };
@@ -413,6 +423,13 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
   const groupCount = groupBy ? new Set(shown.map((r) => r[groupBy as keyof TaskRow] as string)).size : 0;
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
   const done = tasks.filter((t) => t.status === 'done').length;
+  // Ticked tasks in tree order (rows), skipping any deleted since.
+  const chosen = useMemo(() => { const set = new Set(picked); return rows.filter((r) => set.has(r.id)).map((r) => byId.get(r.id)!).filter(Boolean); }, [picked, rows, byId]);
+  const summaryCtx = useMemo(() => ({
+    projectName, projectId, all: tasks, locations,
+    people: new Map(team.map((m) => [m.user_id, { name: displayName(m.profile), email: m.profile.email }])),
+    categories: categoryName, tags: tagName,
+  }), [projectName, projectId, tasks, locations, team, categoryName, tagName]);
 
   return (
     <Section id="project.tasks" title="Tasks" summary={tasks.length ? `${done} of ${tasks.length} done` : undefined}>
@@ -439,6 +456,9 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
       </form>
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
+      {!calendar && loaded && (chosen.length ? (
+        <TaskSummaryBar chosen={chosen} ctx={summaryCtx} onClear={() => (gridRef.current as unknown as { deselectAll?: () => void } | null)?.deselectAll?.()} />
+      ) : tasks.length > 0 && <p className="hint">Tick tasks to email or copy a summary of them.</p>)}
       {/* The task's form opens under the table or calendar, which keeps the full width. */}
       <div className="flex flex-col gap-4">
         {!loaded ? <p className="text-muted">Loading tasks…</p> : calendar ? (
@@ -450,9 +470,18 @@ export function TaskTree({ projectId, companyId, team, locations, canManage, onT
             options={options}
             rows={shown}
             height={Math.min(160 + (shown.length + groupCount) * 34 + (flat ? 44 : 0), 640)}
-            on={{ cellValueChanged: onCellChanged, rangeChanged: onRange }}
+            on={{ cellValueChanged: onCellChanged, rangeChanged: onRange, selectionChanged: (r: TaskRow[]) => { pickedRef.current = r.map((x) => x.id); setPicked(pickedRef.current); } }}
             reveal={reveal}
-            onReady={(g) => { gridRef.current = g; }}
+            onReady={(g) => {
+              gridRef.current = g;
+              // A rebuilt grid (e.g. after the team changes) keeps the ticks.
+              // `selected` and `_render*` are lattice-grid internals.
+              const gi = g as unknown as { selected?: Set<string>; _renderHeader?: () => void; _renderRows?: () => void };
+              if (pickedRef.current.length && gi.selected) {
+                for (const id of pickedRef.current) gi.selected.add(id);
+                gi._renderHeader?.(); gi._renderRows?.();
+              }
+            }}
           />
         )}
         {selected && (

@@ -151,7 +151,7 @@ export function ProjectOverview() {
 /** The project's tasks page. */
 export function ProjectTasks() {
   const { project, projectId, isAdmin, team, locations, reloadLocations } = useProject();
-  return <TaskTree projectId={projectId} companyId={project.company_id} team={team} locations={locations} canManage={isAdmin} onTasksChanged={reloadLocations} />;
+  return <TaskTree projectId={projectId} projectName={project.name} companyId={project.company_id} team={team} locations={locations} canManage={isAdmin} onTasksChanged={reloadLocations} />;
 }
 
 /** The project's locations page. */
