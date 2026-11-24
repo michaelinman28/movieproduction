@@ -40,6 +40,15 @@ day to day.
   calendar shows are due on the chosen day. On a computer, drag a task to another day
   to move its due date (saved at once, like a table cell). Tasks without a due date are
   counted under the month.
+- **Gantt chart** (`src/components/TaskGantt.tsx`): the Calendar view's Month / Gantt
+  chart switch (remembered on the device, `mp-calendar-mode`). Months and days run
+  across the top and task names down the left, in sub-task tree order (sub-tasks
+  indented, foldable). Each task's row has a bar from its start to its due date (its
+  name inside), or a diamond on its one day; done tasks are grey and overdue ones red,
+  and a line marks today. It scrolls sideways and opens at today. Names stay in view
+  from `sm:` up; on phones they scroll with the chart like table columns, and each
+  marker carries its name. Click a task to open its form, click a day to add tasks on
+  it, and on a computer drag a bar to move the task by whole days (saved at once).
 - **Editing in the grid:** every task field. Person, category, status, priority, time
   and "Sub-task of" cells look like dropdowns and open their list with one click.
   Double-click the task name, due date, description or tags to type a change (tags are
@@ -296,7 +305,7 @@ Every screen is designed for a phone first, then enhanced for larger screens.
 
 ```
 src/                         React app
-  components/                LatticeGrid wrapper, TaskTree (grid + panel), TaskCalendar, TaskNotes,
+  components/                LatticeGrid wrapper, TaskTree (grid + panel), TaskCalendar, TaskGantt, TaskNotes,
                              TagPicker, RolePicker, ThemeSwitch
   lib/api.ts                 API client used by every page
   lib/supabase.ts, auth.tsx  Sign-in session only
