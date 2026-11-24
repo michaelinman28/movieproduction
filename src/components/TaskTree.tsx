@@ -289,7 +289,8 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
       { field: 'description', header: 'Description', width: 260, editable: true, editor: 'textarea' },
       {
         // Move a task under another one (not under itself or its own sub-tasks).
-        field: 'parent', header: 'Sub-task of', width: 170, editable: true, editor: 'select',
+        // Filtered by typing part of a task name, not from a list (Michael's choice).
+        field: 'parent', header: 'Sub-task of', width: 170, editable: true, editor: 'select', filter: 'text',
         editorOptions: (d: TaskRow) => {
           const below = subtree(d.id, kidsRef.current);
           return [TOP_LEVEL, ...[...labelsRef.current].filter(([id]) => !below.has(id)).map(([, label]) => label).sort()];
