@@ -219,7 +219,11 @@
               "string",
               "null"
             ],
-            "example": "+1 404 555 0101"
+            "example": "404-555-0101"
+          },
+          "has_account": {
+            "type": "boolean",
+            "description": "False for someone added by an admin who hasn't signed up yet. They join when they sign up with this email."
           }
         },
         "required": [
@@ -227,7 +231,8 @@
           "full_name",
           "nickname",
           "email",
-          "phone"
+          "phone",
+          "has_account"
         ]
       },
       "ProfileUpdate": {
@@ -496,14 +501,52 @@
           "role_ids"
         ]
       },
+      "AddPersonResult": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "added",
+              "already_member",
+              "invited"
+            ],
+            "description": "\"invited\" means they have no account yet; they join when they sign up with this email."
+          }
+        },
+        "required": [
+          "user_id",
+          "result"
+        ]
+      },
       "CompanyMemberAdd": {
         "type": "object",
         "properties": {
           "email": {
             "type": "string",
-            "format": "email",
-            "description": "The email the person signed up with",
+            "maxLength": 254,
+            "description": "Their email. If nobody has an account with it yet, give their name too.",
             "example": "cody@example.com"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 120,
+            "description": "Needed for someone without an account yet"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
           },
           "is_admin": {
             "type": "boolean"
@@ -795,6 +838,34 @@
         },
         "required": [
           "user_id"
+        ]
+      },
+      "ProjectPersonAdd": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "example": "cody@example.com"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 120,
+            "description": "Needed for someone without an account yet"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "email"
         ]
       },
       "Task": {
@@ -1562,6 +1633,23 @@
             ]
           }
         }
+      },
+      "PersonUpdate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProfileUpdate"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "maxLength": 254,
+                "description": "Only for someone without an account yet (to correct the address they'll sign up with)."
+              }
+            }
+          }
+        ]
       },
       "PersonContact": {
         "type": "object",
@@ -2476,7 +2564,7 @@
           }
         ],
         "summary": "Add someone to a company by email (admins)",
-        "description": "The person must already have an account and have confirmed their email.",
+        "description": "Someone with an account is added straight away. For an email nobody has signed up with yet, give their name (and phone): they are added now, without an account, and join when they sign up with that email.",
         "parameters": [
           {
             "schema": {
@@ -2501,23 +2589,11 @@
         },
         "responses": {
           "201": {
-            "description": "Added (or already a member)",
+            "description": "Added, invited (no account yet), or already a member",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "result": {
-                      "type": "string",
-                      "enum": [
-                        "added",
-                        "already_member"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "result"
-                  ]
+                  "$ref": "#/components/schemas/AddPersonResult"
                 }
               }
             }
@@ -3242,6 +3318,74 @@
           },
           "403": {
             "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/people": {
+      "post": {
+        "tags": [
+          "Project team"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add someone to a project by email (admins), adding them to the company too if needed",
+        "description": "For an email nobody has signed up with yet, give their name (and phone): they are added now, without an account, and join when they sign up with that email. Their project roles start as their company roles.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPersonAdd"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added, invited (no account yet), or already on the project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddPersonResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
             "content": {
               "application/json": {
                 "schema": {
@@ -4747,7 +4891,7 @@
           }
         ],
         "summary": "Change someone's name or phone (you, or an admin of a company they're in)",
-        "description": "Their sign-in email can't be changed here; only they can change it.",
+        "description": "A sign-in email can't be changed here; only its owner can. For someone without an account yet, an admin can correct their email.",
         "parameters": [
           {
             "schema": {
@@ -4765,7 +4909,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProfileUpdate"
+                "$ref": "#/components/schemas/PersonUpdate"
               }
             }
           }

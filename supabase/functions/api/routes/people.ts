@@ -1,6 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { authed, found, must } from '../context.ts';
-import { IdParam, PersonContact, PersonContactInput, PersonContactUpdate, Profile, ProfileUpdate } from '../schemas.ts';
+import { IdParam, PersonContact, PersonContactInput, PersonContactUpdate, PersonUpdate, Profile } from '../schemas.ts';
 import { body, errors, ok, profileFields, router, secured, send } from './common.ts';
 
 // People's details. You change your own name and phone on /me; a company admin can
@@ -12,8 +12,8 @@ const tags = ['People'];
 people.openapi(createRoute({
   method: 'patch', path: '/people/{id}', tags, security: secured,
   summary: 'Change someone\'s name or phone (you, or an admin of a company they\'re in)',
-  description: 'Their sign-in email can\'t be changed here; only they can change it.',
-  request: { params: IdParam, ...body(ProfileUpdate) },
+  description: 'A sign-in email can\'t be changed here; only its owner can. For someone without an account yet, an admin can correct their email.',
+  request: { params: IdParam, ...body(PersonUpdate) },
   responses: { 200: ok(Profile), 400: errors[400], 401: errors[401], 404: errors[404] },
 }), async (c) => {
   const { db } = await authed(c);
@@ -23,6 +23,7 @@ people.openapi(createRoute({
   if (b.full_name !== undefined) patch.full_name = b.full_name;
   if (b.nickname !== undefined) patch.nickname = b.nickname || null;
   if (b.phone !== undefined) patch.phone = b.phone || null;
+  if (b.email !== undefined) patch.email = b.email;
   return send(c, found(must(await db.from('profiles').update(patch).eq('id', id).select(profileFields))), 200);
 });
 

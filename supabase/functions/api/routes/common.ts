@@ -32,7 +32,7 @@ export function rolesByUser(rows: { user_id: string; role_id: string }[] | null)
   return map;
 }
 
-export const profileFields = 'id, full_name, nickname, email, phone';
+export const profileFields = 'id, full_name, nickname, email, phone, has_account';
 
 /** Replace the role set of a member: deletes the ones not listed and inserts the new ones. */
 export async function setRoles(

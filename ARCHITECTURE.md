@@ -58,9 +58,25 @@ day to day.
 
 ### How people join
 
-1. A person creates their own account and confirms their email.
-2. A company admin adds them to the company using that email.
-3. The admin assigns them to projects and picks their roles.
+1. A company admin adds someone by email, on the company's People list or a project's
+   Team page. If they already have an account they're added straight away.
+2. If nobody has signed up with that email yet, the admin gives their name (and phone)
+   and they're added anyway, as a profile with `has_account = false`. They can be put
+   on projects, given roles and assigned tasks right away.
+3. The admin sends an invite from the person's form. There's no email server: **Email
+   invite** opens the admin's own email app (`mailto:`) with the message filled in, and
+   **Copy invite** copies it to paste anywhere (`src/lib/invite.ts`,
+   `src/components/InviteButtons.tsx`). The link opens sign-up with their name and
+   email filled in (`?invite=1&email=…`).
+4. When someone signs up with that email and confirms it, the waiting profile becomes
+   theirs (`claim_pending_profile`, run by triggers on `auth.users`): its id changes to
+   their account id, and every link to it (companies, projects, roles, tasks) follows,
+   since those foreign keys are `on update cascade`. Profiles no longer reference
+   `auth.users` directly; deleting an account deletes its profile by trigger.
+5. Until then an admin can correct their email. Removing a waiting person from their
+   last company deletes them. People can also sign up first and be added later.
+   Database: migration `20261124040000_people_without_accounts.sql`
+   (`add_company_person`, `add_project_person`).
 
 ## Architecture
 
