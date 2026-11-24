@@ -44,11 +44,15 @@ export function ProjectTeam() {
     e.preventDefault();
     if (!addUser) return;
     const name = available.find((a) => a.id === addUser)?.name ?? 'them';
+    const hasCompanyRoles = (companyMembers.find((m) => m.user_id === addUser)?.role_ids.length ?? 0) > 0;
     if (!confirmDiscard()) return;
     const id = addUser;
-    if (await run(() => api.assign(projectId, id), `Added ${name} to the project. Pick their project roles in the form.`)) {
+    if (await run(() => api.assign(projectId, id), hasCompanyRoles
+      ? `Added ${name} to the project with their company roles. Change their project roles in the form if needed.`
+      : `Added ${name} to the project. Pick their project roles in the form.`)) {
       setAddUser('');
-      // Open their form, to pick their project roles.
+      // Their project roles start as their company roles (copied by the database).
+      // Open their form, to check or change them.
       setSelectedId(id);
       setReveal({ id, n: Date.now() });
       scrollToForm(id);

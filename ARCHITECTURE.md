@@ -248,6 +248,8 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   them on the company's People list (`/companies/:id?person=<user id>`). Role pickers
   group roles by department (plus Custom roles), each group a collapsible `Section`
   that starts closed unless it has a ticked role.
+  When someone is added to a project, their project roles start as a copy of their
+  company roles (trigger `copy_company_roles_to_project`); admins can then change them.
 
 ## Repository layout
 

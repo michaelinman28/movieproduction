@@ -232,5 +232,16 @@ await expect('you set your own nickname', () => as(U.d, `update profiles set nic
 await expect('non-admin cannot set another nickname', () => as(U.d, `update profiles set nickname='X' where id=$1 returning id`, [U.b]), len(0));
 await expect('blank nickname is cleared', () => as(U.b, `update profiles set nickname='  ' where id=$1 returning nickname`, [U.b]), r => r[0]?.nickname === null);
 await expect('overlong nickname refused', () => as(U.b, `update profiles set nickname=repeat('x', 61) where id=$1`, [U.b]), isErr);
+// project roles start as the person's company roles
+const [co7] = await as(U.a, `insert into companies (name) values ('Role Copy Co') returning id`);
+await as(U.a, `insert into company_members (company_id,user_id) values ($1,$2),($1,$3)`, [co7.id,U.b,U.d]);
+const [r7] = await as(U.a, `insert into roles (company_id,name) values ($1,'Boom Op') returning id`, [co7.id]);
+const [std] = await as(U.a, `select id from roles where company_id is null order by name limit 1`);
+await as(U.a, `insert into company_member_roles (company_id,user_id,role_id) values ($1,$2,$3),($1,$2,$4)`, [co7.id,U.b,r7.id,std.id]);
+const [p7] = await as(U.a, `insert into projects (company_id,name) values ($1,'Copy Film') returning id`, [co7.id]);
+await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2),($1,$3)`, [p7.id,U.b,U.d]);
+await expect('new project member gets their company roles', () => as(U.a, `select role_id from project_member_roles where project_id=$1 and user_id=$2`, [p7.id,U.b]), r => r.length === 2 && r.some(x => x.role_id === r7.id) && r.some(x => x.role_id === std.id));
+await expect('member with no company roles starts with none', () => as(U.a, `select * from project_member_roles where project_id=$1 and user_id=$2`, [p7.id,U.d]), len(0));
+await expect('project roles can then differ', async () => { await as(U.a, `delete from project_member_roles where project_id=$1 and user_id=$2 and role_id=$3`, [p7.id,U.b,std.id]); return as(U.a, `select * from company_member_roles where company_id=$1 and user_id=$2`, [co7.id,U.b]); }, len(2));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
