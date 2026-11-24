@@ -7,7 +7,7 @@ import { Section } from '../components/Section';
 import { errorText } from '../lib/format';
 
 export function ProfilePage() {
-  const [form, setForm] = useState({ full_name: '', phone: '' });
+  const [form, setForm] = useState({ full_name: '', nickname: '', phone: '' });
   const [email, setEmail] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
@@ -28,7 +28,7 @@ export function ProfilePage() {
 
   useEffect(() => {
     api.me()
-      .then((p) => { setForm({ full_name: p.full_name ?? '', phone: p.phone ?? '' }); setEmail(p.email ?? ''); })
+      .then((p) => { setForm({ full_name: p.full_name ?? '', nickname: p.nickname ?? '', phone: p.phone ?? '' }); setEmail(p.email ?? ''); })
       .catch((e) => setMessage({ kind: 'error', text: errorText(e) }))
       .finally(() => setLoaded(true));
   }, []);
@@ -37,7 +37,7 @@ export function ProfilePage() {
     e.preventDefault();
     setMessage(null);
     try {
-      await api.updateMe({ full_name: form.full_name.trim(), phone: form.phone.trim() || null });
+      await api.updateMe({ full_name: form.full_name.trim(), nickname: form.nickname.trim() || null, phone: form.phone.trim() || null });
       setMessage({ kind: 'info', text: 'Profile saved.' });
     } catch (err) { setMessage({ kind: 'error', text: errorText(err) }); }
   }
@@ -48,6 +48,7 @@ export function ProfilePage() {
       <h1>Your profile</h1>
       <form className="card w-full max-w-xl" onSubmit={save}>
         <label className="label">Full name<input className="field" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required autoComplete="name" /></label>
+        <label className="label">Nickname<input className="field" value={form.nickname} maxLength={60} onChange={(e) => setForm({ ...form, nickname: e.target.value })} autoComplete="nickname" placeholder="Optional" /></label>
         <label className="label">Email<input className="field" value={email} disabled /></label>
         <label className="label">Phone number<input className="field" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} autoComplete="tel" placeholder="Optional" /></label>
         <p className="hint">Your name, email and phone are visible to people in the companies you belong to.</p>

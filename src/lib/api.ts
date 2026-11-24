@@ -27,7 +27,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return json as T;
 }
 
-export interface Profile { id: string; full_name: string | null; email: string | null; phone: string | null }
+export interface Profile { id: string; full_name: string | null; nickname: string | null; email: string | null; phone: string | null }
 /** An extra email address or phone number for someone, e.g. a work email. */
 export interface PersonContact { id: string; user_id: string; kind: 'email' | 'phone'; value: string; label: string | null; created_by: string | null; created_at: string }
 export interface Company { id: string; name: string; description: string | null; created_by: string; created_at: string; is_admin: boolean }
@@ -64,9 +64,9 @@ const enc = encodeURIComponent;
 
 export const api = {
   me: () => call<Profile>('GET', '/me'),
-  updateMe: (b: { full_name?: string; phone?: string | null }) => call<Profile>('PATCH', '/me', b),
+  updateMe: (b: { full_name?: string; nickname?: string | null; phone?: string | null }) => call<Profile>('PATCH', '/me', b),
   /** A company admin changes a member's name or phone (or you, your own). */
-  updatePerson: (userId: string, b: { full_name?: string; phone?: string | null }) => call<Profile>('PATCH', `/people/${enc(userId)}`, b),
+  updatePerson: (userId: string, b: { full_name?: string; nickname?: string | null; phone?: string | null }) => call<Profile>('PATCH', `/people/${enc(userId)}`, b),
   contacts: (userId: string) => call<PersonContact[]>('GET', `/people/${enc(userId)}/contacts`),
   addContact: (userId: string, b: { kind: 'email' | 'phone'; value: string; label?: string | null }) =>
     call<PersonContact>('POST', `/people/${enc(userId)}/contacts`, b),

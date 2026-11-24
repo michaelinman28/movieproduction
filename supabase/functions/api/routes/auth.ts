@@ -76,6 +76,7 @@ auth.openapi(createRoute({
   const b = c.req.valid('json');
   const patch: Record<string, unknown> = {};
   if (b.full_name !== undefined) patch.full_name = b.full_name;
+  if (b.nickname !== undefined) patch.nickname = b.nickname || null;
   if (b.phone !== undefined) patch.phone = b.phone || null;
   return send(c, must(await db.from('profiles').update(patch).eq('id', userId).select(profileFields).single()), 200);
 });

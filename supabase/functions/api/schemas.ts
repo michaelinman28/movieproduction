@@ -14,12 +14,14 @@ export const Error = z.object({ error: z.string() }).openapi('Error');
 export const Profile = z.object({
   id: Uuid,
   full_name: nullableText.openapi({ example: 'Ava Martinez' }),
+  nickname: nullableText.openapi({ example: 'Avi' }),
   email: nullableText.openapi({ example: 'ava@example.com' }),
   phone: nullableText.openapi({ example: '+1 404 555 0101' }),
 }).openapi('Profile');
 
 export const ProfileUpdate = z.object({
   full_name: z.string().trim().min(1).optional(),
+  nickname: z.string().trim().max(60).nullable().optional(),
   phone: z.string().trim().max(40).nullable().optional(),
 }).openapi('ProfileUpdate');
 
