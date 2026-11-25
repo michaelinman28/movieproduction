@@ -309,6 +309,20 @@ shootDays.openapi(createRoute({
   return send(c, r.data, 200);
 });
 
+shootDays.openapi(createRoute({
+  method: 'post', path: '/call-sheet-links/{token}/confirm', tags: sheetTags,
+  summary: 'Confirm, from a personal call sheet link, that its person got the sent version (no sign-in)',
+  request: { params: TokenParam },
+  responses: { 204: { description: 'Confirmed' }, 404: errors[404] },
+}), async (c) => {
+  const r = await anonClient(c).rpc('confirm_call_sheet_link', { token: c.req.valid('param').token });
+  if (r.error) {
+    if (r.error.code === 'P0002') throw new HTTPException(404, { message: 'This call sheet link isn\'t working. It may not be sent yet, or you\'re no longer called on this day.' });
+    fail(r.error);
+  }
+  return c.body(null, 204);
+});
+
 // ---- Weather ----------------------------------------------------------------
 
 // Open-Meteo weather codes, in words.

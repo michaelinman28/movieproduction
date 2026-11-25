@@ -514,6 +514,7 @@ export const TokenParam = z.object({ token: Uuid.openapi({ param: { name: 'token
 
 export const LinkedCallSheet = z.object({
   me: Uuid.openapi({ description: 'The person the link belongs to' }),
+  confirmed: z.boolean().openapi({ description: 'Whether they have confirmed the version sent' }),
   project: z.object({ name: z.string(), company_name: z.string() }),
   day: z.any().openapi({ description: 'The day: date, title, times, weather, notes, version, sent_at, day_number, total_days' }),
   location: z.any().nullable().openapi({ description: 'Name, description, address, parking, nearest hospital and on-site contact' }),

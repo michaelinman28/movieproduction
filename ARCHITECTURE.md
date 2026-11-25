@@ -123,9 +123,11 @@ day to day.
   (`shoot_day_calls.link_token`, made by the database and never changed) to their own
   view-only page at `/sheet/{token}` (`src/pages/SheetLinkPage.tsx`). It needs no
   sign-in, sits outside the app (its own top bar with a link back to the site, Print
-  and the theme switch), shows the sent sheet with their call at the top, and can't
-  change anything. It works only once the sheet is sent, stops working when the person
-  is taken off the day, and opening it counts as viewed. It shows names, roles, calls
+  and the theme switch), shows the sent sheet with their call at the top, and lets them
+  confirm but change nothing else. It works only once the sheet is sent, stops working when the person
+  is taken off the day. Opening it counts as viewed, and its **Confirm I got it** button
+  confirms the sent version for that person (`confirm_call_sheet_link`, `POST /call-sheet-links/{token}/confirm`); that's the
+  only thing the page can change. It shows names, roles, calls
   and phones but no emails. The data comes from `call_sheet_for_link(token)` (security
   definer, callable without signing in) through the public `GET /call-sheet-links/{token}`.
   The call sheet page's **Personal links** list opens, copies, emails (mailto) or texts

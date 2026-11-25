@@ -11,6 +11,17 @@ import { errorText, shortDate } from '../lib/format';
 export function SheetLinkPage({ token }: { token: string }) {
   const [sheet, setSheet] = useState<LinkedCallSheet | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  async function confirm() {
+    setBusy(true); setConfirmError(null);
+    try {
+      await api.confirmLinkedCallSheet(token);
+      setSheet((s) => (s ? { ...s, confirmed: true } : s));
+    } catch (e) { setConfirmError(errorText(e)); }
+    setBusy(false);
+  }
 
   useEffect(() => {
     api.linkedCallSheet(token).then(setSheet).catch((e) => setError(errorText(e)));
@@ -40,10 +51,16 @@ export function SheetLinkPage({ token }: { token: string }) {
           <p className="text-center text-muted">Loading your call sheet…</p>
         ) : (
           <div className="flex flex-col gap-4">
-            <CallSheetDocument sheet={sheet} me={sheet.me} sectionPrefix="sheetLink" />
+            <CallSheetDocument sheet={sheet} me={sheet.me} sectionPrefix="sheetLink" youAction={
+              sheet.confirmed
+                ? <span className="cs-confirmed">✓ Confirmed version {sheet.day.version}</span>
+                : <>
+                    <button type="button" className="btn" disabled={busy} onClick={confirm}>{busy ? 'Confirming…' : 'Confirm I got it'}</button>
+                    {confirmError && <span className="error">{confirmError}</span>}
+                  </>
+            } />
             <p className="no-print m-0 text-center text-sm text-muted">
-              This is your personal call sheet, so please don't forward the link.{' '}
-              <a href={home}>Sign in to Movie Production</a> to confirm you got it or see more.
+              This is your personal call sheet, so please don't forward the link. <a href={home}>Go to Movie Production</a>
             </p>
           </div>
         )}

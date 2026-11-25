@@ -5,7 +5,7 @@ import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
 
 /** What the call sheet shows. A personal link gets exactly this; the project's call sheet page maps its data to it. */
-export type SheetData = Omit<LinkedCallSheet, 'me'>;
+export type SheetData = Omit<LinkedCallSheet, 'me' | 'confirmed'>;
 type SheetCall = SheetData['calls'][number];
 
 // Roles listed as key contacts near the top, in this order.
@@ -42,7 +42,7 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
  * call sheet page and by each person's private link.
  */
-export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNote }: {
+export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNote, youAction }: {
   sheet: SheetData;
   /** The person reading it: their call is shown at the top and their rows are marked. */
   me?: string | null;
@@ -52,6 +52,8 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
   status?: (userId: string) => string;
   /** Shown under the header, e.g. "Draft, not sent". */
   versionNote?: string;
+  /** Shown in the reader's "Your call" box, e.g. a Confirm button. */
+  youAction?: ReactNode;
 }) {
   const { day, location: loc, project } = sheet;
   const roleById = new Map(sheet.roles.map((r) => [r.id, r]));
@@ -133,6 +135,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
             </div>
             {mine.note && <p className="cs-you-note">{mine.note}</p>}
           </div>
+          {youAction && <div className="cs-you-action">{youAction}</div>}
         </section>
       )}
 

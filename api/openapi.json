@@ -3174,6 +3174,10 @@
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
             "description": "The person the link belongs to"
           },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Whether they have confirmed the version sent"
+          },
           "project": {
             "type": "object",
             "properties": {
@@ -3248,6 +3252,7 @@
         },
         "required": [
           "me",
+          "confirmed",
           "project",
           "items",
           "scenes",
@@ -8451,6 +8456,41 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/call-sheet-links/{token}/confirm": {
+      "post": {
+        "tags": [
+          "Call sheets"
+        ],
+        "summary": "Confirm, from a personal call sheet link, that its person got the sent version (no sign-in)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Confirmed"
           },
           "404": {
             "description": "Not found, or you do not have access",

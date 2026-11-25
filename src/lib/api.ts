@@ -109,6 +109,8 @@ export interface CallSheet {
 /** What a personal call sheet link shows: the sent sheet, view only, no emails. */
 export interface LinkedCallSheet {
   me: string;
+  /** Whether they have confirmed the version sent. */
+  confirmed: boolean;
   project: { name: string; company_name: string };
   day: Pick<ShootDay, 'id' | 'shoot_date' | 'title' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes' | 'version' | 'sent_at' | 'day_number' | 'total_days'>;
   location: Pick<Location, 'name' | 'description' | 'address' | 'parking' | 'nearest_hospital' | 'contact_name' | 'contact_phone'> | null;
@@ -200,6 +202,7 @@ export const api = {
   sendCallSheet: (dayId: string) => call<ShootDay>('POST', `/shoot-days/${enc(dayId)}/send`),
   viewedCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/viewed`),
   linkedCallSheet: (token: string) => call<LinkedCallSheet>('GET', `/call-sheet-links/${enc(token)}`),
+  confirmLinkedCallSheet: (token: string) => call<void>('POST', `/call-sheet-links/${enc(token)}/confirm`),
   confirmCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/confirm`),
   lookUpWeather: (dayId: string) => call<{ weather: string; sunrise: string; sunset: string; place: string }>('POST', `/shoot-days/${enc(dayId)}/weather`),
 

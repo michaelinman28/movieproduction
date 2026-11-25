@@ -376,6 +376,10 @@ const [sheetRow] = await asAnon(`select call_sheet_for_link($1) s`, [bCall.link_
 await expect('link opens the sheet without signing in', () => Promise.resolve(sheetRow.s), s => s?.me === U.b && s.day.version === 2 && s.calls.length === 1 && s.project.name && Array.isArray(s.items) && s.scenes.length === 1);
 await expect('link sheet has no emails', () => Promise.resolve(JSON.stringify(sheetRow.s)), s => !s.includes('@x.com'));
 await expect('opening the link counts as viewed', () => as(U.b, `select viewed_version from shoot_day_calls where shoot_day_id=$1`, [day.id]), r => r[0]?.viewed_version === 2);
+await expect('sheet says not confirmed yet', () => Promise.resolve(sheetRow.s), s => s.confirmed === false);
+await expect('confirm from the link without signing in', async () => { await asAnon(`select confirm_call_sheet_link($1)`, [bCall.link_token]); return as(U.b, `select confirmed_version from shoot_day_calls where shoot_day_id=$1`, [day.id]); }, r => r[0]?.confirmed_version === 2);
+await expect('sheet then shows confirmed', () => asAnon(`select call_sheet_for_link($1) s`, [bCall.link_token]), r => r[0]?.s?.confirmed === true);
+await expect('unknown link cannot confirm', () => asAnon(`select confirm_call_sheet_link(gen_random_uuid())`), isErr);
 await expect('unknown link shows nothing', () => asAnon(`select call_sheet_for_link(gen_random_uuid()) s`), r => r[0]?.s === null);
 const [day2] = await as(U.a, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-03-13') returning id`, [lp.id]);
 await expect('only the creator or an admin deletes a day', () => as(U.b, `delete from shoot_days where id=$1 returning id`, [day2.id]), len(0));

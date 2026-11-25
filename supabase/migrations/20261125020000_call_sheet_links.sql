@@ -2,7 +2,8 @@
 -- unguessable link to a view-only page of that day's call sheet, with their own call
 -- at the top. The link needs no sign-in: whoever has it can read the sheet (but
 -- change nothing). It works once the sheet has been sent, and stops working when
--- the person is taken off the day. Opening it counts as viewing the sent version.
+-- the person is taken off the day. Opening it counts as viewing the sent version, and
+-- the page's Confirm button confirms that version for the link's person.
 
 alter table public.shoot_day_calls
   add column if not exists link_token uuid not null default gen_random_uuid();
@@ -52,6 +53,7 @@ begin
 
   select jsonb_build_object(
     'me', me.user_id,
+    'confirmed', me.confirmed_version = d.version,
     'project', (select jsonb_build_object('name', p.name, 'company_name', c.name)
                 from projects p join companies c on c.id = p.company_id where p.id = d.project_id),
     'day', jsonb_build_object(
@@ -100,5 +102,23 @@ begin
 end;
 $$;
 
-revoke all on function public.call_sheet_for_link(uuid) from public;
-grant execute on function public.call_sheet_for_link(uuid) to anon, authenticated;
+-- The link's person confirms they got the sent version. Returns the version confirmed.
+create or replace function public.confirm_call_sheet_link(token uuid)
+returns integer language plpgsql security definer set search_path = public as $$
+declare v integer; day uuid; who uuid;
+begin
+  select c.shoot_day_id, c.user_id, d.version into day, who, v
+  from shoot_day_calls c join shoot_days d on d.id = c.shoot_day_id where c.link_token = token;
+  if day is null or v = 0 then raise exception 'This call sheet link isn''t working' using errcode = 'P0002'; end if;
+  perform set_config('mp.confirming', 'on', true);
+  update shoot_day_calls set
+    viewed_version = v, viewed_at = case when viewed_version = v then viewed_at else now() end,
+    confirmed_version = v, confirmed_at = now()
+  where shoot_day_id = day and user_id = who;
+  perform set_config('mp.confirming', 'off', true);
+  return v;
+end;
+$$;
+
+revoke all on function public.call_sheet_for_link(uuid), public.confirm_call_sheet_link(uuid) from public;
+grant execute on function public.call_sheet_for_link(uuid), public.confirm_call_sheet_link(uuid) to anon, authenticated;
