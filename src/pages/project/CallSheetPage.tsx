@@ -5,7 +5,7 @@ import { itemPath } from '../../lib/links';
 import { Section } from '../../components/Section';
 import { api, type CallSheet } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { callSheetMailto, copyCallSheet, personalLink, personalMailto, personalSms } from '../../lib/callSheet';
+import { callSheetMailto, copyCallSheet, personalLink, personalMailto, personalSms, sharedLink, sharedMailto, sharedSms } from '../../lib/callSheet';
 import { displayName, errorText } from '../../lib/format';
 import { callStatus } from './ProjectShootDays';
 import { useProject } from './ProjectLayout';
@@ -29,6 +29,8 @@ export function CallSheetPage() {
   const [justSent, setJustSent] = useState(false);
   const [copied, setCopied] = useState<boolean | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try { setSheet(await api.callSheet(dayId)); } catch (e) { setError(errorText(e)); }
@@ -74,6 +76,21 @@ export function CallSheetPage() {
 
   async function copyLink(userId: string, token: string) {
     try { await navigator.clipboard.writeText(personalLink(token)); setCopiedLink(userId); } catch { setCopiedLink(null); setError('Your browser didn\'t allow copying. Open the link and copy it from the address bar.'); }
+  }
+
+  /** Turn the shared link on or off, make a new one, or show or hide phones; then reload the sheet. */
+  async function share(b: { enabled: boolean; new_link?: boolean; phones?: boolean }, note: string | null) {
+    setSharing(true); setError(null); setShareNote(null);
+    try {
+      const r = await api.shareCallSheet(dayId, b);
+      setSheet((s) => (s ? { ...s, day: { ...s.day, ...r } } : s));
+      setShareNote(note);
+    } catch (e) { setError(errorText(e)); }
+    setSharing(false);
+  }
+
+  async function copyShared(token: string) {
+    try { await navigator.clipboard.writeText(sharedLink(token)); setShareNote('Link copied. Paste it into a text, chat or email.'); } catch { setError('Your browser didn\'t allow copying. Open the link and copy it from the address bar.'); }
   }
 
   const links: SheetLinks | undefined = sheet ? {
@@ -123,8 +140,41 @@ export function CallSheetPage() {
           {copied === false && <p className="error m-0">Your browser didn't allow copying. Use Email everyone instead.</p>}
           {notice && <p className="notice m-0">{notice}</p>}
           {error && <p className="error m-0">{error}</p>}
-          <p className="hint m-0">Email everyone opens your own email app with everyone called in Bcc and a link to this page, which needs a sign-in. To give each person their own view-only call sheet that needs no sign-in, use Personal links below.</p>
+          <p className="hint m-0">Email everyone opens your own email app with everyone called in Bcc and a link to this page, which needs a sign-in. For a view-only call sheet that needs no sign-in, use the Shared link (one page for anyone) or Personal links (each person's own, with Confirm) below.</p>
         </div>
+      </Section>
+
+      <Section id="callSheet.shared" title="Shared link" summary={!day.version ? 'After sending' : day.share_token ? (day.share_phones ? 'On, with phones' : 'On') : 'Off'}>
+        {day.version ? (
+          <div className="flex flex-col gap-2">
+            <p className="hint m-0">One view-only page of the whole call sheet, the same design as the PDF, for anyone you send it to: no sign-in needed. It never shows emails, and shows phone numbers only if you tick the box. It always shows the latest version sent.</p>
+            {day.share_token ? (
+              <>
+                <input className="field text-sm" readOnly value={sharedLink(day.share_token)} aria-label="Shared call sheet link" onFocus={(e) => e.currentTarget.select()} />
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  <a className="btn btn-secondary no-underline sm:w-auto" href={sharedLink(day.share_token)} target="_blank" rel="noreferrer">Open</a>
+                  <button type="button" className="btn btn-secondary sm:w-auto" onClick={() => copyShared(day.share_token!)}>Copy link</button>
+                  <a className="btn btn-secondary no-underline sm:w-auto" href={sharedMailto(sheet, day.share_token, text)}>Email</a>
+                  <a className="btn btn-secondary no-underline sm:w-auto" href={sharedSms(sheet, day.share_token, text)}>Text</a>
+                </div>
+                <label className="flex min-h-11 items-center gap-2">
+                  <input type="checkbox" checked={day.share_phones} disabled={sharing}
+                    onChange={(e) => share({ enabled: true, phones: e.target.checked }, e.target.checked ? 'Phone numbers now show on the shared page.' : 'Phone numbers are now hidden on the shared page.')} />
+                  <span>Show phone numbers (cast, crew and the location's on-site contact)</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  <button type="button" className="btn btn-secondary sm:w-auto" disabled={sharing}
+                    onClick={() => { if (window.confirm('Make a new link? The current link stops working for everyone who has it.')) share({ enabled: true, new_link: true }, 'New link made. The old one no longer works.'); }}>Make a new link</button>
+                  <button type="button" className="btn btn-secondary sm:w-auto" disabled={sharing}
+                    onClick={() => { if (window.confirm('Turn off the shared link? It stops working for everyone who has it.')) share({ enabled: false }, 'The shared link is off.'); }}>Turn off</button>
+                </div>
+              </>
+            ) : (
+              <button type="button" className="btn sm:w-auto sm:self-start" disabled={sharing} onClick={() => share({ enabled: true }, 'The shared link is on. Copy it, or email or text it.')}>Turn on shared link</button>
+            )}
+            {shareNote && <p className="notice m-0">{shareNote}</p>}
+          </div>
+        ) : <p className="hint m-0">Send the call sheet first. Then you can turn on one link to the whole sheet to send to anyone.</p>}
       </Section>
 
       <Section id="callSheet.links" title="Personal links" summary={day.version ? `${people.length} people` : 'After sending'}>

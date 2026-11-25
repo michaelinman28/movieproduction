@@ -134,6 +134,18 @@ day to day.
   definer, callable without signing in) through the public `GET /call-sheet-links/{token}`.
   The call sheet page's **Personal links** list opens, copies, emails (mailto) or texts
   (sms:) each person their own link.
+- **Shared link:** one private, unguessable link per day to a view-only page of the
+  whole call sheet, for anyone (`shoot_days.share_token`), at `/call-sheet/{token}`
+  (`src/pages/SharedSheetPage.tsx`, same design and Print as the personal page, no
+  "your call" and no Confirm). It's off until someone on the project turns it on in the
+  call sheet page's **Shared link** section (`share_call_sheet`, `POST /shoot-days/{id}/share`),
+  which also copies, emails or texts it, makes a new link (the old one stops working)
+  or turns it off. It works only once the sheet is sent and always shows the latest
+  version. No emails ever; phones (people's and the on-site contact's) only when
+  **Show phone numbers** is ticked (`share_phones`). Both columns change only through
+  `share_call_sheet` (trigger `keep_shoot_day_share`). Data: `call_sheet_for_share(token)`
+  through the public `GET /shared-call-sheets/{token}`; opening it is logged as a view
+  ("shared link") but doesn't count as anyone viewing or confirming.
 - **Sending:** there's no mail server yet, so **Send version N** stamps the next version
   (`publish_call_sheet`), then **Email everyone** opens the sender's email app with
   everyone called in Bcc and the sheet as text (`src/lib/callSheet.ts`), or **Copy
@@ -186,7 +198,10 @@ cascade, a personal call sheet link, or a fix made straight in the database). Mi
   logged. **A new table needs the same trigger** and a branch in `audit_row()`.
 - **Also logged:** sign-ins (a trigger on `auth.sessions`), and each opening of a call
   sheet: in the app (`log_call_sheet_view`, `POST /shoot-days/{id}/opened`) and through
-  a personal link (`call_sheet_for_link`, which also logs as the link's person).
+  a personal link (`call_sheet_for_link`, which also logs as the link's person), and
+  through the shared link (`call_sheet_for_share`, no person). Turning the shared link on
+  or off, making a new one and showing phones are logged by `share_call_sheet`; the
+  link codes themselves are never logged.
 - **Who sees it:** company admins only (row-level security). Entries about a person
   that aren't tied to a company (profile changes, sign-ins) show to admins of any
   company that person is in. Nobody can add, change or delete entries directly.
@@ -265,7 +280,7 @@ There are three layers, and each one can be run and tested by itself.
 | Scenes | `GET/POST /projects/{id}/scenes` (with shot counts and time), `PUT /projects/{id}/scene-order`, `PATCH/DELETE /scenes/{id}` |
 | Shots | `GET /projects/{id}/shots`, `GET/POST /scenes/{id}/shots`, `PUT /scenes/{id}/shot-order`, `PATCH/DELETE /shots/{id}` |
 | Shoot days | `GET/POST /projects/{id}/shoot-days`, `PATCH/DELETE /shoot-days/{id}`, `POST /shoot-days/{id}/items`, `PUT /shoot-days/{id}/item-order`, `PATCH/DELETE /shoot-day-items/{id}`, `GET /shoot-days/{id}/calls`, `PUT/DELETE /shoot-days/{id}/calls/{userId}`, `POST /shoot-days/{id}/calls/everyone`, `POST /shoot-days/{id}/weather` |
-| Call sheets | `GET /shoot-days/{id}/call-sheet`, `POST /shoot-days/{id}/send`, `POST /shoot-days/{id}/viewed`, `POST /shoot-days/{id}/confirm`, `GET /call-sheet-links/{token}` (no sign-in) |
+| Call sheets | `GET /shoot-days/{id}/call-sheet`, `POST /shoot-days/{id}/send`, `POST /shoot-days/{id}/viewed`, `POST /shoot-days/{id}/confirm`, `GET /call-sheet-links/{token}` (no sign-in), `POST /shoot-days/{id}/share`, `GET /shared-call-sheets/{token}` (no sign-in) |
 | Task tags | `GET/POST /companies/{id}/task-tags`, `PATCH/DELETE /task-tags/{id}`; a task's `tag_ids` are set with `PATCH /tasks/{id}` |
 
 ### 3. Database (`supabase/migrations`)

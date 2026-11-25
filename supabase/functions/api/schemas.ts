@@ -460,6 +460,8 @@ export const ShootDay = z.object({
   version: z.number().int().openapi({ description: 'How many times the call sheet has been sent (0 = not yet)' }),
   sent_at: z.string().nullable(),
   sent_by: Uuid.nullable(),
+  share_token: Uuid.nullable().openapi({ description: 'The day\'s shared call sheet link, for anyone: /shared-call-sheets/{token}, and the app page /call-sheet/{token}. Null when off' }),
+  share_phones: z.boolean().openapi({ description: 'Whether the shared link shows phone numbers' }),
   created_by: Uuid.nullable(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -553,6 +555,17 @@ export const LinkedCallSheet = z.object({
   roles: z.array(z.object({ id: Uuid, name: z.string(), department: z.string().nullable(), sort_order: z.number().int().nullable() })),
   next_day: z.any().nullable(),
 }).openapi('LinkedCallSheet');
+
+export const SharedCallSheet = LinkedCallSheet.omit({ me: true, confirmed: true }).extend({
+  phones: z.boolean().openapi({ description: 'Whether phone numbers are shown (the sharer chooses); emails never are' }),
+}).openapi('SharedCallSheet');
+
+export const ShareInput = z.object({
+  enabled: z.boolean().openapi({ description: 'true turns the shared link on (keeping the current link), false turns it off' }),
+  new_link: z.boolean().optional().openapi({ description: 'Make a new link; the old one stops working' }),
+  phones: z.boolean().optional().openapi({ description: 'Show phone numbers on the shared page' }),
+}).openapi('ShareInput');
+export const ShareResult = z.object({ share_token: Uuid.nullable(), share_phones: z.boolean() }).openapi('ShareResult');
 
 export const UserParams = z.object({
   id: Uuid.openapi({ param: { name: 'id', in: 'path' } }),
