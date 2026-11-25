@@ -15,14 +15,15 @@ import { LOCATION_STATUSES, errorText, labelOf, valueOf } from '../lib/format';
 
 interface LocationRow {
   id: string; name: string; description: string; address: string;
-  contact_name: string; contact_email: string; contact_phone: string; status: string; tasks: number; map: string;
+  contact_name: string; contact_email: string; contact_phone: string; parking: string; nearest_hospital: string; status: string; tasks: number; map: string;
 }
 type Field = keyof Omit<LocationRow, 'id' | 'tasks' | 'status' | 'map'>;
-const FIELDS: Field[] = ['name', 'description', 'address', 'contact_name', 'contact_email', 'contact_phone'];
+const FIELDS: Field[] = ['name', 'description', 'address', 'contact_name', 'contact_email', 'contact_phone', 'parking', 'nearest_hospital'];
 
 const toRow = (l: Location): LocationRow => ({
   id: l.id, name: l.name, description: l.description ?? '', address: l.address ?? '',
-  contact_name: l.contact_name ?? '', contact_email: l.contact_email ?? '', contact_phone: l.contact_phone ?? '', status: labelOf(LOCATION_STATUSES, l.status), tasks: l.tasks,
+  contact_name: l.contact_name ?? '', contact_email: l.contact_email ?? '', contact_phone: l.contact_phone ?? '',
+  parking: l.parking ?? '', nearest_hospital: l.nearest_hospital ?? '', status: labelOf(LOCATION_STATUSES, l.status), tasks: l.tasks,
   map: l.address ? 'Open map' : '',
 });
 
@@ -87,6 +88,8 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
       { field: 'contact_name', header: 'Contact', width: 160, editable: true },
       { field: 'contact_email', header: 'Contact email', width: 200, editable: true },
       { field: 'contact_phone', header: 'Contact phone', width: 150, editable: true },
+      { field: 'parking', header: 'Parking', width: 200, editable: true, editor: 'textarea' },
+      { field: 'nearest_hospital', header: 'Nearest hospital', width: 220, editable: true, editor: 'textarea' },
       { field: 'description', header: 'Description', width: 260, editable: true, editor: 'textarea' },
       { field: 'tasks', header: 'Tasks', type: 'number', width: 90 },
     ],
@@ -203,6 +206,13 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
         <label className="label md:col-span-2">Address
           <textarea className="field" rows={2} value={draft.address} maxLength={500} autoComplete="street-address" onChange={set('address')} />
           {initial.address && <a className="text-sm" {...mapsLinkProps(initial.address)}>Open in maps</a>}
+        </label>
+        <label className="label">Parking and basecamp
+          <textarea className="field" rows={2} value={draft.parking} maxLength={500} placeholder="Lot behind the hardware store" onChange={set('parking')} />
+        </label>
+        <label className="label">Nearest hospital
+          <textarea className="field" rows={2} value={draft.nearest_hospital} maxLength={500} placeholder="St. Mary's ER, 22 Elm St" onChange={set('nearest_hospital')} />
+          {initial.nearest_hospital && <a className="text-sm" {...mapsLinkProps(initial.nearest_hospital)}>Open in maps</a>}
         </label>
         <label className="label">Contact name
           <input className="field" value={draft.contact_name} maxLength={120} onChange={set('contact_name')} />

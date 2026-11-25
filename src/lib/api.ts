@@ -54,10 +54,10 @@ export type TaskInput = Partial<Pick<Task, 'title' | 'description' | 'status' | 
 export interface Location {
   id: string; project_id: string; name: string; description: string | null; address: string | null;
   contact_name: string | null; contact_email: string | null; contact_phone: string | null;
-  status: LocationStatus;
+  status: LocationStatus; parking: string | null; nearest_hospital: string | null;
   created_by: string | null; created_at: string; updated_at: string; tasks: number;
 }
-export type LocationInput = Partial<Pick<Location, 'name' | 'description' | 'address' | 'contact_name' | 'contact_email' | 'contact_phone' | 'status'>>;
+export type LocationInput = Partial<Pick<Location, 'name' | 'description' | 'address' | 'contact_name' | 'contact_email' | 'contact_phone' | 'status' | 'parking' | 'nearest_hospital'>>;
 /** considering (being scouted), confirmed (booked), or not_using (ruled out). */
 export type LocationStatus = 'considering' | 'confirmed' | 'not_using';
 
@@ -78,6 +78,32 @@ export interface Shot {
   created_by: string | null; created_at: string; updated_at: string;
 }
 export type ShotInput = Partial<Pick<Shot, 'description' | 'size' | 'angle' | 'movement' | 'lens' | 'equipment' | 'est_minutes' | 'done' | 'notes'>>;
+
+/** A day of filming. Times are 'HH:MM' or 'HH:MM:SS'. */
+export interface ShootDay {
+  id: string; project_id: string; shoot_date: string; title: string | null; location_id: string | null;
+  crew_call: string | null; shooting_call: string | null; lunch: string | null; wrap: string | null;
+  weather: string | null; sunrise: string | null; sunset: string | null; notes: string | null;
+  /** How many times the call sheet has been sent; 0 = not yet. */
+  version: number; sent_at: string | null; sent_by: string | null;
+  created_by: string | null; created_at: string; updated_at: string;
+  day_number: number; total_days: number; scene_ids: string[]; pages_eighths: number; called: number; confirmed: number;
+}
+export type ShootDayInput = Partial<Pick<ShootDay, 'shoot_date' | 'title' | 'location_id' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes'>>;
+export type ShootItemKind = 'scene' | 'meal' | 'move' | 'note';
+export interface ShootDayItem { id: string; shoot_day_id: string; project_id: string; sort_order: number; kind: ShootItemKind; scene_id: string | null; label: string | null; at_time: string | null; created_at: string }
+export interface ShootDayCall {
+  shoot_day_id: string; user_id: string; project_id: string;
+  /** Null means the day's crew call. */
+  call_time: string | null; character_name: string | null; pickup_time: string | null; makeup_time: string | null; note: string | null;
+  viewed_version: number; viewed_at: string | null; confirmed_version: number; confirmed_at: string | null; created_at: string;
+  profile: Profile; role_ids: string[];
+}
+export type ShootDayCallInput = Partial<Pick<ShootDayCall, 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note'>>;
+export interface CallSheet {
+  day: ShootDay; location: Location | null; items: ShootDayItem[]; scenes: Scene[]; calls: ShootDayCall[];
+  next_day: { day: ShootDay; scenes: Scene[] } | null;
+}
 
 export interface TaskNote { id: string; task_id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
 
@@ -142,6 +168,25 @@ export const api = {
   updateShot: (id: string, b: ShotInput) => call<Shot>('PATCH', `/shots/${enc(id)}`, b),
   deleteShot: (id: string) => call<void>('DELETE', `/shots/${enc(id)}`),
   orderShots: (sceneId: string, ids: string[]) => call<void>('PUT', `/scenes/${enc(sceneId)}/shot-order`, { ids }),
+
+  shootDays: (projectId: string) => call<ShootDay[]>('GET', `/projects/${enc(projectId)}/shoot-days`),
+  createShootDay: (projectId: string, b: ShootDayInput & { shoot_date: string }) => call<ShootDay>('POST', `/projects/${enc(projectId)}/shoot-days`, b),
+  updateShootDay: (id: string, b: ShootDayInput) => call<ShootDay>('PATCH', `/shoot-days/${enc(id)}`, b),
+  deleteShootDay: (id: string) => call<void>('DELETE', `/shoot-days/${enc(id)}`),
+  addShootDayItem: (dayId: string, b: { kind: ShootItemKind; scene_id?: string | null; label?: string | null; at_time?: string | null }) =>
+    call<ShootDayItem>('POST', `/shoot-days/${enc(dayId)}/items`, b),
+  updateShootDayItem: (id: string, b: { label?: string | null; at_time?: string | null }) => call<ShootDayItem>('PATCH', `/shoot-day-items/${enc(id)}`, b),
+  deleteShootDayItem: (id: string) => call<void>('DELETE', `/shoot-day-items/${enc(id)}`),
+  orderShootDayItems: (dayId: string, ids: string[]) => call<void>('PUT', `/shoot-days/${enc(dayId)}/item-order`, { ids }),
+  shootDayCalls: (dayId: string) => call<ShootDayCall[]>('GET', `/shoot-days/${enc(dayId)}/calls`),
+  setShootDayCall: (dayId: string, userId: string, b: ShootDayCallInput) => call<unknown>('PUT', `/shoot-days/${enc(dayId)}/calls/${enc(userId)}`, b),
+  callEveryone: (dayId: string) => call<{ added: number }>('POST', `/shoot-days/${enc(dayId)}/calls/everyone`),
+  removeShootDayCall: (dayId: string, userId: string) => call<void>('DELETE', `/shoot-days/${enc(dayId)}/calls/${enc(userId)}`),
+  callSheet: (dayId: string) => call<CallSheet>('GET', `/shoot-days/${enc(dayId)}/call-sheet`),
+  sendCallSheet: (dayId: string) => call<ShootDay>('POST', `/shoot-days/${enc(dayId)}/send`),
+  viewedCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/viewed`),
+  confirmCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/confirm`),
+  lookUpWeather: (dayId: string) => call<{ weather: string; sunrise: string; sunset: string; place: string }>('POST', `/shoot-days/${enc(dayId)}/weather`),
 
   tasks: (projectId: string) => call<Task[]>('GET', `/projects/${enc(projectId)}/tasks`),
   createTask: (projectId: string, b: TaskInput & { title: string }) => call<Task>('POST', `/projects/${enc(projectId)}/tasks`, b),

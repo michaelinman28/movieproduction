@@ -306,6 +306,8 @@ export const Location = z.object({
   contact_email: nullableText.openapi({ example: 'sam@oldmill.com' }),
   contact_phone: nullableText.openapi({ example: '+1 555 0100' }),
   status: LocationStatus,
+  parking: nullableText.openapi({ example: 'Lot behind the hardware store' }),
+  nearest_hospital: nullableText.openapi({ example: "St. Mary's ER, 2.1 miles" }),
   created_by: Uuid.nullable(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -321,6 +323,8 @@ export const LocationInput = z.object({
   contact_email: z.union([z.literal(''), z.email().max(254)]).nullable().optional().openapi({ example: 'sam@oldmill.com' }),
   contact_phone: optText(40),
   status: LocationStatus.optional().openapi({ description: 'Defaults to considering' }),
+  parking: optText(500),
+  nearest_hospital: optText(500),
 }).openapi('LocationInput');
 
 export const LocationUpdate = LocationInput.partial().openapi('LocationUpdate');
@@ -404,3 +408,113 @@ export const ShotUpdate = ShotInput.partial().openapi('ShotUpdate');
 export const OrderInput = z.object({
   ids: z.array(Uuid).min(1).max(1000).openapi({ description: 'Every id, in the new order' }),
 }).openapi('OrderInput');
+
+// ---- Shoot days and call sheets ---------------------------------------------
+
+const clock = z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).openapi({ example: '16:00' });
+const optTime = time.nullable().optional();
+
+export const ShootDay = z.object({
+  id: Uuid,
+  project_id: Uuid,
+  shoot_date: date,
+  title: nullableText.openapi({ example: 'Diner nights' }),
+  location_id: Uuid.nullable(),
+  crew_call: clock.nullable(),
+  shooting_call: clock.nullable(),
+  lunch: clock.nullable(),
+  wrap: clock.nullable(),
+  weather: nullableText.openapi({ example: 'Rain likely, 48°F to 55°F' }),
+  sunrise: clock.nullable(),
+  sunset: clock.nullable(),
+  notes: nullableText,
+  version: z.number().int().openapi({ description: 'How many times the call sheet has been sent (0 = not yet)' }),
+  sent_at: z.string().nullable(),
+  sent_by: Uuid.nullable(),
+  created_by: Uuid.nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  day_number: z.number().int().openapi({ description: 'Its place among the project\'s shoot days, by date (Day 3 of 18)' }),
+  total_days: z.number().int(),
+  scene_ids: z.array(Uuid).openapi({ description: 'Scenes on the day, in order' }),
+  pages_eighths: z.number().int().openapi({ description: 'The day\'s scenes\' pages added up, in eighths' }),
+  called: z.number().int().openapi({ description: 'How many people are called' }),
+  confirmed: z.number().int().openapi({ description: 'How many have confirmed the version sent' }),
+}).openapi('ShootDay');
+
+export const ShootDayInput = z.object({
+  shoot_date: date,
+  title: optText(120),
+  location_id: Uuid.nullable().optional(),
+  crew_call: optTime, shooting_call: optTime, lunch: optTime, wrap: optTime,
+  weather: optText(200),
+  sunrise: optTime, sunset: optTime,
+  notes: optText(4000),
+}).openapi('ShootDayInput');
+export const ShootDayUpdate = ShootDayInput.partial().openapi('ShootDayUpdate');
+
+export const ShootItemKind = z.enum(['scene', 'meal', 'move', 'note']).openapi('ShootItemKind', {
+  description: 'scene, meal (a meal break), move (a company move to another location) or note',
+});
+export const ShootDayItem = z.object({
+  id: Uuid,
+  shoot_day_id: Uuid,
+  project_id: Uuid,
+  sort_order: z.number().int(),
+  kind: ShootItemKind,
+  scene_id: Uuid.nullable(),
+  label: nullableText.openapi({ example: 'Hot meal, 1 hour' }),
+  at_time: clock.nullable(),
+  created_at: z.string(),
+}).openapi('ShootDayItem');
+export const ShootDayItemInput = z.object({
+  kind: ShootItemKind,
+  scene_id: Uuid.nullable().optional().openapi({ description: 'Required for a scene' }),
+  label: optText(300),
+  at_time: optTime,
+}).openapi('ShootDayItemInput');
+export const ShootDayItemUpdate = z.object({ label: optText(300), at_time: optTime }).openapi('ShootDayItemUpdate');
+
+export const ShootDayCall = z.object({
+  shoot_day_id: Uuid,
+  user_id: Uuid,
+  project_id: Uuid,
+  call_time: clock.nullable().openapi({ description: 'Their own call; null means the day\'s crew call' }),
+  character_name: nullableText.openapi({ description: 'For cast: the character they play', example: 'Maya' }),
+  pickup_time: clock.nullable(),
+  makeup_time: clock.nullable(),
+  note: nullableText,
+  viewed_version: z.number().int(),
+  viewed_at: z.string().nullable(),
+  confirmed_version: z.number().int(),
+  confirmed_at: z.string().nullable(),
+  created_at: z.string(),
+  profile: Profile,
+  role_ids: z.array(Uuid).openapi({ description: 'Their project roles' }),
+}).openapi('ShootDayCall');
+export const ShootDayCallInput = z.object({
+  call_time: optTime,
+  character_name: optText(120),
+  pickup_time: optTime,
+  makeup_time: optTime,
+  note: optText(500),
+}).openapi('ShootDayCallInput');
+
+export const CallSheet = z.object({
+  day: ShootDay,
+  location: z.any().nullable().openapi({ description: 'The day\'s location (see Location)' }),
+  items: z.array(ShootDayItem),
+  scenes: z.array(z.any()).openapi({ description: 'The scenes on the day (see Scene)' }),
+  calls: z.array(ShootDayCall),
+  next_day: z.object({ day: ShootDay, scenes: z.array(z.any()) }).nullable().openapi({ description: 'A look ahead at the following shoot day' }),
+}).openapi('CallSheet');
+
+export const UserParams = z.object({
+  id: Uuid.openapi({ param: { name: 'id', in: 'path' } }),
+  userId: Uuid.openapi({ param: { name: 'userId', in: 'path' } }),
+});
+export const WeatherResult = z.object({
+  weather: z.string().openapi({ example: 'Light rain, 48°F to 55°F, 60% chance of rain' }),
+  sunrise: clock, sunset: clock,
+  place: z.string().openapi({ example: 'Hudson, New York' }),
+}).openapi('WeatherResult');

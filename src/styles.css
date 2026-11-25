@@ -134,3 +134,25 @@
 
 /* A form opened after adding something scrolls into view below the header and pinned button. */
 [data-form-for] { scroll-margin-top: 7rem; }
+
+/* Call sheet (src/pages/project/CallSheetPage.tsx): compact tables that scroll inside their box on phones. */
+.sheet-h { margin: 0 0 0.25rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); }
+.sheet-table { overflow-x: auto; }
+.sheet-table table { width: 100%; min-width: 36rem; border-collapse: collapse; font-size: 0.875rem; }
+.sheet-table th { text-align: left; font-weight: 600; font-size: 0.75rem; color: var(--color-muted); border-bottom: 1px solid var(--color-line); padding: 0.375rem 0.5rem; }
+.sheet-table td { border-bottom: 1px solid var(--color-line); padding: 0.375rem 0.5rem; vertical-align: top; }
+.sheet-table tfoot td { font-weight: 600; border-bottom: 0; }
+.sheet-break td { background: var(--color-bg); }
+.sheet-dept td { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); background: var(--color-bg); }
+.sheet-me td { background: var(--color-accent-soft); }
+
+/* Printing a call sheet: just the sheet (its open sections), black on white. */
+@media print {
+  nav, .no-print, .pinned-action { display: none !important; }
+  .call-sheet .section-toggle { pointer-events: none; }
+  .call-sheet .section-chevron { display: none; }
+  .sheet { border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+  .sheet-table { overflow: visible; }
+  .sheet-table table { min-width: 0; }
+  body, .card { background: #fff !important; color: #000 !important; }
+}
