@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PickManyMenu, type PickManyOpen } from './PickManyMenu';
 import { useTheme } from '../lib/theme';
 import { confirmDiscard } from '../lib/unsaved';
 import { mapsUrl, openMaps } from '../lib/maps';
@@ -13,6 +14,19 @@ import type {
 } from '../vendor/lattice-grid/lattice-grid';
 
 type Handlers = Record<string, (payload: any) => void>;
+
+/**
+ * A column whose cell holds several picks from a list (e.g. the characters someone
+ * plays): add `pickMany` to the column (and leave `editable` off). One click, or Enter,
+ * opens a dropdown of tick boxes; the cell saves when it closes, through
+ * `cellValueChanged` with `newValue` set to the picked ids. The column gets a dropdown
+ * filter of each name (its value should be the names, comma-separated).
+ */
+export interface PickMany<Row> {
+  choices: (row: Row) => { id: string; name: string }[];
+  selected: (row: Row) => string[];
+  editable?: boolean | ((row: Row) => boolean);
+}
 
 interface Props<Row> {
   /**
@@ -57,6 +71,8 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
   stateIdRef.current = stateId;
   // The table's own columns (not the tree or tick-box columns) for the Columns button.
   const [chooser, setChooser] = useState<ChooserColumn[]>([]);
+  // The open pick-many dropdown, if any.
+  const [picker, setPicker] = useState<PickManyOpen | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -65,8 +81,10 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
       ...options,
       // A pick-list column (editor: 'select') filters by ticking values from a dropdown
       // list instead of typing, unless the column sets its own filter.
-      columns: (options.columns as { editor?: string; filter?: unknown }[] | undefined)?.map((c) =>
-        c.editor === 'select' && c.filter === undefined ? { ...c, filter: 'set' } : c) as LatticeGridOptions<Row>['columns'],
+      // A pick-many column filters by each name in it.
+      columns: (options.columns as { editor?: string; filter?: unknown; pickMany?: unknown; filterSplit?: string }[] | undefined)?.map((c) =>
+        c.pickMany && c.filter === undefined ? { ...c, filter: 'set', filterSplit: c.filterSplit ?? ',' }
+          : c.editor === 'select' && c.filter === undefined ? { ...c, filter: 'set' } : c) as LatticeGridOptions<Row>['columns'],
       rows: rowsRef.current,
     });
     gridRef.current = grid;
@@ -94,6 +112,40 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
     let clickedAt = 0;
     const onPointer = () => { clickedAt = Date.now(); };
     container.addEventListener('pointerdown', onPointer, true);
+
+    // Pick-many cells (see PickMany) open a dropdown of tick boxes on a click or Enter.
+    // `display`, `visible`, `focus` and `_cellEl` are lattice-grid internals.
+    const gp = grid as unknown as {
+      display?: { node?: { data?: Row } }[]; visible?: { id: string; def?: { pickMany?: PickMany<Row> } }[];
+      focus?: { r: number; c: number } | null; _cellEl?: (r: number, c: number) => HTMLElement | null;
+    };
+    const openPickMany = (r: number, c: number) => {
+      const col = gp.visible?.[c];
+      const pm = col?.def?.pickMany;
+      const row = gp.display?.[r]?.node?.data;
+      if (!pm || row === undefined) return false;
+      if (!(typeof pm.editable === 'function' ? pm.editable(row) : pm.editable ?? true)) return false;
+      const cell = gp._cellEl?.(r, c);
+      if (!cell) return false;
+      const selected = pm.selected(row);
+      setPicker({
+        rect: cell.getBoundingClientRect(), choices: pm.choices(row), selected,
+        done: (ids) => {
+          setPicker(null);
+          (grid as unknown as { viewport?: HTMLElement }).viewport?.focus({ preventScroll: true });
+          if (ids && (ids.length !== selected.length || ids.some((id) => !selected.includes(id)))) {
+            handlersRef.current?.cellValueChanged?.({ data: row, column: col!.id, oldValue: selected, newValue: ids });
+          }
+        },
+      });
+      return true;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || (e.target as HTMLElement).closest('.lg-editor')) return;
+      const f = gp.focus;
+      if (f && openPickMany(f.r, f.c)) { e.preventDefault(); e.stopPropagation(); }
+    };
+    container.addEventListener('keydown', onKey, true);
     grid.on('rangeChanged', (r: { r1: number; r2: number; c1: number; c2: number }) => {
       const g = grid as unknown as {
         display?: unknown[]; visible?: { def?: { editor?: string } }[];
@@ -101,6 +153,7 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
         startEdit?: (r: number, c: number) => boolean; editing?: { input?: HTMLSelectElement } | null;
       };
       const col = g.visible?.[r.c1];
+      if (r.r1 === r.r2 && r.c1 === r.c2 && Date.now() - clickedAt <= 400 && openPickMany(r.r1, r.c1)) { clickedAt = 0; return; }
       if (r.r1 !== r.r2 || r.c1 !== r.c2 || col?.def?.editor !== 'select' || Date.now() - clickedAt > 400) return;
       if (!g._isEditable?.(col, g.display?.[r.r1])) return;
       clickedAt = 0;
@@ -206,6 +259,8 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
       phone.removeEventListener('change', applyPins);
       container.removeEventListener('change', onChange);
       container.removeEventListener('pointerdown', onPointer, true);
+      container.removeEventListener('keydown', onKey, true);
+      setPicker(null);
       grid.destroy();
       gridRef.current = null;
     };
@@ -275,6 +330,7 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
       <div ref={containerRef} className={className}
         style={{ height: typeof height === 'number' ? Math.max(height, MIN_GRID_HEIGHT) : height }}
         onMouseDownCapture={onMouseDown} onClick={onClick} />
+      {picker && <PickManyMenu {...picker} />}
     </div>
   );
 }

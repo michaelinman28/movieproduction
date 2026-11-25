@@ -107,8 +107,16 @@ day to day.
   Scenes table's Characters cell) links those characters and adds any new ones.
 - **Notes and History:** character notes (same rules as scene notes) show on Project
   notes; admins see the character's History.
-- **Call sheets:** each person's line shows the characters they're cast as (e.g.
-  "Ellie (#1)"), unless a character was typed on their call.
+- **Who plays whom** is stored once, as each character's actor. Three places show and
+  change that same link: the Characters page (Actor), a shoot day's calls (Characters,
+  pick one or more) and the Team page (Plays, pick one or more). Picking a character
+  that someone else plays moves it to this person (`setCharactersPlayed` in
+  `src/lib/casting.ts`). In tables it's a `pickMany` column (LatticeGrid's dropdown of
+  tick boxes, `src/components/PickManyMenu.tsx`); in forms, `TagPicker`.
+- **Call sheets:** each person's line shows the characters they play (e.g.
+  "Ellie (#1)"). `shoot_day_calls.character_name` is an older typed-in name, shown only
+  if nobody linked them yet; migration `20261126040000` linked the existing ones, and
+  picking characters on the call clears it.
 - **Rules:** names are unique per project (any case) and have no commas; cast numbers
   are unique per project. The actor, stand-in and double must be on the team; taking
   someone off the team clears them. Picking an actor marks the character cast.

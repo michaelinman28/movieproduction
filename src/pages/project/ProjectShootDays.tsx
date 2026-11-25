@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { LatticeGrid, gridDropdown, gridEsc, gridLink, gridLinkHtml, gridLinkList } from '../../components/LatticeGrid';
+import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLink, gridLinkHtml, gridLinkList } from '../../components/LatticeGrid';
 import { OpenLink } from '../../components/OpenLink';
+import { TagPicker } from '../../components/TagPicker';
+import { characterChoices, characterIdsPlayedBy, characterLabel, setCharactersPlayed } from '../../lib/casting';
 import { Section } from '../../components/Section';
 import { ItemHistory } from '../../components/ItemHistory';
 import {
-  api, type Location, type Scene, type ShootDay, type ShootDayCall, type ShootDayCallInput, type ShootDayInput, type ShootDayItem, type ShootItemKind,
+  api, type Character, type Location, type Scene, type ShootDay, type ShootDayCall, type ShootDayCallInput, type ShootDayInput, type ShootDayItem, type ShootItemKind,
 } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import {
@@ -520,14 +522,19 @@ interface CallRow {
 function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<void> }) {
   const { projectId, team, roles } = useProject();
   const [calls, setCalls] = useState<ShootDayCall[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addId, setAddId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
 
   const load = useCallback(async () => {
-    try { setCalls(await api.shootDayCalls(day.id)); } catch (e) { setError(errorText(e)); }
-  }, [day.id]);
+    try {
+      const [c, ch] = await Promise.all([api.shootDayCalls(day.id), api.characters(projectId)]);
+      setCalls(c);
+      setCharacters(ch);
+    } catch (e) { setError(errorText(e)); }
+  }, [day.id, projectId]);
   useEffect(() => { load(); }, [load]);
 
   const run: Run = async (fn) => {
@@ -539,14 +546,20 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
     return ok;
   };
 
+  const nameOf = useCallback((id: string) => {
+    const m = team.find((t) => t.user_id === id);
+    return m ? displayName(m.profile) : undefined;
+  }, [team]);
+
   const crewCall = clockLabel(day.crew_call);
   const rows = useMemo(() => calls.map((c): CallRow => ({
     id: c.user_id, name: displayName(c.profile), department: castLabel(c) ? 'Cast' : departmentOf(c.role_ids, roles),
-    roles: roles.filter((r) => c.role_ids.includes(r.id)).map((r) => r.name).join(', '), character: castLabel(c),
+    roles: roles.filter((r) => c.role_ids.includes(r.id)).map((r) => r.name).join(', '),
+    character: characters.filter((ch) => ch.actor_id === c.user_id).map(characterLabel).join(', ') || (c.character_name ?? ''),
     call: clockLabel(c.call_time), pickup: clockLabel(c.pickup_time), makeup: clockLabel(c.makeup_time), note: c.note ?? '',
     status: callStatus(day, c),
   })).sort((a, b) => Number(b.department === 'Cast') - Number(a.department === 'Cast') || a.department.localeCompare(b.department) || a.name.localeCompare(b.name)),
-  [calls, roles, day]);
+  [calls, roles, day, characters]);
 
   const options = useMemo(() => ({
     rowId: (r: CallRow) => r.id,
@@ -560,14 +573,29 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
       },
       { field: 'department', header: 'Department', width: 130, filter: 'set' },
       { field: 'roles', header: 'Roles', width: 180, filterSplit: ',' },
-      { field: 'character', header: 'Character', width: 150, editable: true, tooltip: () => 'From the Characters page, unless you type one here' },
+      {
+        // The characters they play: the same link as each character's actor on the
+        // Characters page, so picking here casts them there too.
+        field: 'character', header: 'Characters', width: 190,
+        pickMany: {
+          choices: (r: CallRow) => characterChoices(r.id, characters, nameOf),
+          selected: (r: CallRow) => characterIdsPlayedBy(r.id, characters),
+        } satisfies PickMany<CallRow>,
+        render: ({ value, data }: { value: string; data: CallRow }) => {
+          const plays = characters.filter((c) => c.actor_id === data.id);
+          return gridDropdown(plays.length
+            ? gridLinkList(plays.map((c) => ({ text: characterLabel(c), to: itemPath.character(projectId, c.id), title: `Open ${c.name} on the Characters page` })))
+            : gridEsc(value || NONE));
+        },
+        tooltip: () => 'Pick the characters they play. It casts them on the Characters page too.',
+      },
       { field: 'call', header: 'Call', width: 110, editable: true, render: ({ value }: { value: string }) => gridEsc(value || (crewCall ? `${crewCall} (crew)` : '')) },
       { field: 'pickup', header: 'Pickup', width: 100, editable: true },
       { field: 'makeup', header: 'Makeup', width: 100, editable: true },
       { field: 'note', header: 'Note', width: 200, editable: true },
       { field: 'status', header: 'Call sheet', width: 130, filter: 'set' },
     ],
-  }), [crewCall, projectId]);
+  }), [crewCall, projectId, characters, nameOf]);
 
   async function saveCell(e: { data: CallRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
@@ -575,12 +603,21 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
     await run(async () => {
       const patch: ShootDayCallInput = {};
       if (timeKey) patch[timeKey] = parseTime(v);
-      // Blank, or the characters they're cast as, means no typed-in character.
-      else if (e.column === 'character') patch.character_name = v && v !== castLabel({ characters: calls.find((c) => c.user_id === e.data.id)?.characters, character_name: null }) ? v : null;
+      else if (e.column === 'character') return castAs(e.data.id, e.newValue as string[]);
       else if (e.column === 'note') patch.note = v || null;
       else return;
       return api.setShootDayCall(day.id, e.data.id, patch);
     });
+  }
+
+  /**
+   * Cast someone as exactly these characters: they become each one's actor on the
+   * Characters page (and are taken off the others). A character typed on their call by
+   * an older version of the app is cleared, so there's only the one link.
+   */
+  async function castAs(userId: string, ids: string[]) {
+    await setCharactersPlayed(userId, ids, characters);
+    if (calls.find((c) => c.user_id === userId)?.character_name) await api.setShootDayCall(day.id, userId, { character_name: null });
   }
 
   const called = new Set(calls.map((c) => c.user_id));
@@ -623,11 +660,11 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
             cellValueChanged: saveCell,
             selectionChanged: (r: CallRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
           }} />
-        {selected && <CallForm key={selected.user_id} day={day} call={selected} run={run} onRemoved={() => setSelectedId(null)} />}
+        {selected && <CallForm key={selected.user_id} day={day} call={selected} characters={characters} nameOf={nameOf} castAs={castAs} run={run} onRemoved={() => setSelectedId(null)} />}
       </div>
       {rows.length > 0 && (
         <p className="hint mt-2">
-          A blank call means the general crew call{crewCall ? ` (${crewCall})` : ''}. Give actors their character and they're listed as cast.
+          A blank call means the general crew call{crewCall ? ` (${crewCall})` : ''}. Pick an actor's characters and they're listed as cast; it's the same casting as on the Characters and Team pages.
           Add people to the project on the Team page first.
         </p>
       )}
@@ -635,15 +672,30 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
   );
 }
 
-function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDayCall; run: Run; onRemoved: () => void }) {
+function CallForm({ day, call, characters, nameOf, castAs, run, onRemoved }: {
+  day: ShootDay; call: ShootDayCall; characters: Character[]; nameOf: (id: string) => string | undefined;
+  castAs: (userId: string, ids: string[]) => Promise<void>; run: Run; onRemoved: () => void;
+}) {
   const { projectId } = useProject();
+  // The characters they play, held until Save like the rest of the form.
+  const playsKey = characterIdsPlayedBy(call.user_id, characters).join();
+  const playsInitial = useMemo(() => (playsKey ? playsKey.split(',') : []), [playsKey]);
+  const [plays, setPlays] = useState(playsInitial);
+  const playsShown = useRef(playsInitial);
+  useEffect(() => {
+    // After a reload, take in the saved characters unless the person has changed them.
+    const before = playsShown.current;
+    playsShown.current = playsInitial;
+    setPlays((p) => (p.join() === before.join() ? playsInitial : p));
+  }, [playsInitial]);
+  const playsChanged = [...plays].sort().join() !== [...playsInitial].sort().join();
   const initial = useMemo(() => ({
-    character: call.character_name ?? '', call: clockValue(call.call_time), pickup: clockValue(call.pickup_time), makeup: clockValue(call.makeup_time), note: call.note ?? '',
+    call: clockValue(call.call_time), pickup: clockValue(call.pickup_time), makeup: clockValue(call.makeup_time), note: call.note ?? '',
   }), [call]);
   type Draft = typeof initial;
   const [draft, setDraft] = useState(initial);
   const keys = Object.keys(initial) as (keyof Draft)[];
-  const changed = keys.some((k) => draft[k].trim() !== initial[k]);
+  const changed = playsChanged || keys.some((k) => draft[k].trim() !== initial[k]);
   useUnsaved(changed);
   // When the day reloads (after Save, a weather lookup, or a change elsewhere), take in
   // the new saved values for every field the person hasn't changed, and keep their edits.
@@ -665,12 +717,14 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
     e.preventDefault();
     const d = Object.fromEntries(keys.map((k) => [k, draft[k].trim()])) as Draft;
     const patch: ShootDayCallInput = {};
-    if (d.character !== initial.character) patch.character_name = d.character || null;
     if (d.call !== initial.call) patch.call_time = d.call || null;
     if (d.pickup !== initial.pickup) patch.pickup_time = d.pickup || null;
     if (d.makeup !== initial.makeup) patch.makeup_time = d.makeup || null;
     if (d.note !== initial.note) patch.note = d.note || null;
-    if (await run(() => api.setShootDayCall(day.id, call.user_id, patch))) setDraft(d);
+    if (await run(async () => {
+      if (playsChanged) await castAs(call.user_id, plays);
+      if (Object.keys(patch).length) await api.setShootDayCall(day.id, call.user_id, patch);
+    })) { setDraft(d); playsShown.current = plays; }
   }
   async function remove() {
     if (window.confirm(`Remove ${name} from day ${day.day_number}? They won't be on its call sheet.`) && await run(() => api.removeShootDayCall(day.id, call.user_id))) onRemoved();
@@ -683,9 +737,19 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
         {' '}<span className="font-normal text-muted">({callStatus(day, call)})</span>
       </p>
       <form className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-x-4" onSubmit={save}>
-        <label className="label">Character (cast only)
-          <input className="field" value={draft.character} maxLength={120} placeholder={castLabel({ ...call, character_name: null }) || 'Maya'} onChange={set('character')} />
-        </label>
+        <div className="label md:col-span-2">Characters they play (cast only)
+          <TagPicker tags={characterChoices(call.user_id, characters, nameOf)} selected={plays} onChange={setPlays}
+            noun="character" listLabel="Characters they play" maxLength={80} />
+          {plays.length > 0 && (
+            <span className="flex flex-wrap gap-x-4">
+              {plays.map((id) => characters.find((c) => c.id === id)).filter((c): c is Character => Boolean(c)).map((c) => (
+                <OpenLink key={c.id} to={itemPath.character(projectId, c.id)}>Open {c.name} on the Characters page</OpenLink>
+              ))}
+            </span>
+          )}
+          {!plays.length && call.character_name && <span className="hint font-normal">Typed in earlier: {call.character_name}. Pick the character to link it.</span>}
+          <span className="hint font-normal">The same casting as on the Characters and Team pages: a character played by someone else moves to {displayName(call.profile)}.</span>
+        </div>
         <label className="label">Call time
           <input className="field" type="time" value={draft.call} onChange={set('call')} />
           <span className="hint font-normal">Blank means the crew call{day.crew_call ? ` (${clockLabel(day.crew_call)})` : ''}.</span>
@@ -701,7 +765,7 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
         </label>
         <div className="flex gap-2 md:col-span-2">
           <button type="submit" className="btn flex-1 whitespace-nowrap md:flex-none" disabled={!changed} data-pin="2">Save call</button>
-          <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
+          <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => { setDraft(initial); setPlays(playsInitial); }}>Undo changes</button>
         </div>
         {changed && <p className="hint md:col-span-2">Unsaved changes.</p>}
       </form>
