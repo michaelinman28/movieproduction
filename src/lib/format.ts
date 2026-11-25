@@ -156,3 +156,46 @@ export function minutesLabel(m: number | null | undefined) {
   const h = Math.floor(m / 60), r = m % 60;
   return h ? (r ? `${h}h ${r}m` : `${h}h`) : `${r}m`;
 }
+
+// ---- Shoot days ---------------------------------------------------------------
+
+/** A time as typed ('4pm', '4:30 PM', '16:30', '1630') to 'HH:MM'; blank is null. Throws if it can't be read. */
+export function parseTime(text: string): string | null {
+  const t = text.trim().toLowerCase().replace(/\./g, '');
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2})(?::?(\d{2}))?\s*(am|pm|a|p)?$/);
+  if (m) {
+    let h = Number(m[1]);
+    const min = Number(m[2] ?? 0);
+    const ap = m[3]?.[0];
+    const ok = ap ? h >= 1 && h <= 12 : h < 24;
+    if (ap) h = (h % 12) + (ap === 'p' ? 12 : 0);
+    if (ok && min < 60) return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  }
+  throw new Error(`"${text.trim()}" isn't a time. Write it like 4:30 PM or 16:30.`);
+}
+
+/** A stored time for showing ('16:00:00' -> '4:00 PM'), or '' for none. */
+export const clockLabel = (t: string | null | undefined) => (t ? timeLabel(t) : '');
+
+/** 'HH:MM' from a stored time, for a time input. */
+export const clockValue = (t: string | null | undefined) => (t ? t.slice(0, 5) : '');
+
+/** '2027-03-12' -> 'Friday, March 12, 2027'. */
+export function longDate(d: string) {
+  const [y, m, day] = d.split('-').map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+/** '2027-03-12' -> 'Fri, Mar 12'. */
+export function shortDate(d: string) {
+  const [y, m, day] = d.split('-').map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+export const SHOOT_ITEM_KINDS: { value: 'scene' | 'meal' | 'move' | 'note'; label: string }[] = [
+  { value: 'scene', label: 'Scene' },
+  { value: 'meal', label: 'Meal break' },
+  { value: 'move', label: 'Company move' },
+  { value: 'note', label: 'Note' },
+];

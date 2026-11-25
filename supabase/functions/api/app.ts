@@ -11,6 +11,7 @@ import { labels } from './routes/labels.ts';
 import { locations } from './routes/locations.ts';
 import { people } from './routes/people.ts';
 import { scenes } from './routes/scenes.ts';
+import { shootDays } from './routes/shootDays.ts';
 
 export const API_VERSION = '0.1.0';
 
@@ -44,6 +45,7 @@ export function createApp(config: ApiConfig) {
   api.route('/', locations);
   api.route('/', people);
   api.route('/', scenes);
+  api.route('/', shootDays);
 
   api.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http', scheme: 'bearer', bearerFormat: 'JWT',
@@ -76,6 +78,8 @@ export function createApp(config: ApiConfig) {
       { name: 'Locations', description: 'A project\'s locations, with address and on-site contact; tasks can be assigned to one' },
       { name: 'Scenes', description: 'A project\'s scenes in order: set, interior or exterior, time of day, pages, characters, needs and location' },
       { name: 'Shots', description: 'Each scene\'s shot list, in shooting order, ticked off on set' },
+      { name: 'Shoot days', description: 'Each day of filming: location, times, weather, the day\'s schedule of scenes and breaks, and who is called when' },
+      { name: 'Call sheets', description: 'The call sheet built from a shoot day: send a new version, and each person opens and confirms it' },
     ],
   }));
   const docsUrl = config.publicUrl ? `${config.publicUrl}/openapi.json` : `${base}/openapi.json`;

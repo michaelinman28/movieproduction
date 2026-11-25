@@ -18,8 +18,9 @@ day to day.
 | Roles | 32 standard film roles (Producer, Director, DP, Gaffer…) are shared by every company. Company admins add, rename and delete their own custom roles on the Roles page; a custom role can't reuse a standard role's name | Done |
 | Tasks | A tree of tasks and sub-tasks (any depth) on each project's Tasks page. See [Tasks](#tasks) below | Done |
 | Task categories and tags | Each company has its own task categories (12 starter ones) that admins add, rename, reorder and delete, and its own tags, which anyone in the company can add and admins can rename or delete | Done |
-| Locations | Each project's locations, with a status (Considering, Confirmed, Not using; Not using ones are hidden unless you ask, and aren't offered for tasks), a description, an address (the Map column, the panel and the task panel open it in the device's own maps app: Apple Maps on iPhone, iPad and Mac, the default maps app on Android, Google Maps in the browser elsewhere; `src/lib/maps.ts`) and an on-site contact name, email and phone. Anyone on the project adds and edits them; whoever added one or an admin deletes it. A task can be assigned to a location | Done |
-| Scenes and shot lists | Each project's scenes on its Scenes page, in script order (drag to reorder): number, set, INT/EXT, day or night, pages in eighths, synopsis, characters, needs, location and status (Not scheduled, Scheduled, Shot). Each scene has a shot list in its form: shots in shooting order with size, angle, movement, lens, equipment, estimated minutes and notes, ticked Done on set with one tap. Anyone on the project adds, edits and reorders them; whoever added a scene, or an admin, deletes it (with its shots). First step toward shoot days and call sheets. See [Scenes](#scenes-and-shot-lists) below | Done |
+| Locations | Each project's locations, with a status (Considering, Confirmed, Not using; Not using ones are hidden unless you ask, and aren't offered for tasks), a description, an address (the Map column, the panel and the task panel open it in the device's own maps app: Apple Maps on iPhone, iPad and Mac, the default maps app on Android, Google Maps in the browser elsewhere; `src/lib/maps.ts`) an on-site contact name, email and phone, and parking and the nearest hospital for call sheets. Anyone on the project adds and edits them; whoever added one or an admin deletes it. A task can be assigned to a location | Done |
+| Scenes and shot lists | Each project's scenes on its Scenes page, in script order (drag to reorder): number, set, INT/EXT, day or night, pages in eighths, synopsis, characters, needs, location and status (Not scheduled, Scheduled, Shot). Each scene has a shot list in its form: shots in shooting order with size, angle, movement, lens, equipment, estimated minutes and notes, ticked Done on set with one tap. Anyone on the project adds, edits and reorders them; whoever added a scene, or an admin, deletes it (with its shots). See [Scenes](#scenes-and-shot-lists) below | Done |
+| Shoot days and call sheets | Each project's shoot days on its Shoot days page: date, location, crew call, shooting call, lunch, wrap, weather (looked up from the location's address), sunrise and sunset, notes, an ordered schedule of scenes, meal breaks, company moves and notes, and who is called (each person's call time; cast with character, pickup and makeup). Each day's call sheet is built from all that, sent as a new version (by email from your own app, or copied), and confirmed by each person; it prints cleanly. See [Shoot days](#shoot-days-and-call-sheets) below | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
 
 ### Tasks
@@ -87,6 +88,42 @@ day to day.
 - **Rules:** a scene number is unique in its project (any case); a location must be on
   the same project; a shot stays in its scene and takes its project. New scenes and
   shots go to the end of their list. Migration `20261125000000_scenes_shots.sql`.
+
+### Shoot days and call sheets
+
+- **Where:** a project's Shoot days page (`/projects/:id/shoot-days`,
+  `src/pages/project/ProjectShootDays.tsx`) and each day's call sheet
+  (`/projects/:id/shoot-days/:dayId`, `src/pages/project/CallSheetPage.tsx`).
+- **Days table:** one row per date, numbered by date ("Day 1 of 12"). Date, title,
+  location and the four times are editable in place; scenes, pages, sent version and
+  confirmations are read from the day. Add a day by picking its date.
+- **Day form** (select a day; under the table) has three parts:
+  - **Details** (held until **Save day**): date, title, location, crew call, shooting
+    call, lunch, estimated wrap, weather, sunrise, sunset and notes. **Look up weather,
+    sunrise and sunset** asks Open-Meteo (free, no key) for the location's address, for
+    dates up to about 16 days ahead, and saves the result.
+  - **Schedule:** the day's run in order (drag to reorder, `PUT /shoot-days/{id}/item-order`):
+    scenes from the Scenes page, meal breaks, company moves and notes, each with an
+    optional time. A scene can be on a day once; putting it on a day marks it Scheduled.
+  - **Who's called:** people on the project's team. Call, pickup, makeup, character and
+    note are edited in place or in the call's form. A blank call means the crew call; a
+    character makes someone cast. **Call everyone** adds the whole team.
+- **Call sheet:** header (project, day N of M, date, times), location with address
+  (opens maps), parking and on-site contact, nearest hospital, weather, key contacts
+  (producer, director, ADs, location manager and others found by role), scenes with
+  breaks and page total, cast, crew grouped by department, notes, and the next day's
+  scenes. People called see their own call at the top and **Confirm I got it**; opening
+  the sheet marks it viewed. **Print** prints just the sheet.
+- **Sending:** there's no mail server yet, so **Send version N** stamps the next version
+  (`publish_call_sheet`), then **Email everyone** opens the sender's email app with
+  everyone called in Bcc and the sheet as text (`src/lib/callSheet.ts`), or **Copy
+  message** copies it. Each call shows Waiting, Viewed, Confirmed or "Confirmed an old
+  version".
+- **Rules:** a day's location and scenes must be on the same project; only people on
+  the project can be called, and leaving the project takes them off its days. Versions
+  change only through `publish_call_sheet()`, and viewed/confirmed only through
+  `mark_call_sheet()` for the signed-in person, so neither can be faked with a direct
+  update. Migration `20261125010000_shoot_days.sql`.
 
 ### How people join
 
@@ -169,6 +206,8 @@ There are three layers, and each one can be run and tested by itself.
 | Task categories | `GET/POST /companies/{id}/task-categories`, `PATCH/DELETE /task-categories/{id}` |
 | Scenes | `GET/POST /projects/{id}/scenes` (with shot counts and time), `PUT /projects/{id}/scene-order`, `PATCH/DELETE /scenes/{id}` |
 | Shots | `GET /projects/{id}/shots`, `GET/POST /scenes/{id}/shots`, `PUT /scenes/{id}/shot-order`, `PATCH/DELETE /shots/{id}` |
+| Shoot days | `GET/POST /projects/{id}/shoot-days`, `PATCH/DELETE /shoot-days/{id}`, `POST /shoot-days/{id}/items`, `PUT /shoot-days/{id}/item-order`, `PATCH/DELETE /shoot-day-items/{id}`, `GET /shoot-days/{id}/calls`, `PUT/DELETE /shoot-days/{id}/calls/{userId}`, `POST /shoot-days/{id}/calls/everyone`, `POST /shoot-days/{id}/weather` |
+| Call sheets | `GET /shoot-days/{id}/call-sheet`, `POST /shoot-days/{id}/send`, `POST /shoot-days/{id}/viewed`, `POST /shoot-days/{id}/confirm` |
 | Task tags | `GET/POST /companies/{id}/task-tags`, `PATCH/DELETE /task-tags/{id}`; a task's `tag_ids` are set with `PATCH /tasks/{id}` |
 
 ### 3. Database (`supabase/migrations`)
@@ -184,6 +223,9 @@ There are three layers, and each one can be run and tested by itself.
     categories; anyone in the company can create tags; admins rename or delete them.
   - Everyone on a project (and admins) sees, adds, edits and reorders its scenes and
     shots. Whoever added a scene, or an admin, deletes it; anyone on the project deletes a shot.
+  - Everyone on a project (and admins) sees and edits its shoot days, schedules and
+    calls, and sends call sheets. Whoever added a day, or an admin, deletes it. People
+    mark a call sheet viewed or confirmed only for themselves.
   - Private journal entries are visible only to the author and the people they
     share them with. Only the author can edit them.
 - Integrity rules live in the database too. A company always keeps at least one
@@ -208,6 +250,9 @@ There are three layers, and each one can be run and tested by itself.
 | `task_categories`, `task_tags`, `task_tag_links` | Each company's task categories and tags, and which tags each task has |
 | `scenes` | A project's scenes in order: number, set, INT/EXT, time of day, pages in eighths, synopsis, characters, needs, location, status |
 | `shots` | Each scene's shots in order: size, angle, movement, lens, equipment, estimated minutes, done, notes |
+| `shoot_days` | A project's shoot days: date, title, location, crew call, shooting call, lunch, wrap, weather, sunrise, sunset, notes, call sheet version and when and by whom it was sent |
+| `shoot_day_items` | Each day's schedule in order: a scene, meal break, company move or note, with an optional time |
+| `shoot_day_calls` | Who is called on each day: call, pickup and makeup times, character, note, and which version they viewed and confirmed |
 | `journal_entries`, `journal_entry_shares` | The project journal and who private entries are shared with |
 
 ## Technologies
@@ -231,8 +276,8 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   styles. Add `sm:` (640px), `md:` (768px) and `lg:` (1024px) only to adapt
   for bigger screens. For example, `flex flex-col gap-3 md:flex-row` stacks on a
   phone and sits side by side on a laptop.
-- **Project pages have a left nav.** A project's areas (Overview, Tasks, Scenes, Locations,
-  Team, Journal) are separate pages under `/projects/:id`, framed by
+- **Project pages have a left nav.** A project's areas (Overview, Tasks, Scenes, Shoot days,
+  Locations, Team, Journal) are separate pages under `/projects/:id`, framed by
   `src/pages/project/ProjectLayout.tsx`: the project's name, and a nav that is a left
   column from `md:` up and a row of tabs (scrolling sideways inside itself) on phones,
   plus links to the company's pages. The layout loads the project, team, roles and
@@ -387,5 +432,5 @@ Checks: `npm run typecheck` (app and API), `npm run test:db` (security rules), `
 2. Companies, projects and people (done)
 3. Roles: manage custom roles per company (done)
 4. Tasks and sub-tasks in a lattice-grid tree, with due times, notes, categories and tags (done)
-5. Scenes and shot lists (done); next shoot days and call sheets
+5. Scenes and shot lists, shoot days and call sheets (done)
 6. Project journal with private, shared and public entries

@@ -8,6 +8,8 @@ import { ProjectJournal, ProjectLayout } from './pages/project/ProjectLayout';
 import { ProjectLocationsPage, ProjectOverview, ProjectTasks } from './pages/project/ProjectOverview';
 import { ProjectTeam } from './pages/project/ProjectTeam';
 import { ProjectScenes } from './pages/project/ProjectScenes';
+import { ProjectShootDays } from './pages/project/ProjectShootDays';
+import { CallSheetPage } from './pages/project/CallSheetPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
 import { TaskSettingsPage } from './pages/TaskSettingsPage';
@@ -32,7 +34,7 @@ export function App() {
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-      <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-surface px-4 py-1">
+      <header className="no-print sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-surface px-4 py-1">
         <Link to="/" className="mr-auto font-bold text-fg no-underline">Movie Production</Link>
         <Link to="/profile" className="btn-link text-sm text-muted no-underline">
           <span className="sm:hidden">Profile</span>
@@ -52,6 +54,8 @@ export function App() {
             <Route index element={<ProjectOverview />} />
             <Route path="tasks" element={<ProjectTasks />} />
             <Route path="scenes" element={<ProjectScenes />} />
+            <Route path="shoot-days" element={<ProjectShootDays />} />
+            <Route path="shoot-days/:dayId" element={<CallSheetPage />} />
             <Route path="locations" element={<ProjectLocationsPage />} />
             <Route path="team" element={<ProjectTeam />} />
             <Route path="journal" element={<ProjectJournal />} />

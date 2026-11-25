@@ -26,6 +26,7 @@ const AREAS = [
   { to: '', label: 'Overview', end: true },
   { to: 'tasks', label: 'Tasks' },
   { to: 'scenes', label: 'Scenes' },
+  { to: 'shoot-days', label: 'Shoot days' },
   { to: 'locations', label: 'Locations' },
   { to: 'team', label: 'Team' },
   { to: 'journal', label: 'Journal' },
@@ -78,7 +79,7 @@ export function ProjectLayout() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
+      <div className="no-print flex flex-col gap-1">
         <p className="text-sm text-muted">
           <Link to="/">Companies</Link> / <Link to={company}>{project.company.name}</Link>
         </p>
