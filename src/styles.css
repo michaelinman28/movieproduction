@@ -88,6 +88,11 @@
 .task-pill-low { color: var(--color-muted); }
 .task-pill-loc-confirmed { border-color: var(--color-accent); color: var(--color-accent-strong); background: var(--color-accent-soft); }
 .task-pill-loc-not_using { color: var(--color-muted); text-decoration: line-through; }
+.task-pill-scene-scheduled { border-color: #b7791f; color: #92400e; background: #fef3c7; }
+.task-pill-scene-shot { border-color: var(--color-accent); color: var(--color-accent-strong); background: var(--color-accent-soft); }
+:root[data-theme='dark'] .task-pill-scene-scheduled { border-color: #d69e2e; color: #fcd34d; background: #3a2a0b; }
+/* A tick box inside a grid cell (a shot's Done): big enough to tap on set. */
+.grid-check { width: 1.25rem; height: 1.25rem; accent-color: var(--color-accent); cursor: pointer; vertical-align: middle; }
 :root[data-theme='dark'] .task-pill-in_progress, :root[data-theme='dark'] .task-pill-high { border-color: #d69e2e; color: #fcd34d; background: #3a2a0b; }
 .task-overdue { color: var(--color-danger); font-weight: 600; }
 
