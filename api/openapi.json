@@ -3390,13 +3390,13 @@
                   "object",
                   "null"
                 ],
-                "description": "Who wrote it (task and scene notes only)."
+                "description": "Who wrote it. For a note kept in a field (shot, shoot day, schedule, call), who last set or changed it; null for ones written before that was recorded."
               }
             ]
           },
           "at": {
             "type": "string",
-            "description": "When the note was written, or when its item was last changed for notes kept in a field."
+            "description": "When the note was written (for a note kept in a field, when it was last set or changed)."
           },
           "edited": {
             "type": "boolean"

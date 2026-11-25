@@ -327,6 +327,7 @@ await expect('outsider cannot add a shot', () => as(U.c, `insert into shots (sce
 await expect('off-project member cannot see shots', () => as(U.d, `select * from shots where scene_id=$1`, [sc.id]), len(0));
 await expect('shot cannot move scene', () => as(U.b, `update shots set scene_id=$1 where id=$2 returning scene_id`, [sc2.id, sh1.id]), r => r[0]?.scene_id === sc.id);
 await expect('mark a shot done and reorder', () => as(U.b, `update shots set done=true, sort_order=3 where id=$1 returning done, sort_order`, [sh1.id]), r => r[0]?.done === true && r[0]?.sort_order === 3);
+await expect('shot note records its writer', () => as(U.a, `update shots set notes='Use the slider' where id=$1 returning note_by`, [sh1.id]), r => r[0]?.note_by === U.a);
 await expect('too long a shot refused', () => as(U.b, `update shots set est_minutes=2000 where id=$1`, [sh1.id]), isErr);
 const [sc3] = await as(U.a, `insert into scenes (project_id,number) values ($1,'20') returning id`, [lp.id]);
 await expect('only the creator or an admin deletes a scene', () => as(U.b, `delete from scenes where id=$1 returning id`, [sc3.id]), len(0));
@@ -377,6 +378,16 @@ await expect('person confirms', async () => { await as(U.b, `select mark_call_sh
 await expect('admin not called cannot confirm', () => as(U.a, `select mark_call_sheet($1,true)`, [day.id]), isErr);
 await expect('new version needs a new confirm', async () => { await as(U.b, `select publish_call_sheet($1)`, [day.id]); return as(U.b, `select d.version, c.confirmed_version from shoot_days d join shoot_day_calls c on c.shoot_day_id=d.id where d.id=$1`, [day.id]); }, r => r[0]?.version === 2 && r[0]?.confirmed_version === 1);
 await expect('editing a day keeps its version', () => as(U.b, `update shoot_days set notes='Rain' where id=$1 returning version`, [day.id]), r => r[0]?.version === 2);
+// who wrote each note kept in a field
+await expect('day note records its writer', () => as(U.b, `select note_by, note_at from shoot_days where id=$1`, [day.id]), r => r[0]?.note_by === U.b && r[0]?.note_at);
+await expect('changing the day note moves it to the new writer', () => as(U.a, `update shoot_days set notes='Rain after 3' where id=$1 returning note_by`, [day.id]), r => r[0]?.note_by === U.a);
+await expect('other day edits keep the note writer', () => as(U.b, `update shoot_days set title='Diner' where id=$1 returning note_by`, [day.id]), r => r[0]?.note_by === U.a);
+await expect('note writer cannot be faked', () => as(U.b, `update shoot_days set note_by=$2 where id=$1 returning note_by`, [day.id, U.b]), r => r[0]?.note_by === U.a);
+await expect('clearing the day note clears its writer', () => as(U.b, `update shoot_days set notes='  ' where id=$1 returning note_by, note_at`, [day.id]), r => r[0]?.note_by === null && r[0]?.note_at === null);
+await expect('schedule note records its writer', () => as(U.b, `insert into shoot_day_items (shoot_day_id,kind,label) values ($1,'note','Quiet on set') returning note_by, note_at`, [day.id]), r => r[0]?.note_by === U.b && r[0]?.note_at);
+await expect('company move is not a note', () => as(U.b, `insert into shoot_day_items (shoot_day_id,kind,label) values ($1,'move','To the park') returning note_by`, [day.id]), r => r[0]?.note_by === null);
+await expect('call note records its writer', () => as(U.a, `update shoot_day_calls set note='Bring boots' where shoot_day_id=$1 returning note_by`, [day.id]), r => r[0]?.note_by === U.a);
+await expect('viewing keeps the call note writer', async () => { await as(U.b, `select mark_call_sheet($1,false)`, [day.id]); return as(U.b, `select note_by from shoot_day_calls where shoot_day_id=$1`, [day.id]); }, r => r[0]?.note_by === U.a);
 // personal call sheet links
 await db.exec(`grant usage on schema public to anon;`);
 async function asAnon(sql, params=[]) {

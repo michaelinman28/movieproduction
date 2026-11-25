@@ -280,8 +280,8 @@ export const ProjectNote = z.object({
   }),
   note_id: Uuid.nullable().openapi({ description: 'The task or scene note\'s id; null for notes kept in a field of another item.' }),
   body: z.string(),
-  author: Profile.nullable().openapi({ description: 'Who wrote it (task and scene notes only).' }),
-  at: z.string().openapi({ description: 'When the note was written, or when its item was last changed for notes kept in a field.' }),
+  author: Profile.nullable().openapi({ description: 'Who wrote it. For a note kept in a field (shot, shoot day, schedule, call), who last set or changed it; null for ones written before that was recorded.' }),
+  at: z.string().openapi({ description: 'When the note was written (for a note kept in a field, when it was last set or changed).' }),
   edited: z.boolean(),
   item: z.object({
     kind: z.enum(['task', 'scene', 'shoot_day']).openapi({ description: 'The page that holds the note' }),

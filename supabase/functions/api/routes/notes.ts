@@ -79,10 +79,10 @@ notes.openapi(createRoute({
   const [tasks, scenes, shots, days, items, calls] = await Promise.all([
     db.from('tasks').select('id, title').eq('project_id', id),
     db.from('scenes').select('id, number, set_name').eq('project_id', id),
-    db.from('shots').select('id, scene_id, sort_order, notes, created_at, updated_at').eq('project_id', id).order('sort_order'),
-    db.from('shoot_days').select('id, shoot_date, title, notes, created_at, updated_at').eq('project_id', id),
-    db.from('shoot_day_items').select('id, shoot_day_id, label, at_time, created_at').eq('project_id', id).eq('kind', 'note'),
-    db.from('shoot_day_calls').select(`shoot_day_id, user_id, note, created_at, profile:profiles(${profileFields})`).eq('project_id', id).not('note', 'is', null),
+    db.from('shots').select('id, scene_id, sort_order, notes, note_by, note_at, updated_at').eq('project_id', id).order('sort_order'),
+    db.from('shoot_days').select('id, shoot_date, title, notes, note_by, note_at, updated_at').eq('project_id', id),
+    db.from('shoot_day_items').select('id, shoot_day_id, label, at_time, note_by, note_at, created_at').eq('project_id', id).eq('kind', 'note'),
+    db.from('shoot_day_calls').select(`shoot_day_id, user_id, note, note_by, note_at, created_at, profile:profiles(${profileFields})`).eq('project_id', id).not('note', 'is', null),
   ]).then((rs) => rs.map((r) => must<Row[]>(r)));
   const taskById = new Map(tasks.map((t: Row) => [t.id, t]));
   const sceneById = new Map(scenes.map((s: Row) => [s.id, s]));
@@ -93,6 +93,10 @@ notes.openapi(createRoute({
     scenes.length ? db.from('scene_notes').select('*').in('scene_id', scenes.map((s: Row) => s.id)) : { data: [], error: null },
   ]).then((rs) => rs.map((r) => must<Row[]>(r)));
   const [taskAuthored, sceneAuthored] = await Promise.all([withAuthors(db, taskNotes), withAuthors(db, sceneNotes)]);
+  // Notes kept in a field record who last wrote them (note_by) and when (note_at).
+  const writerIds = [...new Set([...shots, ...days, ...items, ...calls].map((r: Row) => r.note_by).filter(Boolean))];
+  const writers = new Map((await withAuthors(db, writerIds.map((author_id) => ({ author_id })))).map((w) => [w.author_id, w.author]));
+  const writer = (r: Row) => (r.note_by ? writers.get(r.note_by) ?? null : null);
 
   const out: z.infer<typeof ProjectNote>[] = [];
   for (const n of taskAuthored) {
@@ -115,21 +119,21 @@ notes.openapi(createRoute({
   }
   for (const sh of shots.filter((x: Row) => x.notes)) {
     const s = sceneById.get(sh.scene_id);
-    out.push({ key: `shot:${sh.id}`, source: 'shot', note_id: null, body: sh.notes, author: null, at: sh.updated_at, edited: false,
+    out.push({ key: `shot:${sh.id}`, source: 'shot', note_id: null, body: sh.notes, author: writer(sh), at: sh.note_at ?? sh.updated_at, edited: false,
       item: { kind: 'scene', id: sh.scene_id, label: s ? sceneLabel(s) : 'Scene', detail: `Shot ${shotNumber.get(sh.id)}` } });
   }
   for (const d of days.filter((x: Row) => x.notes)) {
-    out.push({ key: `shoot_day:${d.id}`, source: 'shoot_day', note_id: null, body: d.notes, author: null, at: d.updated_at, edited: false,
+    out.push({ key: `shoot_day:${d.id}`, source: 'shoot_day', note_id: null, body: d.notes, author: writer(d), at: d.note_at ?? d.updated_at, edited: false,
       item: { kind: 'shoot_day', id: d.id, label: dayLabel(d), detail: 'Day notes' } });
   }
   for (const it of items) {
     const d = dayById.get(it.shoot_day_id);
-    out.push({ key: `schedule:${it.id}`, source: 'schedule', note_id: null, body: it.label ?? '', author: null, at: it.created_at, edited: false,
+    out.push({ key: `schedule:${it.id}`, source: 'schedule', note_id: null, body: it.label ?? '', author: writer(it), at: it.note_at ?? it.created_at, edited: false,
       item: { kind: 'shoot_day', id: it.shoot_day_id, label: d ? dayLabel(d) : 'Shoot day', detail: it.at_time ? `Schedule, ${String(it.at_time).slice(0, 5)}` : 'Schedule' } });
   }
   for (const cl of calls) {
     const d = dayById.get(cl.shoot_day_id);
-    out.push({ key: `call:${cl.shoot_day_id}:${cl.user_id}`, source: 'call', note_id: null, body: cl.note, author: null, at: cl.created_at, edited: false,
+    out.push({ key: `call:${cl.shoot_day_id}:${cl.user_id}`, source: 'call', note_id: null, body: cl.note, author: writer(cl), at: cl.note_at ?? cl.created_at, edited: false,
       item: { kind: 'shoot_day', id: cl.shoot_day_id, label: d ? dayLabel(d) : 'Shoot day', detail: `Call for ${personName(cl.profile)}` } });
   }
   out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
