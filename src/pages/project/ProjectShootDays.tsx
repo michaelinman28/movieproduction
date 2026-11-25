@@ -9,7 +9,7 @@ import {
 } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import {
-  NONE, SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, clockLabel, clockValue, displayName, errorText, labelOf, pagesLabel, parseTime, shortDate,
+  NONE, SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, clockLabel, clockValue, displayName, errorText, labelOf, pagesLabel, parseTime, shortDate,
 } from '../../lib/format';
 import type { Role } from '../../lib/database.types';
 import { scrollToForm, useOpenFromLink } from '../../lib/reveal';
@@ -541,8 +541,8 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
 
   const crewCall = clockLabel(day.crew_call);
   const rows = useMemo(() => calls.map((c): CallRow => ({
-    id: c.user_id, name: displayName(c.profile), department: c.character_name ? 'Cast' : departmentOf(c.role_ids, roles),
-    roles: roles.filter((r) => c.role_ids.includes(r.id)).map((r) => r.name).join(', '), character: c.character_name ?? '',
+    id: c.user_id, name: displayName(c.profile), department: castLabel(c) ? 'Cast' : departmentOf(c.role_ids, roles),
+    roles: roles.filter((r) => c.role_ids.includes(r.id)).map((r) => r.name).join(', '), character: castLabel(c),
     call: clockLabel(c.call_time), pickup: clockLabel(c.pickup_time), makeup: clockLabel(c.makeup_time), note: c.note ?? '',
     status: callStatus(day, c),
   })).sort((a, b) => Number(b.department === 'Cast') - Number(a.department === 'Cast') || a.department.localeCompare(b.department) || a.name.localeCompare(b.name)),
@@ -560,7 +560,7 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
       },
       { field: 'department', header: 'Department', width: 130, filter: 'set' },
       { field: 'roles', header: 'Roles', width: 180, filterSplit: ',' },
-      { field: 'character', header: 'Character', width: 130, editable: true },
+      { field: 'character', header: 'Character', width: 150, editable: true, tooltip: () => 'From the Characters page, unless you type one here' },
       { field: 'call', header: 'Call', width: 110, editable: true, render: ({ value }: { value: string }) => gridEsc(value || (crewCall ? `${crewCall} (crew)` : '')) },
       { field: 'pickup', header: 'Pickup', width: 100, editable: true },
       { field: 'makeup', header: 'Makeup', width: 100, editable: true },
@@ -575,7 +575,8 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
     await run(async () => {
       const patch: ShootDayCallInput = {};
       if (timeKey) patch[timeKey] = parseTime(v);
-      else if (e.column === 'character') patch.character_name = v || null;
+      // Blank, or the characters they're cast as, means no typed-in character.
+      else if (e.column === 'character') patch.character_name = v && v !== castLabel({ characters: calls.find((c) => c.user_id === e.data.id)?.characters, character_name: null }) ? v : null;
       else if (e.column === 'note') patch.note = v || null;
       else return;
       return api.setShootDayCall(day.id, e.data.id, patch);
@@ -598,7 +599,7 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
   }
 
   const selected = calls.find((c) => c.user_id === selectedId) ?? null;
-  const cast = calls.filter((c) => c.character_name).length;
+  const cast = calls.filter((c) => castLabel(c)).length;
   const summary = calls.length ? `${calls.length} called${cast ? ` (${cast} cast)` : ''}${day.version ? `, ${day.confirmed} confirmed` : ''}` : undefined;
 
   return (
@@ -683,7 +684,7 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
       </p>
       <form className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-x-4" onSubmit={save}>
         <label className="label">Character (cast only)
-          <input className="field" value={draft.character} maxLength={120} placeholder="Maya" onChange={set('character')} />
+          <input className="field" value={draft.character} maxLength={120} placeholder={castLabel({ ...call, character_name: null }) || 'Maya'} onChange={set('character')} />
         </label>
         <label className="label">Call time
           <input className="field" type="time" value={draft.call} onChange={set('call')} />

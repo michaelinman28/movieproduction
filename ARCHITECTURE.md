@@ -91,6 +91,42 @@ day to day.
   the same project; a shot stays in its scene and takes its project. New scenes and
   shots go to the end of their list. Migration `20261125000000_scenes_shots.sql`.
 
+### Characters
+
+- **Where:** a project's Characters page (`/projects/:id/characters`,
+  `src/pages/project/ProjectCharacters.tsx`).
+- **Fields:** basics (name, cast number, type: lead / supporting / day player /
+  background, age range, gender, description, traits and arc), casting (status: open /
+  auditioning / offered / cast; actor, stand-in and stunt double picked from the
+  project's team), look and continuity (wardrobe, hair and makeup, props, continuity).
+  No photos. Every field is editable in the table and in the form (**Save character**).
+- **Scenes:** one link (`scene_characters`) that both pages edit: the character form's
+  Scenes section and the scene form's Characters picker. Each link has a look note
+  (how they look in that scene). `scenes.characters` (text) is kept in step with the
+  links by the database, so call sheets keep reading it; writing names there (the
+  Scenes table's Characters cell) links those characters and adds any new ones.
+- **Notes and History:** character notes (same rules as scene notes) show on Project
+  notes; admins see the character's History.
+- **Call sheets:** each person's line shows the characters they're cast as (e.g.
+  "Ellie (#1)"), unless a character was typed on their call.
+- **Rules:** names are unique per project (any case) and have no commas; cast numbers
+  are unique per project. The actor, stand-in and double must be on the team; taking
+  someone off the team clears them. Picking an actor marks the character cast.
+  Migration `20261126020000_characters.sql`.
+
+### Dietary needs and team member notes
+
+- **Dietary needs** are per project, on each person's line on the Team page
+  (`project_members.dietary`, `dietary_allergy`), set by company admins or the person
+  themselves (`set_dietary`). The project's call sheet has a Dietary needs box for
+  catering (allergies first, in red); a personal link shows only that person's own;
+  the public shared link never shows them.
+- **Team member notes** (`team_notes`): dated notes about a person on a project, each with
+  a type from the company's list (`team_note_types`, managed by admins in the Team
+  page's Team note types section; seven starter types). Only company admins and the
+  person a note is about can see them; they show on Project notes for those people.
+  Migration `20261126030000_team_notes.sql`.
+
 ### Shoot days and call sheets
 
 - **Where:** a project's Shoot days page (`/projects/:id/shoot-days`,
@@ -317,7 +353,7 @@ There are three layers, and each one can be run and tested by itself.
 | `roles` | Standard roles (`company_id` null) and each company's custom roles |
 | `company_member_roles`, `project_member_roles` | Roles a person holds in the company or on a project |
 | `projects` | Films under a company: status, dates, logline |
-| `project_members` | People assigned to a project |
+| `project_members` | People assigned to a project, with their dietary needs there |
 | `tasks` | Project tasks. `parent_id` makes a sub-task; due date with optional part of day or time |
 | `task_notes` | Notes on a task, with author and time |
 | `scene_notes` | Notes on a scene, with author and time (same rules as task notes) |
@@ -327,6 +363,10 @@ There are three layers, and each one can be run and tested by itself.
 | `shoot_days` | A project's shoot days: date, title, location, crew call, shooting call, lunch, wrap, weather, sunrise, sunset, notes, call sheet version and when and by whom it was sent |
 | `shoot_day_items` | Each day's schedule in order: a scene, meal break, company move or note, with an optional time |
 | `shoot_day_calls` | Who is called on each day: call, pickup and makeup times, character, note, which version they viewed and confirmed, and their personal link token |
+| `characters` | A project's characters: cast number, type, description, age range, gender, traits, casting status, actor / stand-in / stunt double, wardrobe, hair and makeup, props, continuity |
+| `scene_characters` | Which characters are in which scenes, with a look note per scene |
+| `character_notes` | Notes on a character (same rules as scene notes) |
+| `team_note_types`, `team_notes` | Each company's team note types, and notes about people on a project (admins and the person only) |
 | `journal_entries`, `journal_entry_shares` | The project journal and who private entries are shared with |
 
 ## Technologies

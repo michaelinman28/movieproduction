@@ -64,6 +64,22 @@
       "description": "A project's scenes in order: set, interior or exterior, time of day, pages, characters, needs and location"
     },
     {
+      "name": "Characters",
+      "description": "A project's characters: cast number, type, casting (actor, stand-in, stunt double), look and continuity, and the scenes they're in"
+    },
+    {
+      "name": "Character notes",
+      "description": "Any number of notes on a character"
+    },
+    {
+      "name": "Team member notes",
+      "description": "Notes about a person on a project, each with a type. Only company admins and the person see them"
+    },
+    {
+      "name": "Team note types",
+      "description": "Each company's list of team note types, set up by its admins"
+    },
+    {
       "name": "Shots",
       "description": "Each scene's shot list, in shooting order, ticked off on set"
     },
@@ -838,13 +854,27 @@
               "format": "uuid",
               "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
             }
+          },
+          "dietary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Dietary needs on this project, for catering and the call sheet",
+            "example": "Vegetarian"
+          },
+          "dietary_allergy": {
+            "type": "boolean",
+            "description": "Whether the dietary needs are an allergy (shown in red)"
           }
         },
         "required": [
           "user_id",
           "joined_at",
           "profile",
-          "role_ids"
+          "role_ids",
+          "dietary",
+          "dietary_allergy"
         ]
       },
       "ProjectMemberAdd": {
@@ -886,6 +916,27 @@
         },
         "required": [
           "email"
+        ]
+      },
+      "DietaryInput": {
+        "type": "object",
+        "properties": {
+          "needs": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "Blank clears it",
+            "example": "Peanut allergy"
+          },
+          "allergy": {
+            "type": "boolean",
+            "description": "Show it as an allergy"
+          }
+        },
+        "required": [
+          "needs"
         ]
       },
       "Task": {
@@ -1955,7 +2006,8 @@
               "string",
               "null"
             ],
-            "example": "Maya, Leo, Waitress"
+            "example": "Maya, Leo, Waitress",
+            "description": "The names of the scene's characters, by cast number. Kept in step with character_ids."
           },
           "needs": {
             "type": [
@@ -2004,6 +2056,15 @@
           "est_minutes": {
             "type": "integer",
             "description": "The shots' estimated minutes added up"
+          },
+          "character_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "description": "The characters in the scene (see Characters). `characters` holds their names."
           }
         },
         "required": [
@@ -2025,7 +2086,8 @@
           "updated_at",
           "shots",
           "shots_done",
-          "est_minutes"
+          "est_minutes",
+          "character_ids"
         ]
       },
       "SceneIntExt": {
@@ -2104,7 +2166,8 @@
               "string",
               "null"
             ],
-            "maxLength": 1000
+            "maxLength": 1000,
+            "description": "Character names, comma-separated. They become the scene's characters; names the project doesn't have yet are added as new characters."
           },
           "needs": {
             "type": [
@@ -2197,7 +2260,8 @@
               "string",
               "null"
             ],
-            "maxLength": 1000
+            "maxLength": 1000,
+            "description": "Character names, comma-separated. They become the scene's characters; names the project doesn't have yet are added as new characters."
           },
           "needs": {
             "type": [
@@ -2464,6 +2528,651 @@
               "null"
             ],
             "maxLength": 2000
+          }
+        }
+      },
+      "Character": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "name": {
+            "type": "string",
+            "example": "Ellie"
+          },
+          "cast_number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The cast number on call sheets; 1 is usually the lead",
+            "example": 1
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CharacterKind"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "A drone photographer who loses everything in one afternoon"
+          },
+          "age_range": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "30s"
+          },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Female"
+          },
+          "traits": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Traits and arc",
+            "example": "Stubborn, funny; learns to ask for help"
+          },
+          "casting_status": {
+            "$ref": "#/components/schemas/CastingStatus"
+          },
+          "actor_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "Someone on the project's team. Picking an actor marks the character cast."
+          },
+          "stand_in_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "double_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "Stunt double"
+          },
+          "wardrobe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hair_makeup": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "props": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "continuity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CharacterScene"
+            },
+            "description": "The scenes they're in"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "cast_number",
+          "kind",
+          "description",
+          "age_range",
+          "gender",
+          "traits",
+          "casting_status",
+          "actor_id",
+          "stand_in_id",
+          "double_id",
+          "wardrobe",
+          "hair_makeup",
+          "props",
+          "continuity",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "scenes"
+        ]
+      },
+      "CharacterKind": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "enum": [
+          "lead",
+          "supporting",
+          "day_player",
+          "background",
+          null
+        ]
+      },
+      "CastingStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "auditioning",
+          "offered",
+          "cast"
+        ]
+      },
+      "CharacterScene": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "look_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How they look in this scene",
+            "example": "Jacket torn, mud on face"
+          }
+        },
+        "required": [
+          "scene_id",
+          "look_note"
+        ]
+      },
+      "CharacterInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^,]*$",
+            "example": "Ellie"
+          },
+          "cast_number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 9999
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CharacterKind"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "age_range": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
+          },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
+          },
+          "traits": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "casting_status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CastingStatus"
+              },
+              {
+                "description": "Defaults to open"
+              }
+            ]
+          },
+          "actor_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "stand_in_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "double_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "wardrobe": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "hair_makeup": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "props": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "continuity": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CharacterUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^,]*$",
+            "example": "Ellie"
+          },
+          "cast_number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 9999
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CharacterKind"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "age_range": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
+          },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
+          },
+          "traits": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "casting_status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CastingStatus"
+              },
+              {
+                "description": "Defaults to open"
+              }
+            ]
+          },
+          "actor_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "stand_in_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "double_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "wardrobe": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "hair_makeup": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "props": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "continuity": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          }
+        }
+      },
+      "IdsInput": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "maxItems": 1000,
+            "description": "The full list; anything not listed is removed"
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "LookNoteInput": {
+        "type": "object",
+        "properties": {
+          "look_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          }
+        }
+      },
+      "CharacterNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "author": {
+            "$ref": "#/components/schemas/Profile"
+          },
+          "body": {
+            "type": "string",
+            "example": "Has a scar on her left hand; keep it visible in close-ups."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "character_id",
+          "author_id",
+          "author",
+          "body",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "TeamNoteType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "company_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "name": {
+            "type": "string",
+            "example": "Travel"
+          },
+          "sort_order": {
+            "type": "integer"
+          },
+          "notes": {
+            "type": "integer",
+            "description": "How many notes use it (admins only; 0 for others)"
+          }
+        },
+        "required": [
+          "id",
+          "company_id",
+          "name",
+          "sort_order",
+          "notes"
+        ]
+      },
+      "TeamNoteTypeInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "example": "Travel"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "TeamNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "Who the note is about"
+          },
+          "type_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "author": {
+            "$ref": "#/components/schemas/Profile"
+          },
+          "body": {
+            "type": "string",
+            "example": "Flies in Dec 6, needs a pickup from the airport."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "user_id",
+          "type_id",
+          "author_id",
+          "author",
+          "body",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "TeamNoteInput": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "type_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "TeamNoteUpdate": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "type_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
           }
         }
       },
@@ -3065,6 +3774,47 @@
               "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
             },
             "description": "Their project roles"
+          },
+          "characters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "cast_number": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "cast_number"
+              ]
+            },
+            "description": "The characters they play (from Characters)"
+          },
+          "dietary": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "needs": {
+                "type": "string"
+              },
+              "allergy": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "needs",
+              "allergy"
+            ],
+            "description": "Their dietary needs on the project, if any"
           }
         },
         "required": [
@@ -3083,7 +3833,9 @@
           "link_token",
           "created_at",
           "profile",
-          "role_ids"
+          "role_ids",
+          "characters",
+          "dietary"
         ]
       },
       "ShootDayCallInput": {
@@ -3231,7 +3983,7 @@
           "calls": {
             "type": "array",
             "items": {},
-            "description": "Everyone called: their call, character, pickup, makeup, note, name, nickname, phone and role ids (no emails)"
+            "description": "Everyone called: their call, character, the characters they play, pickup, makeup, note, name, nickname, phone and role ids (no emails). On a personal link, the reader's own call also has their dietary needs."
           },
           "roles": {
             "type": "array",
@@ -3356,7 +4108,7 @@
           "calls": {
             "type": "array",
             "items": {},
-            "description": "Everyone called: their call, character, pickup, makeup, note, name, nickname, phone and role ids (no emails)"
+            "description": "Everyone called: their call, character, the characters they play, pickup, makeup, note, name, nickname, phone and role ids (no emails). On a personal link, the reader's own call also has their dietary needs."
           },
           "roles": {
             "type": "array",
@@ -3511,9 +4263,11 @@
               "shot",
               "shoot_day",
               "schedule",
-              "call"
+              "call",
+              "character",
+              "team"
             ],
-            "description": "Where the note was taken: a task's or scene's notes, a shot's Notes field, a shoot day's Notes, a note in a day's schedule, or the note on someone's call."
+            "description": "Where the note was taken: a task's, scene's or character's notes, a shot's Notes field, a shoot day's Notes, a note in a day's schedule, or the note on someone's call."
           },
           "note_id": {
             "type": [
@@ -3522,7 +4276,7 @@
             ],
             "format": "uuid",
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
-            "description": "The task or scene note's id; null for notes kept in a field of another item."
+            "description": "The task, scene or character note's id; null for notes kept in a field of another item."
           },
           "body": {
             "type": "string"
@@ -3556,7 +4310,9 @@
                 "enum": [
                   "task",
                   "scene",
-                  "shoot_day"
+                  "shoot_day",
+                  "character",
+                  "team_member"
                 ],
                 "description": "The page that holds the note"
               },
@@ -5628,6 +6384,87 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/members/{userId}/dietary": {
+      "put": {
+        "tags": [
+          "Project team"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set someone's dietary needs on a project (company admins, or the person themselves)",
+        "description": "Shown on the call sheet for catering, and on that person's own call sheet link. Never on the shared link.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DietaryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
           },
           "400": {
             "description": "Invalid request, or a rule in the database refused it",
@@ -7994,6 +8831,1249 @@
         }
       }
     },
+    "/projects/{id}/characters": {
+      "get": {
+        "tags": [
+          "Characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The project's characters, by cast number then name, with their scenes",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Character"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a character (anyone on the project)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Character"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/{id}": {
+      "patch": {
+        "tags": [
+          "Characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Change a character (anyone on the project)",
+        "description": "The actor, stand-in and stunt double must be on the project's team. Picking an actor for a character that isn't cast yet marks it cast, unless casting_status is sent too.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Character"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a character, taking it out of its scenes (whoever added it, or a company admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/{id}/scenes": {
+      "put": {
+        "tags": [
+          "Characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set the scenes a character is in",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Character"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scenes/{id}/characters": {
+      "put": {
+        "tags": [
+          "Characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set the characters in a scene",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scenes/{id}/characters/{characterId}": {
+      "patch": {
+        "tags": [
+          "Characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set how a character looks in one scene (the look note)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+              "description": "The scene"
+            },
+            "required": true,
+            "description": "The scene",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "characterId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookNoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/{id}/notes": {
+      "get": {
+        "tags": [
+          "Character notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Notes on a character, oldest first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CharacterNote"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Character notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a note to a character",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskNoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/character-notes/{id}": {
+      "patch": {
+        "tags": [
+          "Character notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Edit your own character note",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskNoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Character notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a character note (its author, or a company admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{id}/team-note-types": {
+      "get": {
+        "tags": [
+          "Team note types"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The company's team note types, in order, with how many notes use each (admins)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TeamNoteType"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Team note types"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a team note type (company admins)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamNoteTypeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamNoteType"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/team-note-types/{id}": {
+      "patch": {
+        "tags": [
+          "Team note types"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Rename a team note type (company admins)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamNoteTypeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Renamed"
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Team note types"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a team note type (company admins); its notes stay, with no type",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/members/{userId}/notes": {
+      "get": {
+        "tags": [
+          "Team member notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Notes about someone on a project, oldest first (company admins and that person)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TeamNote"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Team member notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a note about someone on a project (company admins, or the person about themselves)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamNoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/team-notes/{id}": {
+      "patch": {
+        "tags": [
+          "Team member notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Edit your own team note, or change its type",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamNoteUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Team member notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a team note (its author, or a company admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{id}/shoot-days": {
       "get": {
         "tags": [
@@ -9541,7 +11621,7 @@
           }
         ],
         "summary": "Every note on the project, newest first",
-        "description": "Task notes, scene notes, shot notes, shoot day notes, notes in a day's schedule and notes on people's calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.",
+        "description": "Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, shoot day notes, notes in a day's schedule and notes on people's calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.",
         "parameters": [
           {
             "schema": {

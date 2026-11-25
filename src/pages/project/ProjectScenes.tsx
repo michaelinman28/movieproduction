@@ -5,7 +5,8 @@ import { SceneNotes } from '../../components/Notes';
 import { itemPath } from '../../lib/links';
 import { Section } from '../../components/Section';
 import { ItemHistory } from '../../components/ItemHistory';
-import { api, type Location, type Scene, type SceneInput, type Shot, type ShotInput } from '../../lib/api';
+import { TagPicker } from '../../components/TagPicker';
+import { api, type Character, type Location, type Scene, type SceneInput, type Shot, type ShotInput } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import {
   NONE, SCENE_INT_EXT, SCENE_STATUSES, SCENE_TIMES, SHOT_ANGLES, SHOT_MOVEMENTS, SHOT_SIZES,
@@ -61,6 +62,7 @@ export function ProjectScenes() {
   const { session } = useAuth();
   const me = session?.user.id;
   const [scenes, setScenes] = useState<Scene[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newNumber, setNewNumber] = useState('');
@@ -70,7 +72,11 @@ export function ProjectScenes() {
   const gridRef = useRef<LatticeGridInstance<SceneRow> | null>(null);
 
   const load = useCallback(async () => {
-    try { setScenes(await api.scenes(projectId)); } catch (e) { setError(errorText(e)); }
+    try {
+      const [s, c] = await Promise.all([api.scenes(projectId), api.characters(projectId)]);
+      setScenes(s);
+      setCharacters(c);
+    } catch (e) { setError(errorText(e)); }
     setLoaded(true);
   }, [projectId]);
   useEffect(() => { load(); }, [load]);
@@ -98,7 +104,11 @@ export function ProjectScenes() {
       { field: 'time_of_day', header: 'D/N', width: 100, editable: true, editor: 'select', editorOptions: withNone(SCENE_TIMES.map((x) => x.label)), render: dd },
       { field: 'pages', header: 'Pages', width: 90, editable: true },
       { field: 'synopsis', header: 'Synopsis', width: 260, editable: true, editor: 'textarea' },
-      { field: 'characters', header: 'Characters', width: 200, editable: true, filterSplit: ',' },
+      {
+        // Comma-separated; new names are added as characters on the Characters page.
+        field: 'characters', header: 'Characters', width: 200, editable: true, filterSplit: ',',
+        tooltip: () => 'Separate characters with commas. New names are added as characters.',
+      },
       {
         field: 'location', header: 'Location', width: 170, editable: true, editor: 'select', editorOptions: withNone(locationNames),
         render: ({ value, data }: { value: string; data: SceneRow }) => gridDropdown(gridEsc(value || NONE),
@@ -185,7 +195,7 @@ export function ProjectScenes() {
             selectionChanged: (r: SceneRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
           }} />
         {selected && (
-          <ScenePanel key={selected.id} scene={selected} locations={locations} run={run}
+          <ScenePanel key={selected.id} scene={selected} locations={locations} characters={characters} run={run} reloadCharacters={load}
             isAdmin={isAdmin} canDelete={isAdmin || selected.created_by === me} onDeleted={() => setSelectedId(null)} onShotsChanged={load} />
         )}
       </div>
@@ -199,38 +209,52 @@ export function ProjectScenes() {
   );
 }
 
-function ScenePanel({ scene, locations, run, isAdmin, canDelete, onDeleted, onShotsChanged }: {
-  scene: Scene; locations: Location[]; run: Run; isAdmin: boolean; canDelete: boolean; onDeleted: () => void; onShotsChanged: () => Promise<void>;
+function ScenePanel({ scene, locations, characters, run, reloadCharacters, isAdmin, canDelete, onDeleted, onShotsChanged }: {
+  scene: Scene; locations: Location[]; characters: Character[]; run: Run; reloadCharacters: () => Promise<void>;
+  isAdmin: boolean; canDelete: boolean; onDeleted: () => void; onShotsChanged: () => Promise<void>;
 }) {
   const { project } = useProject();
   // Every field here is held until Save.
   const initial = useMemo(() => ({
     number: scene.number, set_name: scene.set_name ?? '', int_ext: scene.int_ext ?? '', time_of_day: scene.time_of_day ?? '',
-    pages: pagesLabel(scene.pages_eighths), synopsis: scene.synopsis ?? '', characters: scene.characters ?? '', needs: scene.needs ?? '',
+    pages: pagesLabel(scene.pages_eighths), synopsis: scene.synopsis ?? '', needs: scene.needs ?? '',
     location_id: scene.location_id ?? '', status: scene.status as string,
   }), [scene]);
   type Draft = typeof initial;
   const [draft, setDraft] = useState(initial);
   const keys = Object.keys(initial) as (keyof Draft)[];
-  const changed = keys.some((k) => draft[k].trim() !== initial[k]);
+  const initialCast = scene.character_ids;
+  const [cast, setCast] = useState(initialCast);
+  const castChanged = cast.length !== initialCast.length || cast.some((id) => !initialCast.includes(id));
+  const changed = keys.some((k) => draft[k].trim() !== initial[k]) || castChanged;
   useUnsaved(changed);
   // Show changes made in the table unless something here is unsaved.
-  useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!changed) { setDraft(initial); setCast(initialCast); } }, [initial, initialCast]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k: keyof Draft) => (e: { target: { value: string } }) => setDraft({ ...draft, [k]: e.target.value });
+
+  // A new character is added to the project straight away; it goes in this scene when you save.
+  async function createCharacter(name: string) {
+    try {
+      const made = await api.createCharacter(scene.project_id, { name });
+      await reloadCharacters();
+      return made;
+    } catch (e) { window.alert(errorText(e)); return null; }
+  }
 
   async function save(e: FormEvent) {
     e.preventDefault();
     const d = Object.fromEntries(keys.map((k) => [k, draft[k].trim()])) as Draft;
-    if (await run(() => {
+    if (await run(async () => {
       const patch: SceneInput = {};
       if (d.number !== initial.number) { if (!d.number) throw new Error('A scene needs a number.'); patch.number = d.number; }
-      for (const k of ['set_name', 'synopsis', 'characters', 'needs'] as const) if (d[k] !== initial[k]) patch[k] = d[k] || null;
+      for (const k of ['set_name', 'synopsis', 'needs'] as const) if (d[k] !== initial[k]) patch[k] = d[k] || null;
       if (d.int_ext !== initial.int_ext) patch.int_ext = (d.int_ext || null) as SceneIntExt | null;
       if (d.time_of_day !== initial.time_of_day) patch.time_of_day = (d.time_of_day || null) as SceneTime | null;
       if (d.location_id !== initial.location_id) patch.location_id = d.location_id || null;
       if (d.status !== initial.status) patch.status = d.status as SceneStatus;
       if (d.pages !== initial.pages) patch.pages_eighths = parsePages(d.pages);
-      return api.updateScene(scene.id, patch);
+      if (Object.keys(patch).length) await api.updateScene(scene.id, patch);
+      if (castChanged) await api.setSceneCharacters(scene.id, cast);
     }, `Saved scene ${d.number}.`)) setDraft(d);
   }
 
@@ -284,9 +308,17 @@ function ScenePanel({ scene, locations, run, isAdmin, canDelete, onDeleted, onSh
           <label className="label md:col-span-2">Synopsis
             <textarea className="field" rows={2} value={draft.synopsis} maxLength={1000} placeholder="Maya confronts Leo about the money" onChange={set('synopsis')} />
           </label>
-          <label className="label md:col-span-2">Characters
-            <input className="field" value={draft.characters} maxLength={1000} placeholder="Maya, Leo, Waitress" onChange={set('characters')} />
-          </label>
+          <div className="label md:col-span-2">Characters
+            <TagPicker tags={characters} selected={cast} onChange={setCast} onCreate={createCharacter} noun="character" listLabel="Characters in this scene" maxLength={100} />
+            {cast.length > 0 && (
+              <span className="flex flex-wrap gap-x-4">
+                {cast.map((id) => {
+                  const ch = characters.find((x) => x.id === id);
+                  return ch ? <OpenLink key={id} to={itemPath.character(scene.project_id, id)}>Open {ch.name}</OpenLink> : null;
+                })}
+              </span>
+            )}
+          </div>
           <label className="label md:col-span-2">Needs
             <textarea className="field" rows={2} value={draft.needs} maxLength={2000} placeholder="Props, wardrobe, vehicles, effects" onChange={set('needs')} />
           </label>

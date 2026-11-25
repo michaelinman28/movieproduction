@@ -350,6 +350,82 @@ await expect('member cannot delete someone else\'s scene note', () => as(U.b, `d
 await expect('admin can delete a scene note', () => as(U.a, `delete from scene_notes where id=$1 returning id`, [sn.id]), len(1));
 await expect('deleting a scene deletes its shots', async () => { await as(U.b, `delete from scenes where id=$1`, [sc.id]); return as(U.a, `select * from shots where scene_id=$1`, [sc.id]); }, len(0));
 await expect('deleting a scene deletes its notes', () => as(U.a, `select * from scene_notes where scene_id=$1`, [sc.id]), len(0));
+// characters
+const [chp] = await as(U.a, `insert into projects (company_id,name) values ($1,'Character Film') returning id`, [cc.id]);
+await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2),($1,$3)`, [chp.id, U.b, U.d]);
+const [ch1] = await as(U.b, `insert into characters (project_id,name,cast_number,kind,age_range) values ($1,'  Ellie ',1,'lead',' 30s ') returning *`, [chp.id]);
+await expect('member adds a character, tidied, open for casting', () => Promise.resolve([ch1]), r => r[0].name === 'Ellie' && r[0].age_range === '30s' && r[0].casting_status === 'open' && r[0].created_by === U.b);
+await expect('duplicate character name refused', () => as(U.b, `insert into characters (project_id,name) values ($1,'ellie')`, [chp.id]), isErr);
+await expect('duplicate cast number refused', () => as(U.b, `insert into characters (project_id,name,cast_number) values ($1,'Mark',1)`, [chp.id]), isErr);
+await expect('comma in a name refused', () => as(U.b, `insert into characters (project_id,name) values ($1,'Mark, Jr')`, [chp.id]), isErr);
+await expect('outsider cannot add a character', () => as(U.c, `insert into characters (project_id,name) values ($1,'Nope')`, [chp.id]), isErr);
+await expect('off-project person cannot see characters', () => as(U.d, `select * from characters where project_id=$1`, [lp.id]), len(0));
+await expect('actor must be on the team', () => as(U.b, `update characters set actor_id=$1 where id=$2`, [U.c, ch1.id]), isErr);
+await expect('picking an actor marks the character cast', () => as(U.b, `update characters set actor_id=$1 where id=$2 returning casting_status`, [U.d, ch1.id]), r => r[0]?.casting_status === 'cast');
+await expect('status can still be set by hand', () => as(U.b, `update characters set casting_status='offered' where id=$1 returning casting_status`, [ch1.id]), r => r[0]?.casting_status === 'offered');
+await expect('character cannot move project', () => as(U.b, `update characters set project_id=$1 where id=$2 returning project_id`, [lp.id, ch1.id]), r => r[0]?.project_id === chp.id);
+// scene links, from the scene's Characters text and from links
+const [chs] = await as(U.b, `insert into scenes (project_id,number,characters) values ($1,'1','Mark, ellie , Ranger Dale') returning id`, [chp.id]);
+await expect('names in a scene link characters, adding new ones', () => as(U.b, `select c.name from scene_characters l join characters c on c.id=l.character_id where l.scene_id=$1 order by c.name`, [chs.id]),
+  r => r.map((x) => x.name).join('|') === 'Ellie|Mark|Ranger Dale');
+await expect('the scene shows the names by cast number, then name', () => as(U.b, `select characters from scenes where id=$1`, [chs.id]), r => r[0]?.characters === 'Ellie, Mark, Ranger Dale');
+const [mark] = await as(U.b, `select id from characters where project_id=$1 and name='Mark'`, [chp.id]);
+await expect('new characters are added by whoever typed them', () => as(U.b, `select created_by from characters where id=$1`, [mark.id]), r => r[0]?.created_by === U.b);
+await expect('a look note on a link', () => as(U.b, `update scene_characters set look_note=' Muddy jacket ' where scene_id=$1 and character_id=$2 returning look_note`, [chs.id, ch1.id]), r => r[0]?.look_note === 'Muddy jacket');
+await as(U.b, `update scenes set characters='Ellie' where id=$1`, [chs.id]);
+await expect('removing names removes links, keeps the rest and their notes', () => as(U.b, `select look_note from scene_characters where scene_id=$1`, [chs.id]), r => r.length === 1 && r[0].look_note === 'Muddy jacket');
+await expect('removed names stay as characters', () => as(U.b, `select count(*)::int n from characters where project_id=$1`, [chp.id]), r => r[0].n === 3);
+await as(U.b, `insert into scene_characters (scene_id,character_id) values ($1,$2)`, [chs.id, mark.id]);
+await expect('a link added from the character updates the scene', () => as(U.b, `select characters from scenes where id=$1`, [chs.id]), r => r[0]?.characters === 'Ellie, Mark');
+await as(U.b, `update characters set name='Marcus', cast_number=2 where id=$1`, [mark.id]);
+await expect('renaming a character renames it in its scenes', () => as(U.b, `select characters from scenes where id=$1`, [chs.id]), r => r[0]?.characters === 'Ellie, Marcus');
+const [otherCh] = await as(U.b, `insert into characters (project_id,name) values ($1,'Waitress') returning id`, [lp.id]);
+await expect('character from another project refused', () => as(U.b, `insert into scene_characters (scene_id,character_id) values ($1,$2)`, [chs.id, otherCh.id]), isErr);
+await expect('outsider cannot link', () => as(U.c, `insert into scene_characters (scene_id,character_id) values ($1,$2)`, [chs.id, otherCh.id]), isErr);
+// notes
+const [chn] = await as(U.b, `insert into character_notes (character_id,body) values ($1,' Has a scar on her left hand ') returning *`, [ch1.id]);
+await expect('character note tidied', () => Promise.resolve([chn]), r => r[0].body === 'Has a scar on her left hand' && r[0].author_id === U.b);
+await expect('only the author edits a character note', () => as(U.d, `update character_notes set body='x' where id=$1 returning id`, [chn.id]), len(0));
+await expect('outsider cannot read character notes', () => as(U.c, `select * from character_notes`), len(0));
+await expect('member cannot delete someone else\'s character', () => as(U.d, `delete from characters where id=$1 returning id`, [ch1.id]), len(0));
+await expect('character changes are logged', () => as(U.a, `select table_name from audit_log where project_id=$1 and table_name in ('characters','scene_characters','character_notes')`, [chp.id]),
+  r => ['characters', 'scene_characters', 'character_notes'].every((t) => r.some((x) => x.table_name === t)));
+await as(U.a, `delete from project_members where project_id=$1 and user_id=$2`, [chp.id, U.d]);
+await expect('taking the actor off the team clears them', () => as(U.b, `select actor_id, casting_status from characters where id=$1`, [ch1.id]), r => r[0]?.actor_id === null && r[0]?.casting_status === 'offered');
+await as(U.a, `delete from characters where id=$1`, [ch1.id]);
+await expect('deleting a character removes it from its scenes', () => as(U.b, `select characters from scenes where id=$1`, [chs.id]), r => r[0]?.characters === 'Marcus');
+await expect('and its notes are logged against it', () => as(U.a, `select project_id from audit_log where table_name='character_notes' and action='delete'`), r => r.length === 1 && r[0].project_id === chp.id);
+// dietary needs and team member notes
+const [tnp] = await as(U.a, `insert into projects (company_id,name) values ($1,'Notes Film') returning id`, [cc.id]);
+await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2),($1,$3)`, [tnp.id, U.b, U.d]);
+await expect('the person sets their own dietary needs', () => as(U.b, `select set_dietary($1,$2,'  Vegetarian ',false)`, [tnp.id, U.b]), ok);
+await expect('stored tidied', () => as(U.d, `select dietary, dietary_allergy from project_members where project_id=$1 and user_id=$2`, [tnp.id, U.b]), r => r[0]?.dietary === 'Vegetarian' && r[0]?.dietary_allergy === false);
+await expect('someone else on the team cannot set them', () => as(U.d, `select set_dietary($1,$2,'Vegan',false)`, [tnp.id, U.b]), isErr);
+await expect('an admin can set anyone\'s', () => as(U.a, `select set_dietary($1,$2,'Peanut allergy',true)`, [tnp.id, U.d]), ok);
+await expect('blank needs clear the allergy flag', async () => { await as(U.a, `select set_dietary($1,$2,'  ',true)`, [tnp.id, U.b]); return as(U.b, `select dietary, dietary_allergy from project_members where project_id=$1 and user_id=$2`, [tnp.id, U.b]); }, r => r[0]?.dietary === null && r[0]?.dietary_allergy === false);
+await expect('outsiders cannot set dietary needs', () => as(U.c, `select set_dietary($1,$2,'x',false)`, [tnp.id, U.c]), isErr);
+await expect('direct edits by members are refused', () => as(U.b, `update project_members set dietary='x' where project_id=$1 and user_id=$2 returning user_id`, [tnp.id, U.b]), len(0));
+const types = await as(U.b, `select id, name from team_note_types where company_id=$1 order by sort_order`, [cc.id]);
+await expect('each company starts with note types', () => Promise.resolve(types), r => r.length === 7 && r[0].name === 'General');
+await expect('members cannot add note types', () => as(U.b, `insert into team_note_types (company_id,name) values ($1,'Pets')`, [cc.id]), isErr);
+await expect('admins add note types', () => as(U.a, `insert into team_note_types (company_id,name) values ($1,' Pets ') returning name`, [cc.id]), r => r[0]?.name === 'Pets');
+const travel = types.find((t) => t.name === 'Travel');
+const [tn1] = await as(U.a, `insert into team_notes (project_id,user_id,type_id,body) values ($1,$2,$3,' Flies in Dec 6 ') returning *`, [tnp.id, U.d, travel.id]);
+await expect('admin adds a note about someone', () => Promise.resolve([tn1]), r => r[0].body === 'Flies in Dec 6' && r[0].author_id === U.a);
+await expect('the person sees notes about them', () => as(U.d, `select * from team_notes`), len(1));
+await expect('others on the team do not', () => as(U.b, `select * from team_notes`), len(0));
+await expect('members cannot add notes about others', () => as(U.b, `insert into team_notes (project_id,user_id,body) values ($1,$2,'x')`, [tnp.id, U.d]), isErr);
+await expect('a person adds a note about themselves', () => as(U.b, `insert into team_notes (project_id,user_id,body) values ($1,$2,'Out on Dec 8 afternoon') returning id`, [tnp.id, U.b]), len(1));
+await expect('the person cannot edit the admin\'s note', () => as(U.d, `update team_notes set body='x' where id=$1 returning id`, [tn1.id]), len(0));
+await expect('or delete it', () => as(U.d, `delete from team_notes where id=$1 returning id`, [tn1.id]), len(0));
+const [otherCo] = await as(U.c, `insert into companies (name) values ('Other Co') returning id`);
+const [otherType] = await as(U.c, `select id from team_note_types where company_id=$1 limit 1`, [otherCo.id]);
+await expect('a note type from another company is refused', () => as(U.a, `update team_notes set type_id=$1 where id=$2`, [otherType.id, tn1.id]), isErr);
+await expect('team notes are logged', () => as(U.a, `select subject_user_id from audit_log where table_name='team_notes' and action='insert' and project_id=$1`, [tnp.id]), r => r.length === 2);
+await as(U.a, `delete from team_note_types where id=$1`, [travel.id]);
+await expect('deleting a type keeps its notes', () => as(U.a, `select type_id from team_notes where id=$1`, [tn1.id]), r => r.length === 1 && r[0].type_id === null);
+await as(U.a, `delete from project_members where project_id=$1 and user_id=$2`, [tnp.id, U.d]);
+await expect('taking someone off the project removes notes about them', () => as(U.a, `select * from team_notes where user_id=$1`, [U.d]), len(0));
 // shoot days and call sheets
 const [sdLoc] = await as(U.b, `insert into project_locations (project_id,name,parking,nearest_hospital) values ($1,'Diner',' Lot behind ','  St. Mary ER ') returning *`, [lp.id]);
 await expect('location parking and hospital tidied', () => Promise.resolve([sdLoc]), r => r[0].parking === 'Lot behind' && r[0].nearest_hospital === 'St. Mary ER');
@@ -406,6 +482,10 @@ await expect('opening the link counts as viewed', () => as(U.b, `select viewed_v
 await expect('sheet says not confirmed yet', () => Promise.resolve(sheetRow.s), s => s.confirmed === false);
 await expect('confirm from the link without signing in', async () => { await asAnon(`select confirm_call_sheet_link($1)`, [bCall.link_token]); return as(U.b, `select confirmed_version from shoot_day_calls where shoot_day_id=$1`, [day.id]); }, r => r[0]?.confirmed_version === 2);
 await expect('sheet then shows confirmed', () => asAnon(`select call_sheet_for_link($1) s`, [bCall.link_token]), r => r[0]?.s?.confirmed === true);
+await as(U.b, `select set_dietary($1,$2,'Shellfish allergy',true)`, [lp.id, U.b]);
+await as(U.b, `update characters set cast_number=1, actor_id=$2 where project_id=$1 and name='Maya'`, [lp.id, U.b]);
+await expect('a personal link shows the reader\'s characters and own dietary needs', () => asAnon(`select call_sheet_for_link($1) s`, [bCall.link_token]),
+  r => { const me = r[0]?.s?.calls?.find((c) => c.user_id === U.b); return me?.characters?.[0]?.name === 'Maya' && me.characters[0].cast_number === 1 && me.dietary?.needs === 'Shellfish allergy' && me.dietary.allergy === true; });
 await expect('unknown link cannot confirm', () => asAnon(`select confirm_call_sheet_link(gen_random_uuid())`), isErr);
 await expect('unknown link shows nothing', () => asAnon(`select call_sheet_for_link(gen_random_uuid()) s`), r => r[0]?.s === null);
 const [day2] = await as(U.a, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-03-13') returning id`, [lp.id]);
@@ -480,6 +560,7 @@ await expect('turning it on again keeps the same link', () => as(U.c, `select sh
 await as(U.a, `update profiles set phone='9195550111' where id=$1`, [U.c]);
 const [slShared] = await asAnon(`select call_sheet_for_share($1) s`, [slSh1.t]);
 await expect('the shared link opens the whole sheet without signing in', () => Promise.resolve(slShared.s), s => s?.day?.version === 1 && s.calls.length === 1 && s.project.name === 'Audit Film' && s.me === undefined);
+await expect('it never shows dietary needs', () => Promise.resolve(JSON.stringify(slShared.s)), s => !s.includes('dietary') && s.includes('"characters":'));
 await expect('it shows no emails, and no phones by default', () => Promise.resolve(JSON.stringify(slShared.s)), s => !s.includes('@x.com') && !s.includes('919-555-0111') && s.includes('"phones":false'));
 await expect('opening it is not counted as anyone viewing', () => as(U.c, `select viewed_version from shoot_day_calls where shoot_day_id=$1`, [aday.id]), r => r[0]?.viewed_version === 1);
 await expect('opening it is logged as a shared link view', () => as(U.a, `select * from audit_log where action='view' and row_key=$1 and detail like '%shared link'`, [aday.id]), r => r.length === 1 && r[0].actor_id === null);

@@ -10,6 +10,8 @@ import { useProject } from './ProjectLayout';
 export const NOTE_SOURCES: Record<NoteSource, string> = {
   task: 'Task notes',
   scene: 'Scene notes',
+  character: 'Character notes',
+  team: 'Team member notes',
   shot: 'Shot list',
   shoot_day: 'Shoot day',
   schedule: 'Day schedule',
@@ -33,6 +35,8 @@ function linkFor(projectId: string, n: ProjectNote) {
   switch (n.item.kind) {
     case 'task': return { to: itemPath.task(projectId, n.item.id), page: 'Tasks' };
     case 'scene': return { to: itemPath.scene(projectId, n.item.id), page: 'Scenes' };
+    case 'character': return { to: itemPath.character(projectId, n.item.id), page: 'Characters' };
+    case 'team_member': return { to: itemPath.teamMember(projectId, n.item.id), page: 'Team' };
     default: return { to: itemPath.shootDay(projectId, n.item.id), page: 'Shoot days' };
   }
 }

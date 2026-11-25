@@ -9,6 +9,7 @@ import { ProjectNotes } from './pages/project/ProjectNotes';
 import { ProjectLocationsPage, ProjectOverview, ProjectTasks } from './pages/project/ProjectOverview';
 import { ProjectTeam } from './pages/project/ProjectTeam';
 import { ProjectScenes } from './pages/project/ProjectScenes';
+import { ProjectCharacters } from './pages/project/ProjectCharacters';
 import { ProjectShootDays } from './pages/project/ProjectShootDays';
 import { CallSheetPage } from './pages/project/CallSheetPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -69,6 +70,7 @@ export function App() {
             <Route index element={<ProjectOverview />} />
             <Route path="tasks" element={<ProjectTasks />} />
             <Route path="scenes" element={<ProjectScenes />} />
+            <Route path="characters" element={<ProjectCharacters />} />
             <Route path="shoot-days" element={<ProjectShootDays />} />
             <Route path="shoot-days/:dayId" element={<CallSheetPage />} />
             <Route path="locations" element={<ProjectLocationsPage />} />

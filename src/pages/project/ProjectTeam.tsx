@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { LatticeGrid } from '../../components/LatticeGrid';
+import { LatticeGrid, gridDropdown, gridEsc } from '../../components/LatticeGrid';
+import { TeamNotes } from '../../components/TeamNotes';
+import { RenameForm } from '../../components/RenameForm';
+import { useAuth } from '../../lib/auth';
 import { Section } from '../../components/Section';
 import { RolePicker } from '../../components/RolePicker';
 import { PersonContacts } from '../../components/PersonContacts';
-import { api, type ProjectMember } from '../../lib/api';
+import { api, type ProjectMember, type TeamNoteType } from '../../lib/api';
 import { displayName, errorText, roleIdsFor, roleNames } from '../../lib/format';
 import type { Role } from '../../lib/database.types';
 import type { Run } from '../CompanyPage';
@@ -15,12 +18,19 @@ import { emailProblem, formatPhone, phoneOrThrow } from '../../lib/contact';
 import { InviteButtons } from '../../components/InviteButtons';
 import { useProject } from './ProjectLayout';
 
-interface TeamRow { id: string; name: string; nickname: string; roles: string; email: string; phone: string; joined: string; account: string }
+interface TeamRow { id: string; name: string; nickname: string; roles: string; email: string; phone: string; joined: string; account: string; dietary: string; allergy: string }
 
 /** The project's team: who's assigned, and their project roles. */
 export function ProjectTeam() {
   const { project, projectId, isAdmin, team, companyMembers, roles, reload } = useProject();
+  const { session } = useAuth();
+  const me = session?.user.id;
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [types, setTypes] = useState<TeamNoteType[]>([]);
+  const loadTypes = useCallback(async () => {
+    try { setTypes(await api.teamNoteTypes(project.company_id)); } catch (e) { setError(errorText(e)); }
+  }, [project.company_id]);
+  useEffect(() => { loadTypes(); }, [loadTypes]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const load = reload;
@@ -89,20 +99,31 @@ export function ProjectTeam() {
   const teamRows = useMemo<TeamRow[]>(() => team.map((t) => ({
     id: t.user_id, name: displayName(t.profile), nickname: t.profile.nickname ?? '', email: t.profile.email ?? '', phone: t.profile.phone ?? '',
     roles: roleNames(t.role_ids, roles), joined: t.joined_at.slice(0, 10), account: t.profile.has_account === false ? 'Not yet' : 'Yes',
+    dietary: t.dietary ?? '', allergy: t.dietary_allergy ? 'Yes' : 'No',
   })).sort((a, b) => a.name.localeCompare(b.name)), [team, roles]);
 
   const teamOptions = useMemo(() => ({
     rowId: (r: TeamRow) => r.id,
     toolbar: false, groupPanel: false, statusBar: false,
-    selection: 'single', rowClickSelection: true, readOnly: !isAdmin,
+    selection: 'single', rowClickSelection: true,
     emptyMessage: 'Nobody is assigned yet',
-    // Name, email and phone belong to each person's own profile.
+    // Name, email and phone belong to each person's own profile. Admins set roles;
+    // admins and each person set their own dietary needs.
     columns: [
       { field: 'name', header: 'Name', width: 200 },
       { field: 'nickname', header: 'Nickname', width: 130 },
       {
-        field: 'roles', header: 'Project roles', width: 280, editable: true, filter: 'set', filterSplit: ',',
+        field: 'roles', header: 'Project roles', width: 280, editable: isAdmin, filter: 'set', filterSplit: ',',
         tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
+      },
+      {
+        field: 'dietary', header: 'Dietary needs', width: 200, editable: (r: TeamRow) => isAdmin || r.id === me,
+        tooltip: () => 'Shown on the call sheet for catering',
+        render: ({ value, data }: { value: string; data: TeamRow }) => (data.allergy === 'Yes' && value ? `<span class="task-overdue">${gridEsc(value)}</span>` : gridEsc(value)),
+      },
+      {
+        field: 'allergy', header: 'Allergy', width: 100, editable: (r: TeamRow) => isAdmin || r.id === me, editor: 'select', editorOptions: ['No', 'Yes'],
+        render: ({ value }: { value: string }) => gridDropdown(gridEsc(value)),
       },
       { field: 'email', header: 'Email', width: 220 },
       { field: 'phone', header: 'Phone', width: 140 },
@@ -110,9 +131,17 @@ export function ProjectTeam() {
         tooltip: (r: TeamRow) => r.account === 'Yes' ? 'Signed up' : 'Added before signing up. They join when they sign up with this email.' },
       { field: 'joined', header: 'Assigned', type: 'date', width: 120 },
     ],
-  }), [isAdmin]);
+  }), [isAdmin, me]);
 
   async function saveTeamCell(e: { data: TeamRow; column: string; newValue: unknown }) {
+    if (e.column === 'dietary' || e.column === 'allergy') {
+      const m = team.find((t) => t.user_id === e.data.id);
+      const needs = e.column === 'dietary' ? String(e.newValue ?? '').trim() : m?.dietary ?? '';
+      const allergy = e.column === 'allergy' ? e.newValue === 'Yes' : Boolean(m?.dietary_allergy);
+      if (e.column === 'allergy' && allergy && !needs) { setError('Type their dietary needs first, then mark it as an allergy.'); await load(); return; }
+      await run(() => api.setDietary(projectId, e.data.id, needs || null, allergy));
+      return;
+    }
     if (e.column !== 'roles') { await load(); return; }
     const { ids, unknown } = roleIdsFor(String(e.newValue ?? ''), roles);
     if (unknown.length) {
@@ -184,35 +213,53 @@ export function ProjectTeam() {
               projectName={project.name}
               member={selected}
               roles={roles}
+              types={types}
+              isMe={selected.user_id === me}
               isAdmin={isAdmin}
               run={run}
               onRemoved={() => setSelectedId(null)}
             />
           )}
         </div>
-        {!selected && teamRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and set their project roles' : ''}.</p>}
+        {!selected && teamRows.length > 0 && (
+          <p className="hint mt-2">
+            Select a person to see their details{isAdmin ? ', set their project roles and dietary needs, and keep notes about them' : ''}.
+            {!isAdmin && ' Select yourself to set your dietary needs and keep notes about yourself.'}
+          </p>
+        )}
       </Section>
+
+      {isAdmin && <NoteTypes companyId={project.company_id} types={types} reload={loadTypes} />}
 
     </>
   );
 }
 
-function TeamPanel({ projectId, companyId, companyName, projectName, member, roles, isAdmin, run, onRemoved }: {
-  projectId: string; companyId: string; companyName: string; projectName: string; member: ProjectMember; roles: Role[]; isAdmin: boolean; run: Run; onRemoved: () => void;
+function TeamPanel({ projectId, companyId, companyName, projectName, member, roles, types, isMe, isAdmin, run, onRemoved }: {
+  projectId: string; companyId: string; companyName: string; projectName: string; member: ProjectMember; roles: Role[];
+  types: TeamNoteType[]; isMe: boolean; isAdmin: boolean; run: Run; onRemoved: () => void;
 }) {
   const name = displayName(member.profile);
   const roleIds = new Set(member.role_ids);
-  // Project roles are held until Save.
-  const initial = useMemo(() => [...member.role_ids].sort(), [member]);
+  // Project roles and dietary needs are held until Save.
+  const initial = useMemo(() => ({ roles: [...member.role_ids].sort(), dietary: member.dietary ?? '', allergy: member.dietary_allergy }), [member]);
   const [draft, setDraft] = useState(initial);
-  const changed = draft.join() !== initial.join();
+  const rolesChanged = draft.roles.join() !== initial.roles.join();
+  const foodChanged = draft.dietary.trim() !== initial.dietary || draft.allergy !== initial.allergy;
+  const changed = rolesChanged || foodChanged;
   useUnsaved(changed);
   useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleRole = (roleId: string, on: boolean) =>
-    setDraft((d) => (on ? [...d, roleId] : d.filter((r) => r !== roleId)).sort());
+    setDraft((d) => ({ ...d, roles: (on ? [...d.roles, roleId] : d.roles.filter((r) => r !== roleId)).sort() }));
+  const canFood = isAdmin || isMe;
+
   async function save(e: FormEvent) {
     e.preventDefault();
-    await run(() => api.setTeamRoles(projectId, member.user_id, draft), `Saved ${name}'s project roles.`);
+    const needs = draft.dietary.trim();
+    await run(async () => {
+      if (rolesChanged) await api.setTeamRoles(projectId, member.user_id, draft.roles);
+      if (foodChanged) await api.setDietary(projectId, member.user_id, needs || null, draft.allergy && Boolean(needs));
+    }, `Saved ${isMe ? 'your' : `${name}'s`} details.`);
   }
 
   async function remove() {
@@ -220,6 +267,7 @@ function TeamPanel({ projectId, companyId, companyName, projectName, member, rol
     if (await run(() => api.unassign(projectId, member.user_id), `Removed ${name} from the project.`)) onRemoved();
   }
 
+  const foodSummary = member.dietary ? `${member.dietary_allergy ? 'Allergy: ' : ''}${member.dietary}` : 'None';
   return (
     <aside data-pin-scope data-form-for={member.user_id} className="card gap-2">
       {/* The person's name opens them on the company's People list, with all their details. */}
@@ -229,23 +277,112 @@ function TeamPanel({ projectId, companyId, companyName, projectName, member, rol
         <InviteButtons info={{ name, email: member.profile.email ?? '', company: companyName, project: projectName }} />
       )}
       <PersonContacts userId={member.user_id} name={name} canEdit={false} />
-      {isAdmin ? (
-        <>
-          <form className="flex flex-col gap-2" onSubmit={save}>
-            <Section id="project.person.roles" title="Project roles" level="h4" summary={draft.length ? `${draft.length} picked` : 'None'}>
-              <RolePicker id="project.person.roles" roles={roles} selected={new Set(draft)} onToggle={toggleRole} />
-            </Section>
+      <form className="flex flex-col gap-2" onSubmit={save}>
+        <Section id="project.person.roles" title="Project roles" level="h4" summary={isAdmin ? (draft.roles.length ? `${draft.roles.length} picked` : 'None') : undefined}>
+          {isAdmin
+            ? <RolePicker id="project.person.roles" roles={roles} selected={new Set(draft.roles)} onToggle={toggleRole} />
+            : <p>{roleNames(roleIds, roles) || <span className="text-muted">No project roles</span>}</p>}
+        </Section>
+        <Section id="project.person.dietary" title="Dietary needs" level="h4" summary={foodSummary}>
+          {canFood ? (
+            <div className="flex flex-col gap-2">
+              <label className="label">{isMe ? 'Your dietary needs on this project' : `${name}'s dietary needs on this project`}
+                <textarea className="field" rows={2} value={draft.dietary} maxLength={500} placeholder="e.g. Vegetarian, no nuts"
+                  onChange={(e) => setDraft({ ...draft, dietary: e.target.value })} />
+              </label>
+              <label className="check">
+                <input type="checkbox" checked={draft.allergy} disabled={!draft.dietary.trim()} onChange={(e) => setDraft({ ...draft, allergy: e.target.checked })} />
+                This is an allergy (shown in red)
+              </label>
+              <p className="hint">Shown on the call sheet for catering, and on {isMe ? 'your' : 'their'} own call sheet link. Never on the shared link.</p>
+            </div>
+          ) : (
+            <p className={member.dietary_allergy ? 'font-semibold text-danger' : ''}>{member.dietary ? foodSummary : <span className="text-muted">None given</span>}</p>
+          )}
+        </Section>
+        {(isAdmin || canFood) && (
+          <>
             <div className="flex gap-2">
-              <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>
+              <button type="submit" className="btn flex-1 md:flex-none" disabled={!changed} data-pin="2">Save</button>
               <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
             </div>
             {changed && <p className="hint">Unsaved changes.</p>}
-          </form>
-          <button className="btn btn-danger" onClick={remove}>Remove from project</button>
-        </>
-      ) : (
-        <p>{roleNames(roleIds, roles) || <span className="text-muted">No project roles</span>}</p>
-      )}
+          </>
+        )}
+      </form>
+      {(isAdmin || isMe) && <TeamNotes projectId={projectId} userId={member.user_id} name={name} types={types} isAdmin={isAdmin} />}
+      {isAdmin && <button className="btn btn-danger" onClick={remove}>Remove from project</button>}
     </aside>
+  );
+}
+
+/** The company's team note types (admins): add, rename, delete. */
+function NoteTypes({ companyId, types, reload }: { companyId: string; types: TeamNoteType[]; reload: () => Promise<void> }) {
+  const [newName, setNewName] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (fn: () => Promise<unknown>) => {
+    setError(null);
+    try { await fn(); } catch (e) { setError(errorText(e)); await reload(); return false; }
+    await reload();
+    return true;
+  };
+  const rows = useMemo(() => types.map((t) => ({ id: t.id, name: t.name, notes: t.notes })), [types]);
+  const options = useMemo(() => ({
+    rowId: (r: { id: string }) => r.id,
+    toolbar: false, groupPanel: false, statusBar: false,
+    selection: 'single', rowClickSelection: true,
+    emptyMessage: 'No note types',
+    columns: [
+      { field: 'name', header: 'Note type', width: 220, editable: true },
+      { field: 'notes', header: 'Notes', type: 'number', width: 100, filter: false },
+    ],
+  }), []);
+
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    const name = newName.trim();
+    if (!name || !confirmDiscard()) return;
+    let id = '';
+    if (await run(async () => { id = (await api.createTeamNoteType(companyId, name)).id; })) {
+      setNewName('');
+      setSelectedId(id);
+      setReveal({ id, n: Date.now() });
+      scrollToForm(id);
+    }
+  }
+
+  const selected = types.find((t) => t.id === selectedId) ?? null;
+  async function remove(t: TeamNoteType) {
+    const msg = t.notes ? `Delete the ${t.name} note type? Its ${t.notes === 1 ? 'note stays' : `${t.notes} notes stay`}, with no type.` : `Delete the ${t.name} note type?`;
+    if (window.confirm(msg) && await run(() => api.deleteTeamNoteType(t.id))) setSelectedId(null);
+  }
+
+  return (
+    <Section id="project.team.noteTypes" title="Team note types" summary={types.length} bodyClassName="flex flex-col gap-2">
+      <p className="hint">The kinds of notes you can keep about people, shared by every project in the company. Double-click a type to rename it, or select it to rename or delete it below.</p>
+      <form className="form-row" onSubmit={add}>
+        <input className="field" placeholder="New note type, e.g. Pets" aria-label="New note type" value={newName} maxLength={40} required onChange={(e) => setNewName(e.target.value)} />
+        <button type="submit" className="btn btn-secondary">Add note type</button>
+      </form>
+      {error && <p className="error">{error}</p>}
+      <LatticeGrid stateId="project.team.noteTypes" options={options} rows={rows} reveal={reveal} height={Math.min(80 + rows.length * 34, 320)}
+        on={{
+          selectionChanged: (r: { id: string }[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
+          cellValueChanged: (e: { data: { id: string }; newValue: unknown }) => {
+            const v = String(e.newValue ?? '').trim();
+            if (v) run(() => api.renameTeamNoteType(e.data.id, v)); else reload();
+          },
+        }} />
+      {selected && (
+        <div className="card gap-2" data-form-for={selected.id}>
+          <span className="hint">{selected.name}: used by {selected.notes} {selected.notes === 1 ? 'note' : 'notes'}.</span>
+          <RenameForm key={selected.id} label="Note type name" value={selected.name} maxLength={40}
+            onSave={(name) => run(() => api.renameTeamNoteType(selected.id, name))} />
+          <button className="btn btn-danger sm:self-start" onClick={() => remove(selected)}>Delete note type</button>
+        </div>
+      )}
+    </Section>
   );
 }

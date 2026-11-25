@@ -2,7 +2,7 @@
 // writes all data through the API; Supabase is used here only to keep the user
 // signed in and supply their access token.
 import { supabase } from './supabase';
-import type { SceneIntExt, SceneStatus, SceneTime } from './format';
+import type { CastingStatus, CharacterKind, SceneIntExt, SceneStatus, SceneTime } from './format';
 import type { DayPart, ProjectStatus, Role, Task as TaskRow, TaskPriority, TaskStatus } from './database.types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://localhost:8787';
@@ -42,7 +42,11 @@ export interface Project {
   status: ProjectStatus; start_date: string | null; end_date: string | null; created_by: string; created_at: string;
 }
 export interface ProjectDetail extends Project { company: { id: string; name: string }; can_manage: boolean }
-export interface ProjectMember { user_id: string; joined_at: string; profile: Profile; role_ids: string[] }
+export interface ProjectMember {
+  user_id: string; joined_at: string; profile: Profile; role_ids: string[];
+  /** Dietary needs on this project (for catering and the call sheet); dietary_allergy shows it as an allergy. */
+  dietary: string | null; dietary_allergy: boolean;
+}
 export type ProjectInput = Partial<Pick<Project, 'name' | 'logline' | 'description' | 'status' | 'start_date' | 'end_date'>>;
 
 export type { DayPart, TaskPriority, TaskStatus };
@@ -69,6 +73,8 @@ export interface Scene {
   location_id: string | null; status: SceneStatus; sort_order: number;
   created_by: string | null; created_at: string; updated_at: string;
   shots: number; shots_done: number; est_minutes: number;
+  /** The scene's characters, by cast number then name; `characters` holds their names. */
+  character_ids: string[];
 }
 export type SceneInput = Partial<Pick<Scene, 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths' | 'synopsis' | 'characters' | 'needs' | 'location_id' | 'status'>>;
 export interface Shot {
@@ -78,6 +84,18 @@ export interface Shot {
   created_by: string | null; created_at: string; updated_at: string;
 }
 export type ShotInput = Partial<Pick<Shot, 'description' | 'size' | 'angle' | 'movement' | 'lens' | 'equipment' | 'est_minutes' | 'done' | 'notes'>>;
+
+export type { CastingStatus, CharacterKind } from './format';
+export interface Character {
+  id: string; project_id: string; name: string; cast_number: number | null; kind: CharacterKind | null;
+  description: string | null; age_range: string | null; gender: string | null; traits: string | null;
+  casting_status: CastingStatus; actor_id: string | null; stand_in_id: string | null; double_id: string | null;
+  wardrobe: string | null; hair_makeup: string | null; props: string | null; continuity: string | null;
+  created_by: string | null; created_at: string; updated_at: string;
+  /** The scenes they're in, in scene order, with how they look in each. */
+  scenes: { scene_id: string; look_note: string | null }[];
+}
+export type CharacterInput = Partial<Omit<Character, 'id' | 'project_id' | 'created_by' | 'created_at' | 'updated_at' | 'scenes'>>;
 
 /** A day of filming. Times are 'HH:MM' or 'HH:MM:SS'. */
 export interface ShootDay {
@@ -104,7 +122,13 @@ export interface ShootDayCall {
   /** Their personal, view-only call sheet link: /sheet/{link_token} in the app. */
   link_token: string;
   profile: Profile; role_ids: string[];
+  /** The characters they play. */
+  characters: CallCharacter[];
+  dietary: Dietary | null;
 }
+/** A character someone plays, as the call sheet shows it. */
+export interface CallCharacter { name: string; cast_number: number | null }
+export interface Dietary { needs: string; allergy: boolean }
 export type ShootDayCallInput = Partial<Pick<ShootDayCall, 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note'>>;
 export interface CallSheet {
   day: ShootDay; location: Location | null; items: ShootDayItem[]; scenes: Scene[]; calls: ShootDayCall[];
@@ -120,7 +144,12 @@ export interface LinkedCallSheet {
   location: Pick<Location, 'name' | 'description' | 'address' | 'parking' | 'nearest_hospital' | 'contact_name' | 'contact_phone'> | null;
   items: Pick<ShootDayItem, 'id' | 'kind' | 'scene_id' | 'label' | 'at_time'>[];
   scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths' | 'synopsis' | 'characters' | 'needs'>[];
-  calls: (Pick<ShootDayCall, 'user_id' | 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note' | 'role_ids'> & { profile: { id: string; full_name: string | null; nickname: string | null; phone: string | null } })[];
+  calls: (Pick<ShootDayCall, 'user_id' | 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note' | 'role_ids'> & {
+    profile: { id: string; full_name: string | null; nickname: string | null; phone: string | null };
+    characters?: CallCharacter[];
+    /** Only on the project's call sheet (everyone) and a personal link (the reader's own); never on the shared link. */
+    dietary?: Dietary | null;
+  })[];
   roles: { id: string; name: string; department: string | null; sort_order: number | null }[];
   next_day: { day: Pick<ShootDay, 'shoot_date' | 'crew_call' | 'title' | 'day_number'>; scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths'>[] } | null;
 }
@@ -132,12 +161,16 @@ export type SharedCallSheet = Omit<LinkedCallSheet, 'me' | 'confirmed'> & { phon
 export interface Note { id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
 export interface TaskNote extends Note { task_id: string }
 export interface SceneNote extends Note { scene_id: string }
+export interface CharacterNote extends Note { character_id: string }
+/** A note about someone on a project; only admins and that person see it. */
+export interface TeamNote extends Note { project_id: string; user_id: string; type_id: string | null }
+export interface TeamNoteType { id: string; company_id: string; name: string; sort_order: number; notes: number }
 /** Where a note on the Project Notes page was taken. */
-export type NoteSource = 'task' | 'scene' | 'shot' | 'shoot_day' | 'schedule' | 'call';
+export type NoteSource = 'task' | 'scene' | 'shot' | 'shoot_day' | 'schedule' | 'call' | 'character' | 'team';
 /** A note from anywhere on a project, with the item it belongs to. */
 export interface ProjectNote {
   key: string; source: NoteSource; note_id: string | null; body: string; author: Profile | null; at: string; edited: boolean;
-  item: { kind: 'task' | 'scene' | 'shoot_day'; id: string; label: string; detail: string | null };
+  item: { kind: 'task' | 'scene' | 'shoot_day' | 'character' | 'team_member'; id: string; label: string; detail: string | null };
 }
 
 const enc = encodeURIComponent;
@@ -215,6 +248,29 @@ export const api = {
   updateScene: (id: string, b: SceneInput) => call<Scene>('PATCH', `/scenes/${enc(id)}`, b),
   deleteScene: (id: string) => call<void>('DELETE', `/scenes/${enc(id)}`),
   orderScenes: (projectId: string, ids: string[]) => call<void>('PUT', `/projects/${enc(projectId)}/scene-order`, { ids }),
+  setSceneCharacters: (sceneId: string, ids: string[]) => call<void>('PUT', `/scenes/${enc(sceneId)}/characters`, { ids }),
+  setLookNote: (sceneId: string, characterId: string, look_note: string | null) =>
+    call<void>('PATCH', `/scenes/${enc(sceneId)}/characters/${enc(characterId)}`, { look_note }),
+  setDietary: (projectId: string, userId: string, needs: string | null, allergy: boolean) =>
+    call<void>('PUT', `/projects/${enc(projectId)}/members/${enc(userId)}/dietary`, { needs, allergy }),
+  teamNoteTypes: (companyId: string) => call<TeamNoteType[]>('GET', `/companies/${enc(companyId)}/team-note-types`),
+  createTeamNoteType: (companyId: string, name: string) => call<TeamNoteType>('POST', `/companies/${enc(companyId)}/team-note-types`, { name }),
+  renameTeamNoteType: (id: string, name: string) => call<void>('PATCH', `/team-note-types/${enc(id)}`, { name }),
+  deleteTeamNoteType: (id: string) => call<void>('DELETE', `/team-note-types/${enc(id)}`),
+  teamNotes: (projectId: string, userId: string) => call<TeamNote[]>('GET', `/projects/${enc(projectId)}/members/${enc(userId)}/notes`),
+  addTeamNote: (projectId: string, userId: string, b: { body: string; type_id: string | null }) =>
+    call<TeamNote>('POST', `/projects/${enc(projectId)}/members/${enc(userId)}/notes`, b),
+  updateTeamNote: (id: string, b: { body?: string; type_id?: string | null }) => call<TeamNote>('PATCH', `/team-notes/${enc(id)}`, b),
+  deleteTeamNote: (id: string) => call<void>('DELETE', `/team-notes/${enc(id)}`),
+  characters: (projectId: string) => call<Character[]>('GET', `/projects/${enc(projectId)}/characters`),
+  createCharacter: (projectId: string, b: CharacterInput & { name: string }) => call<Character>('POST', `/projects/${enc(projectId)}/characters`, b),
+  updateCharacter: (id: string, b: CharacterInput) => call<Character>('PATCH', `/characters/${enc(id)}`, b),
+  deleteCharacter: (id: string) => call<void>('DELETE', `/characters/${enc(id)}`),
+  setCharacterScenes: (id: string, ids: string[]) => call<Character>('PUT', `/characters/${enc(id)}/scenes`, { ids }),
+  characterNotes: (id: string) => call<CharacterNote[]>('GET', `/characters/${enc(id)}/notes`),
+  addCharacterNote: (id: string, body: string) => call<CharacterNote>('POST', `/characters/${enc(id)}/notes`, { body }),
+  updateCharacterNote: (id: string, body: string) => call<CharacterNote>('PATCH', `/character-notes/${enc(id)}`, { body }),
+  deleteCharacterNote: (id: string) => call<void>('DELETE', `/character-notes/${enc(id)}`),
   shots: (sceneId: string) => call<Shot[]>('GET', `/scenes/${enc(sceneId)}/shots`),
   createShot: (sceneId: string, b: ShotInput & { description: string }) => call<Shot>('POST', `/scenes/${enc(sceneId)}/shots`, b),
   updateShot: (id: string, b: ShotInput) => call<Shot>('PATCH', `/shots/${enc(id)}`, b),
