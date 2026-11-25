@@ -90,3 +90,32 @@ export function personalMailto(sheet: CallSheet, c: ShootDayCall, t: SheetText) 
 export function personalSms(sheet: CallSheet, c: ShootDayCall, t: SheetText) {
   return `sms:${(c.profile.phone ?? '').replace(/[^\d+]/g, '')}?body=${encodeURIComponent(personalText(sheet, c, t))}`;
 }
+
+// ---- The shared link (one for the whole day, for anyone) ----------------------
+
+/** The address of a day's shared, view-only call sheet page. No sign-in needed. */
+export function sharedLink(token: string) {
+  return `${window.location.origin}${import.meta.env.BASE_URL}call-sheet/${token}`;
+}
+
+function sharedText(sheet: CallSheet, token: string, t: SheetText) {
+  const d = sheet.day;
+  const call = clockLabel(d.crew_call);
+  return [
+    `Here's the call sheet for ${t.projectName}, day ${d.day_number} of ${d.total_days} (${longDate(d.shoot_date)}).`,
+    call ? `Crew call: ${call}${sheet.location ? ` at ${sheet.location.name}` : ''}.` : '',
+    '',
+    'The whole call sheet:',
+    sharedLink(token),
+  ].filter((l, i) => l || i === 2).join('\n');
+}
+
+/** An email with the shared link, from the sender's email app; they pick who it goes to. */
+export function sharedMailto(sheet: CallSheet, token: string, t: SheetText) {
+  return `mailto:?subject=${encodeURIComponent(callSheetSubject(sheet, t))}&body=${encodeURIComponent(sharedText(sheet, token, t))}`;
+}
+
+/** A text message with the shared link; they pick who it goes to. */
+export function sharedSms(sheet: CallSheet, token: string, t: SheetText) {
+  return `sms:?&body=${encodeURIComponent(sharedText(sheet, token, t))}`;
+}

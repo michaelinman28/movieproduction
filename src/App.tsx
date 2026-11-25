@@ -17,14 +17,16 @@ import { TaskSettingsPage } from './pages/TaskSettingsPage';
 import { ActivityPage } from './pages/ActivityPage';
 import { ProjectActivity } from './pages/project/ProjectActivity';
 import { SheetLinkPage } from './pages/SheetLinkPage';
+import { SharedSheetPage } from './pages/SharedSheetPage';
 import { ThemeSwitch } from './components/ThemeSwitch';
 import { PinnedAction } from './components/PinnedAction';
 import { UnsavedGuard } from './components/UnsavedGuard';
 
-/** A personal call sheet link (/sheet/:token) opens on its own page, with no sign-in. */
+/** Call sheet links open on their own page, with no sign-in: personal (/sheet/:token) or shared (/call-sheet/:token). */
 function sheetToken() {
   const path = window.location.pathname.slice(import.meta.env.BASE_URL.replace(/\/$/, '').length);
-  return path.match(/^\/sheet\/([0-9a-f-]{36})\/?$/i)?.[1] ?? null;
+  const m = path.match(/^\/(sheet|call-sheet)\/([0-9a-f-]{36})\/?$/i);
+  return m ? { shared: m[1].toLowerCase() === 'call-sheet', token: m[2] } : null;
 }
 
 export function App() {
@@ -40,7 +42,7 @@ export function App() {
         </div>
       </main>
     );
-  if (token) return <SheetLinkPage token={token} />;
+  if (token) return token.shared ? <SharedSheetPage token={token.token} /> : <SheetLinkPage token={token.token} />;
   if (loading) return <main className="grid min-h-dvh place-items-center p-4"><p className="text-muted">Loading…</p></main>;
   if (!session) return <SignIn />;
 

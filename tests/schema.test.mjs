@@ -470,6 +470,32 @@ await expect('opening a link is not also logged as a change', () => as(U.a, `sel
 await asAnon(`select confirm_call_sheet_link($1)`, [cTok.link_token]);
 await expect('confirming from a link is logged as that person', () => as(U.a, `select * from audit_log where company_id=$1 and table_name='shoot_day_calls' and action='update' and source='link'`, [ac.id]), r => r.length === 1 && r[0].actor_id === U.c && r[0].changed.includes('confirmed_at'));
 await expect('link codes are not kept in the log', () => as(U.a, `select * from audit_log where table_name='shoot_day_calls'`), r => r.length > 0 && !JSON.stringify(r).includes(cTok.link_token));
+// shared call sheet link (one for the whole day)
+await expect('a day has no shared link until it is turned on', () => as(U.b, `select share_token from shoot_days where id=$1`, [aday.id]), r => r[0]?.share_token === null);
+await expect('the shared link cannot be set directly', () => as(U.b, `update shoot_days set share_token=gen_random_uuid(), share_phones=true where id=$1 returning share_token, share_phones`, [aday.id]), r => r[0]?.share_token === null && r[0]?.share_phones === false);
+await expect('outsiders cannot turn it on', () => as(U.d, `select share_call_sheet($1, true)`, [aday.id]), isErr);
+const [slSh1] = await as(U.b, `select share_call_sheet($1, true) t`, [aday.id]);
+await expect('anyone on the project turns it on', () => Promise.resolve(slSh1), r => /^[0-9a-f-]{36}$/.test(r?.t));
+await expect('turning it on again keeps the same link', () => as(U.c, `select share_call_sheet($1, true) t`, [aday.id]), r => r[0]?.t === slSh1.t);
+await as(U.a, `update profiles set phone='9195550111' where id=$1`, [U.c]);
+const [slShared] = await asAnon(`select call_sheet_for_share($1) s`, [slSh1.t]);
+await expect('the shared link opens the whole sheet without signing in', () => Promise.resolve(slShared.s), s => s?.day?.version === 1 && s.calls.length === 1 && s.project.name === 'Audit Film' && s.me === undefined);
+await expect('it shows no emails, and no phones by default', () => Promise.resolve(JSON.stringify(slShared.s)), s => !s.includes('@x.com') && !s.includes('919-555-0111') && s.includes('"phones":false'));
+await expect('opening it is not counted as anyone viewing', () => as(U.c, `select viewed_version from shoot_day_calls where shoot_day_id=$1`, [aday.id]), r => r[0]?.viewed_version === 1);
+await expect('opening it is logged as a shared link view', () => as(U.a, `select * from audit_log where action='view' and row_key=$1 and detail like '%shared link'`, [aday.id]), r => r.length === 1 && r[0].actor_id === null);
+await as(U.b, `select share_call_sheet($1, true, false, true)`, [aday.id]);
+await expect('phones show once chosen', () => asAnon(`select call_sheet_for_share($1) s`, [slSh1.t]), r => JSON.stringify(r[0]?.s).includes('919-555-0111'));
+const [slSh2] = await as(U.b, `select share_call_sheet($1, true, true) t`, [aday.id]);
+await expect('a new link replaces the old one', () => asAnon(`select call_sheet_for_share($1) s`, [slSh1.t]), r => slSh2.t !== slSh1.t && r[0]?.s === null);
+await expect('the new link works', () => asAnon(`select call_sheet_for_share($1) s`, [slSh2.t]), r => r[0]?.s?.day?.id === aday.id);
+await as(U.b, `select share_call_sheet($1, false)`, [aday.id]);
+await expect('turning it off stops the link', () => asAnon(`select call_sheet_for_share($1) s`, [slSh2.t]), r => r[0]?.s === null);
+await expect('unknown shared links show nothing', () => asAnon(`select call_sheet_for_share(gen_random_uuid()) s`), r => r[0]?.s === null);
+await expect('turning it on, off and changing it is logged without the code', () => as(U.a, `select * from audit_log where table_name='shoot_days' and row_key=$1 and action='update' and before ? 'shared_link' order by id`, [aday.id]),
+  r => r.length === 4 && r[1].after.shared_link === 'On' && r[2].after.shared_link === 'New link' && r.every((x) => x.actor_id === U.b) && JSON.stringify(r[0].changed) === '["shared_link"]' && r[3].after.shared_link === 'Off' && !JSON.stringify(r).includes(slSh1.t) && !JSON.stringify(r).includes(slSh2.t));
+const [slUnsent] = await as(U.b, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-04-02') returning id`, [ap.id]);
+const [slSh3] = await as(U.b, `select share_call_sheet($1, true) t`, [slUnsent.id]);
+await expect('a sheet not sent yet does not open from its shared link', () => asAnon(`select call_sheet_for_share($1) s`, [slSh3.t]), r => r[0]?.s === null);
 // deleting a project keeps its log
 await as(U.a, `delete from projects where id=$1`, [ap.id]);
 await expect('deleting a project keeps its log, with its company', () => as(U.a, `select count(*)::int n from audit_log where project_id=$1 and company_id=$2`, [ap.id, ac.id]), r => r[0].n > 10);

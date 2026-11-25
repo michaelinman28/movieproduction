@@ -2579,6 +2579,19 @@
             "format": "uuid",
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
           },
+          "share_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "The day's shared call sheet link, for anyone: /shared-call-sheets/{token}, and the app page /call-sheet/{token}. Null when off"
+          },
+          "share_phones": {
+            "type": "boolean",
+            "description": "Whether the shared link shows phone numbers"
+          },
           "created_by": {
             "type": [
               "string",
@@ -2639,6 +2652,8 @@
           "version",
           "sent_at",
           "sent_by",
+          "share_token",
+          "share_phones",
           "created_by",
           "created_at",
           "updated_at",
@@ -3262,6 +3277,134 @@
           "scenes",
           "calls",
           "roles"
+        ]
+      },
+      "ShareResult": {
+        "type": "object",
+        "properties": {
+          "share_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "share_phones": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "share_token",
+          "share_phones"
+        ]
+      },
+      "ShareInput": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "true turns the shared link on (keeping the current link), false turns it off"
+          },
+          "new_link": {
+            "type": "boolean",
+            "description": "Make a new link; the old one stops working"
+          },
+          "phones": {
+            "type": "boolean",
+            "description": "Show phone numbers on the shared page"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "SharedCallSheet": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "company_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "company_name"
+            ]
+          },
+          "day": {
+            "description": "The day: date, title, times, weather, notes, version, sent_at, day_number, total_days"
+          },
+          "location": {
+            "description": "Name, description, address, parking, nearest hospital and on-site contact"
+          },
+          "items": {
+            "type": "array",
+            "items": {},
+            "description": "The schedule in order: id, kind, scene_id, label, at_time"
+          },
+          "scenes": {
+            "type": "array",
+            "items": {},
+            "description": "The scenes on the day, in order"
+          },
+          "calls": {
+            "type": "array",
+            "items": {},
+            "description": "Everyone called: their call, character, pickup, makeup, note, name, nickname, phone and role ids (no emails)"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "department": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sort_order": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "department",
+                "sort_order"
+              ]
+            }
+          },
+          "next_day": {},
+          "phones": {
+            "type": "boolean",
+            "description": "Whether phone numbers are shown (the sharer chooses); emails never are"
+          }
+        },
+        "required": [
+          "project",
+          "items",
+          "scenes",
+          "calls",
+          "roles",
+          "phones"
         ]
       },
       "WeatherResult": {
@@ -8923,6 +9066,127 @@
         "responses": {
           "204": {
             "description": "Confirmed"
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shoot-days/{id}/share": {
+      "post": {
+        "tags": [
+          "Call sheets"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Turn the day's shared call sheet link on or off, make a new one, or choose whether it shows phones",
+        "description": "The shared link is one view-only page of the whole sent call sheet, for anyone who has it, with no sign-in. It never shows emails; phone numbers only when `phones` is on. Anyone on the project can change it.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shared-call-sheets/{token}": {
+      "get": {
+        "tags": [
+          "Call sheets"
+        ],
+        "summary": "A shared call sheet link: the whole sent call sheet, view only, with no sign-in",
+        "description": "Whoever has the link (ShootDay.share_token) can read the day's sent call sheet; nothing can be changed through it, and nobody is marked as viewing or confirming. No emails; phones only if the sharer chose. Unknown or turned-off links, and sheets not sent yet, give 404.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedCallSheet"
+                }
+              }
+            }
           },
           "404": {
             "description": "Not found, or you do not have access",

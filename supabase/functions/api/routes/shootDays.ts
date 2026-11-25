@@ -2,7 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { HTTPException } from 'hono/http-exception';
 import { anonClient, authed, fail, found, must } from '../context.ts';
 import {
-  CallSheet, IdParam, LinkedCallSheet, TokenParam, OrderInput, ShootDay, ShootDayCall, ShootDayCallInput, ShootDayInput, ShootDayItem,
+  CallSheet, IdParam, LinkedCallSheet, ShareInput, ShareResult, SharedCallSheet, TokenParam, OrderInput, ShootDay, ShootDayCall, ShootDayCallInput, ShootDayInput, ShootDayItem,
   ShootDayItemInput, ShootDayItemUpdate, ShootDayUpdate, UserParams, WeatherLookup, WeatherResult,
 } from '../schemas.ts';
 import { body, errors, ok, profileFields, rolesByUser, router, secured, send } from './common.ts';
@@ -321,6 +321,39 @@ shootDays.openapi(createRoute({
     fail(r.error);
   }
   return c.body(null, 204);
+});
+
+shootDays.openapi(createRoute({
+  method: 'post', path: '/shoot-days/{id}/share', tags: sheetTags, security: secured,
+  summary: 'Turn the day\'s shared call sheet link on or off, make a new one, or choose whether it shows phones',
+  description: 'The shared link is one view-only page of the whole sent call sheet, for anyone who has it, with no sign-in. '
+    + 'It never shows emails; phone numbers only when `phones` is on. Anyone on the project can change it.',
+  request: { params: IdParam, ...body(ShareInput) },
+  responses: { 200: ok(ShareResult), 400: errors[400], 401: errors[401], 403: errors[403] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const { id } = c.req.valid('param');
+  const b = c.req.valid('json');
+  const r = await db.rpc('share_call_sheet', { day: id, enabled: b.enabled, new_link: b.new_link ?? false, phones: b.phones ?? null });
+  if (r.error) fail(r.error);
+  const row = found(must<Row[]>(await db.from('shoot_days').select('share_token, share_phones').eq('id', id)));
+  return send(c, row, 200);
+});
+
+shootDays.openapi(createRoute({
+  method: 'get', path: '/shared-call-sheets/{token}', tags: sheetTags,
+  summary: 'A shared call sheet link: the whole sent call sheet, view only, with no sign-in',
+  description: 'Whoever has the link (ShootDay.share_token) can read the day\'s sent call sheet; nothing can be changed through it, '
+    + 'and nobody is marked as viewing or confirming. No emails; phones only if the sharer chose. Unknown or turned-off links, '
+    + 'and sheets not sent yet, give 404.',
+  request: { params: TokenParam },
+  responses: { 200: ok(SharedCallSheet), 404: errors[404] },
+}), async (c) => {
+  const r = await anonClient(c).rpc('call_sheet_for_share', { token: c.req.valid('param').token });
+  if (r.error) fail(r.error);
+  if (!r.data) throw new HTTPException(404, { message: 'This call sheet link isn\'t working. It may have been turned off or replaced with a new link.' });
+  c.header('Cache-Control', 'no-store');
+  return send(c, r.data, 200);
 });
 
 // ---- Weather ----------------------------------------------------------------

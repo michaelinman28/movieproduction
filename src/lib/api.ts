@@ -86,6 +86,10 @@ export interface ShootDay {
   weather: string | null; sunrise: string | null; sunset: string | null; notes: string | null;
   /** How many times the call sheet has been sent; 0 = not yet. */
   version: number; sent_at: string | null; sent_by: string | null;
+  /** The day's shared call sheet link for anyone (/call-sheet/{share_token} in the app); null when off. */
+  share_token: string | null;
+  /** Whether the shared link shows phone numbers. */
+  share_phones: boolean;
   created_by: string | null; created_at: string; updated_at: string;
   day_number: number; total_days: number; scene_ids: string[]; pages_eighths: number; called: number; confirmed: number;
 }
@@ -120,6 +124,9 @@ export interface LinkedCallSheet {
   roles: { id: string; name: string; department: string | null; sort_order: number | null }[];
   next_day: { day: Pick<ShootDay, 'shoot_date' | 'crew_call' | 'title' | 'day_number'>; scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths'>[] } | null;
 }
+
+/** What a shared call sheet link shows: the whole sent sheet, view only, no emails, phones only if chosen. */
+export type SharedCallSheet = Omit<LinkedCallSheet, 'me' | 'confirmed'> & { phones: boolean };
 
 /** A note on a task or scene (many per item; the author edits it). */
 export interface Note { id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
@@ -232,6 +239,9 @@ export const api = {
   viewedCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/viewed`),
   linkedCallSheet: (token: string) => call<LinkedCallSheet>('GET', `/call-sheet-links/${enc(token)}`),
   confirmLinkedCallSheet: (token: string) => call<void>('POST', `/call-sheet-links/${enc(token)}/confirm`),
+  shareCallSheet: (dayId: string, b: { enabled: boolean; new_link?: boolean; phones?: boolean }) =>
+    call<{ share_token: string | null; share_phones: boolean }>('POST', `/shoot-days/${enc(dayId)}/share`, b),
+  sharedCallSheet: (token: string) => call<SharedCallSheet>('GET', `/shared-call-sheets/${enc(token)}`),
   confirmCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/confirm`),
   /** The forecast, sunrise and sunset for a day; nothing is saved. Pass the form's date and location to look those up. */
   lookUpWeather: (dayId: string, ask: { shoot_date?: string; location_id?: string } = {}) =>
