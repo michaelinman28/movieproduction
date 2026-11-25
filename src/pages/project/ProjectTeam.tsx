@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { LatticeGrid, gridDropdown, gridEsc, gridLinkList } from '../../components/LatticeGrid';
+import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLinkList } from '../../components/LatticeGrid';
+import { TagPicker } from '../../components/TagPicker';
+import { characterChoices, characterIdsPlayedBy, characterLabel, setCharactersPlayed } from '../../lib/casting';
 import { OpenLink } from '../../components/OpenLink';
 import { TeamNotes } from '../../components/TeamNotes';
 import { RenameForm } from '../../components/RenameForm';
@@ -9,7 +11,7 @@ import { Section } from '../../components/Section';
 import { RolePicker } from '../../components/RolePicker';
 import { PersonContacts } from '../../components/PersonContacts';
 import { api, type Character, type ProjectMember, type TeamNoteType } from '../../lib/api';
-import { displayName, errorText, roleIdsFor, roleNames } from '../../lib/format';
+import { NONE, displayName, errorText, roleIdsFor, roleNames } from '../../lib/format';
 import type { Role } from '../../lib/database.types';
 import type { Run } from '../CompanyPage';
 import { confirmDiscard, useUnsaved } from '../../lib/unsaved';
@@ -34,9 +36,15 @@ export function ProjectTeam() {
   useEffect(() => { loadTypes(); }, [loadTypes]);
   // The characters each person plays (set on the Characters page).
   const [characters, setCharacters] = useState<Character[]>([]);
-  useEffect(() => { api.characters(projectId).then(setCharacters).catch((e) => setError(errorText(e))); }, [projectId, team]);
+  const loadCharacters = useCallback(async () => {
+    try { setCharacters(await api.characters(projectId)); } catch (e) { setError(errorText(e)); }
+  }, [projectId]);
+  useEffect(() => { loadCharacters(); }, [loadCharacters, team]);
   const playsOf = useCallback((userId: string) => characters.filter((c) => c.actor_id === userId), [characters]);
-  const charLabel = (c: Character) => (c.cast_number != null ? `${c.name} (#${c.cast_number})` : c.name);
+  const nameOf = useCallback((id: string) => {
+    const m = team.find((t) => t.user_id === id);
+    return m ? displayName(m.profile) : undefined;
+  }, [team]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const load = reload;
@@ -44,10 +52,11 @@ export function ProjectTeam() {
   const run: Run = async (fn, ok) => {
     setError(null);
     setNotice(null);
-    try { await fn(); } catch (e) { setError(errorText(e)); return false; }
-    if (ok) setNotice(ok);
-    await load();
-    return true;
+    let done = true;
+    try { await fn(); } catch (e) { setError(errorText(e)); done = false; }
+    if (done && ok) setNotice(ok);
+    await Promise.all([load(), loadCharacters()]);
+    return done;
   };
 
   // ---- Team ----------------------------------------------------------------
@@ -106,7 +115,7 @@ export function ProjectTeam() {
     id: t.user_id, name: displayName(t.profile), nickname: t.profile.nickname ?? '', email: t.profile.email ?? '', phone: t.profile.phone ?? '',
     roles: roleNames(t.role_ids, roles), joined: t.joined_at.slice(0, 10), account: t.profile.has_account === false ? 'Not yet' : 'Yes',
     dietary: t.dietary ?? '', allergy: t.dietary_allergy ? 'Yes' : 'No',
-    plays: playsOf(t.user_id).map(charLabel).join(', '),
+    plays: playsOf(t.user_id).map(characterLabel).join(', '),
   })).sort((a, b) => a.name.localeCompare(b.name)), [team, roles, playsOf]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const teamOptions = useMemo(() => ({
@@ -124,12 +133,19 @@ export function ProjectTeam() {
         tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
       },
       {
-        // Set on the Characters page (or by picking a character on a shoot day call).
-        field: 'plays', header: 'Plays', width: 170, filter: 'set', filterSplit: ',',
-        tooltip: () => 'The characters they play. Change casting on the Characters page.',
-        render: ({ data }: { data: TeamRow }) => gridLinkList(playsOf(data.id).map((c) => ({
-          text: charLabel(c), to: itemPath.character(projectId, c.id), title: `Open ${c.name} on the Characters page`,
-        }))),
+        // The same link as each character's actor on the Characters page.
+        field: 'plays', header: 'Plays', width: 190,
+        pickMany: {
+          choices: (r: TeamRow) => characterChoices(r.id, characters, nameOf),
+          selected: (r: TeamRow) => characterIdsPlayedBy(r.id, characters),
+        } satisfies PickMany<TeamRow>,
+        tooltip: () => 'The characters they play. Picking here casts them on the Characters page too.',
+        render: ({ data }: { data: TeamRow }) => {
+          const plays = playsOf(data.id);
+          return gridDropdown(plays.length ? gridLinkList(plays.map((c) => ({
+            text: characterLabel(c), to: itemPath.character(projectId, c.id), title: `Open ${c.name} on the Characters page`,
+          }))) : gridEsc(NONE));
+        },
       },
       {
         field: 'dietary', header: 'Dietary needs', width: 200, editable: (r: TeamRow) => isAdmin || r.id === me,
@@ -146,9 +162,13 @@ export function ProjectTeam() {
         tooltip: (r: TeamRow) => r.account === 'Yes' ? 'Signed up' : 'Added before signing up. They join when they sign up with this email.' },
       { field: 'joined', header: 'Assigned', type: 'date', width: 120 },
     ],
-  }), [isAdmin, me, playsOf, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }), [isAdmin, me, playsOf, projectId, characters, nameOf]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveTeamCell(e: { data: TeamRow; column: string; newValue: unknown }) {
+    if (e.column === 'plays') {
+      await run(() => setCharactersPlayed(e.data.id, e.newValue as string[], characters));
+      return;
+    }
     if (e.column === 'dietary' || e.column === 'allergy') {
       const m = team.find((t) => t.user_id === e.data.id);
       const needs = e.column === 'dietary' ? String(e.newValue ?? '').trim() : m?.dietary ?? '';
@@ -229,7 +249,8 @@ export function ProjectTeam() {
               member={selected}
               roles={roles}
               types={types}
-              plays={playsOf(selected.user_id)}
+              characters={characters}
+              nameOf={nameOf}
               isMe={selected.user_id === me}
               isAdmin={isAdmin}
               run={run}
@@ -251,20 +272,39 @@ export function ProjectTeam() {
   );
 }
 
-function TeamPanel({ projectId, companyId, companyName, projectName, member, roles, types, plays, isMe, isAdmin, run, onRemoved }: {
+function TeamPanel({ projectId, companyId, companyName, projectName, member, roles, types, characters, nameOf, isMe, isAdmin, run, onRemoved }: {
   projectId: string; companyId: string; companyName: string; projectName: string; member: ProjectMember; roles: Role[];
-  types: TeamNoteType[]; plays: Character[]; isMe: boolean; isAdmin: boolean; run: Run; onRemoved: () => void;
+  types: TeamNoteType[]; characters: Character[]; nameOf: (id: string) => string | undefined; isMe: boolean; isAdmin: boolean; run: Run; onRemoved: () => void;
 }) {
   const name = displayName(member.profile);
   const roleIds = new Set(member.role_ids);
-  // Project roles and dietary needs are held until Save.
-  const initial = useMemo(() => ({ roles: [...member.role_ids].sort(), dietary: member.dietary ?? '', allergy: member.dietary_allergy }), [member]);
+  // Project roles, the characters they play and dietary needs are held until Save.
+  const playsKey = characterIdsPlayedBy(member.user_id, characters).sort().join();
+  const initial = useMemo(() => ({
+    roles: [...member.role_ids].sort(), plays: playsKey ? playsKey.split(',') : [], dietary: member.dietary ?? '', allergy: member.dietary_allergy,
+  }), [member, playsKey]);
   const [draft, setDraft] = useState(initial);
   const rolesChanged = draft.roles.join() !== initial.roles.join();
+  const playsChanged = [...draft.plays].sort().join() !== initial.plays.join();
   const foodChanged = draft.dietary.trim() !== initial.dietary || draft.allergy !== initial.allergy;
-  const changed = rolesChanged || foodChanged;
+  const changed = rolesChanged || playsChanged || foodChanged;
   useUnsaved(changed);
-  useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
+  // When the saved values reload (after Save, or a change in the table or elsewhere),
+  // take in the new ones for every field the person hasn't changed, and keep their edits.
+  const shown = useRef(initial);
+  useEffect(() => {
+    const before = shown.current;
+    shown.current = initial;
+    if (before === initial) return;
+    setDraft((d) => {
+      const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+      const next = { ...d };
+      for (const k of Object.keys(initial) as (keyof typeof initial)[]) {
+        if (same(k === 'plays' ? [...d.plays].sort() : k === 'dietary' ? d.dietary.trim() : d[k], before[k])) (next as Record<string, unknown>)[k] = initial[k];
+      }
+      return next;
+    });
+  }, [initial]);
   const toggleRole = (roleId: string, on: boolean) =>
     setDraft((d) => ({ ...d, roles: (on ? [...d.roles, roleId] : d.roles.filter((r) => r !== roleId)).sort() }));
   const canFood = isAdmin || isMe;
@@ -274,6 +314,7 @@ function TeamPanel({ projectId, companyId, companyName, projectName, member, rol
     const needs = draft.dietary.trim();
     await run(async () => {
       if (rolesChanged) await api.setTeamRoles(projectId, member.user_id, draft.roles);
+      if (playsChanged) await setCharactersPlayed(member.user_id, draft.plays, characters);
       if (foodChanged) await api.setDietary(projectId, member.user_id, needs || null, draft.allergy && Boolean(needs));
     }, `Saved ${isMe ? 'your' : `${name}'s`} details.`);
   }
@@ -293,25 +334,26 @@ function TeamPanel({ projectId, companyId, companyName, projectName, member, rol
         <InviteButtons info={{ name, email: member.profile.email ?? '', company: companyName, project: projectName }} />
       )}
       <PersonContacts userId={member.user_id} name={name} canEdit={false} />
-      {plays.length > 0 && (
-        <Section id="project.person.characters" title="Characters" level="h4" summary={plays.map((c) => c.name).join(', ')}>
-          <ul className="flex flex-col">
-            {plays.map((c) => (
-              <li key={c.id}>
-                <OpenLink to={itemPath.character(projectId, c.id)} title={`Open ${c.name} on the Characters page`}>
-                  {c.cast_number != null ? `#${c.cast_number} ` : ''}{c.name}
-                </OpenLink>
-              </li>
-            ))}
-          </ul>
-          <p className="hint">Change casting on the Characters page.</p>
-        </Section>
-      )}
       <form className="flex flex-col gap-2" onSubmit={save}>
         <Section id="project.person.roles" title="Project roles" level="h4" summary={isAdmin ? (draft.roles.length ? `${draft.roles.length} picked` : 'None') : undefined}>
           {isAdmin
             ? <RolePicker id="project.person.roles" roles={roles} selected={new Set(draft.roles)} onToggle={toggleRole} />
             : <p>{roleNames(roleIds, roles) || <span className="text-muted">No project roles</span>}</p>}
+        </Section>
+        <Section id="project.person.characters" title="Characters" level="h4"
+          summary={draft.plays.map((id) => characters.find((c) => c.id === id)?.name).filter(Boolean).join(', ') || 'None'}>
+          <div className="flex flex-col gap-2">
+            <TagPicker tags={characterChoices(member.user_id, characters, nameOf)} selected={draft.plays}
+              onChange={(ids) => setDraft({ ...draft, plays: ids })} noun="character" listLabel={`Characters ${name} plays`} maxLength={80} />
+            {draft.plays.length > 0 && (
+              <span className="flex flex-wrap gap-x-4">
+                {draft.plays.map((id) => characters.find((c) => c.id === id)).filter((c): c is Character => Boolean(c)).map((c) => (
+                  <OpenLink key={c.id} to={itemPath.character(projectId, c.id)} title={`Open ${c.name} on the Characters page`}>Open {c.name}</OpenLink>
+                ))}
+              </span>
+            )}
+            <p className="hint">The same casting as on the Characters page and shoot days. A character played by someone else moves to {isMe ? 'you' : name}.</p>
+          </div>
         </Section>
         <Section id="project.person.dietary" title="Dietary needs" level="h4" summary={foodSummary}>
           {canFood ? (
@@ -330,7 +372,7 @@ function TeamPanel({ projectId, companyId, companyName, projectName, member, rol
             <p className={member.dietary_allergy ? 'font-semibold text-danger' : ''}>{member.dietary ? foodSummary : <span className="text-muted">None given</span>}</p>
           )}
         </Section>
-        {(isAdmin || canFood) && (
+        {(
           <>
             <div className="flex gap-2">
               <button type="submit" className="btn flex-1 md:flex-none" disabled={!changed} data-pin="2">Save</button>
