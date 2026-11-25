@@ -82,7 +82,7 @@ notes.openapi(createRoute({
     db.from('shots').select('id, scene_id, sort_order, notes, note_by, note_at, updated_at').eq('project_id', id).order('sort_order'),
     db.from('shoot_days').select('id, shoot_date, title, notes, note_by, note_at, updated_at').eq('project_id', id),
     db.from('shoot_day_items').select('id, shoot_day_id, label, at_time, note_by, note_at, created_at').eq('project_id', id).eq('kind', 'note'),
-    db.from('shoot_day_calls').select(`shoot_day_id, user_id, note, note_by, note_at, created_at, profile:profiles(${profileFields})`).eq('project_id', id).not('note', 'is', null),
+    db.from('shoot_day_calls').select(`shoot_day_id, user_id, note, note_by, note_at, created_at, profile:profiles!shoot_day_calls_user_id_fkey(${profileFields})`).eq('project_id', id).not('note', 'is', null),
   ]).then((rs) => rs.map((r) => must<Row[]>(r)));
   const taskById = new Map(tasks.map((t: Row) => [t.id, t]));
   const sceneById = new Map(scenes.map((s: Row) => [s.id, s]));

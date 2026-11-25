@@ -59,7 +59,7 @@ async function oneDay(db: Db, id: string) {
 /** A day's calls with each person's profile and project roles, cast (with a character) first. */
 async function callsFor(db: Db, day: Row) {
   const [calls, roles] = await Promise.all([
-    db.from('shoot_day_calls').select(`*, profile:profiles(${profileFields})`).eq('shoot_day_id', day.id),
+    db.from('shoot_day_calls').select(`*, profile:profiles!shoot_day_calls_user_id_fkey(${profileFields})`).eq('shoot_day_id', day.id),
     db.from('project_member_roles').select('user_id, role_id').eq('project_id', day.project_id),
   ]);
   const byUser = rolesByUser(must(roles));
