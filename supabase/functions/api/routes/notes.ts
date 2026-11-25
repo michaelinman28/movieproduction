@@ -1,0 +1,137 @@
+import { createRoute, z } from '@hono/zod-openapi';
+import { authed, found, must } from '../context.ts';
+import { IdParam, ProjectNote, SceneNote, TaskNoteInput } from '../schemas.ts';
+import { body, errors, ok, profileFields, router, secured, send, withAuthors } from './common.ts';
+
+// Scene notes (many per scene, like task notes), and every note on a project in one
+// list for the Project Notes page. The project journal is separate and isn't here.
+export const notes = router();
+const sceneNoteTags = ['Scene notes'];
+
+// deno-lint-ignore no-explicit-any
+type Row = any;
+
+// ---- Scene notes -------------------------------------------------------------
+
+notes.openapi(createRoute({
+  method: 'get', path: '/scenes/{id}/notes', tags: sceneNoteTags, security: secured,
+  summary: 'Notes on a scene, oldest first',
+  request: { params: IdParam },
+  responses: { 200: ok(z.array(SceneNote)), 401: errors[401] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const rows = must<Row[]>(await db.from('scene_notes').select('*').eq('scene_id', c.req.valid('param').id).order('created_at'));
+  return send(c, await withAuthors(db, rows), 200);
+});
+
+notes.openapi(createRoute({
+  method: 'post', path: '/scenes/{id}/notes', tags: sceneNoteTags, security: secured,
+  summary: 'Add a note to a scene',
+  description: 'Anyone on the project can add notes. The note is signed by the caller.',
+  request: { params: IdParam, ...body(TaskNoteInput) },
+  responses: { 201: ok(SceneNote, 'Created'), 400: errors[400], 401: errors[401], 403: errors[403] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const row = must<Row>(await db.from('scene_notes').insert({ scene_id: c.req.valid('param').id, body: c.req.valid('json').body }).select('*').single());
+  return send(c, (await withAuthors(db, [row]))[0], 201);
+});
+
+notes.openapi(createRoute({
+  method: 'patch', path: '/scene-notes/{id}', tags: sceneNoteTags, security: secured,
+  summary: 'Edit your own scene note',
+  request: { params: IdParam, ...body(TaskNoteInput) },
+  responses: { 200: ok(SceneNote), 400: errors[400], 401: errors[401], 404: errors[404] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const row = found(must<Row[]>(await db.from('scene_notes').update({ body: c.req.valid('json').body }).eq('id', c.req.valid('param').id).select('*')));
+  return send(c, (await withAuthors(db, [row]))[0], 200);
+});
+
+notes.openapi(createRoute({
+  method: 'delete', path: '/scene-notes/{id}', tags: sceneNoteTags, security: secured,
+  summary: 'Delete a scene note (its author, or a company admin)',
+  request: { params: IdParam },
+  responses: { 204: { description: 'Deleted' }, 401: errors[401], 404: errors[404] },
+}), async (c) => {
+  const { db } = await authed(c);
+  found(must(await db.from('scene_notes').delete().eq('id', c.req.valid('param').id).select('id')));
+  return c.body(null, 204);
+});
+
+// ---- Every note on a project ---------------------------------------------------
+
+const dayLabel = (d: Row) => {
+  const date = new Date(`${d.shoot_date}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  return d.title ? `${date}: ${d.title}` : date;
+};
+const sceneLabel = (s: Row) => `Scene ${s.number}${s.set_name ? `: ${s.set_name}` : ''}`;
+const personName = (p: Row) => p?.nickname || p?.full_name || p?.email || 'Someone';
+
+notes.openapi(createRoute({
+  method: 'get', path: '/projects/{id}/notes', tags: ['Project notes'], security: secured,
+  summary: 'Every note on the project, newest first',
+  description: 'Task notes, scene notes, shot notes, shoot day notes, notes in a day\'s schedule and notes on people\'s calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.',
+  request: { params: IdParam },
+  responses: { 200: ok(z.array(ProjectNote)), 401: errors[401] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const { id } = c.req.valid('param');
+  const [tasks, scenes, shots, days, items, calls] = await Promise.all([
+    db.from('tasks').select('id, title').eq('project_id', id),
+    db.from('scenes').select('id, number, set_name').eq('project_id', id),
+    db.from('shots').select('id, scene_id, sort_order, notes, created_at, updated_at').eq('project_id', id).order('sort_order'),
+    db.from('shoot_days').select('id, shoot_date, title, notes, created_at, updated_at').eq('project_id', id),
+    db.from('shoot_day_items').select('id, shoot_day_id, label, at_time, created_at').eq('project_id', id).eq('kind', 'note'),
+    db.from('shoot_day_calls').select(`shoot_day_id, user_id, note, created_at, profile:profiles(${profileFields})`).eq('project_id', id).not('note', 'is', null),
+  ]).then((rs) => rs.map((r) => must<Row[]>(r)));
+  const taskById = new Map(tasks.map((t: Row) => [t.id, t]));
+  const sceneById = new Map(scenes.map((s: Row) => [s.id, s]));
+  const dayById = new Map(days.map((d: Row) => [d.id, d]));
+
+  const [taskNotes, sceneNotes] = await Promise.all([
+    tasks.length ? db.from('task_notes').select('*').in('task_id', tasks.map((t: Row) => t.id)) : { data: [], error: null },
+    scenes.length ? db.from('scene_notes').select('*').in('scene_id', scenes.map((s: Row) => s.id)) : { data: [], error: null },
+  ]).then((rs) => rs.map((r) => must<Row[]>(r)));
+  const [taskAuthored, sceneAuthored] = await Promise.all([withAuthors(db, taskNotes), withAuthors(db, sceneNotes)]);
+
+  const out: z.infer<typeof ProjectNote>[] = [];
+  for (const n of taskAuthored) {
+    const t = taskById.get(n.task_id);
+    out.push({ key: `task_note:${n.id}`, source: 'task', note_id: n.id, body: n.body, author: n.author, at: n.created_at, edited: n.updated_at > n.created_at,
+      item: { kind: 'task', id: n.task_id, label: t?.title ?? 'Task', detail: null } });
+  }
+  for (const n of sceneAuthored) {
+    const s = sceneById.get(n.scene_id);
+    out.push({ key: `scene_note:${n.id}`, source: 'scene', note_id: n.id, body: n.body, author: n.author, at: n.created_at, edited: n.updated_at > n.created_at,
+      item: { kind: 'scene', id: n.scene_id, label: s ? sceneLabel(s) : 'Scene', detail: null } });
+  }
+  // Shots are numbered by their place in their scene's list.
+  const shotNumber = new Map<string, number>();
+  const perScene = new Map<string, number>();
+  for (const sh of shots) {
+    const n = (perScene.get(sh.scene_id) ?? 0) + 1;
+    perScene.set(sh.scene_id, n);
+    shotNumber.set(sh.id, n);
+  }
+  for (const sh of shots.filter((x: Row) => x.notes)) {
+    const s = sceneById.get(sh.scene_id);
+    out.push({ key: `shot:${sh.id}`, source: 'shot', note_id: null, body: sh.notes, author: null, at: sh.updated_at, edited: false,
+      item: { kind: 'scene', id: sh.scene_id, label: s ? sceneLabel(s) : 'Scene', detail: `Shot ${shotNumber.get(sh.id)}` } });
+  }
+  for (const d of days.filter((x: Row) => x.notes)) {
+    out.push({ key: `shoot_day:${d.id}`, source: 'shoot_day', note_id: null, body: d.notes, author: null, at: d.updated_at, edited: false,
+      item: { kind: 'shoot_day', id: d.id, label: dayLabel(d), detail: 'Day notes' } });
+  }
+  for (const it of items) {
+    const d = dayById.get(it.shoot_day_id);
+    out.push({ key: `schedule:${it.id}`, source: 'schedule', note_id: null, body: it.label ?? '', author: null, at: it.created_at, edited: false,
+      item: { kind: 'shoot_day', id: it.shoot_day_id, label: d ? dayLabel(d) : 'Shoot day', detail: it.at_time ? `Schedule, ${String(it.at_time).slice(0, 5)}` : 'Schedule' } });
+  }
+  for (const cl of calls) {
+    const d = dayById.get(cl.shoot_day_id);
+    out.push({ key: `call:${cl.shoot_day_id}:${cl.user_id}`, source: 'call', note_id: null, body: cl.note, author: null, at: cl.created_at, edited: false,
+      item: { kind: 'shoot_day', id: cl.shoot_day_id, label: d ? dayLabel(d) : 'Shoot day', detail: `Call for ${personName(cl.profile)}` } });
+  }
+  out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  return send(c, out, 200);
+});

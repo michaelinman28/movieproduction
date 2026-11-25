@@ -21,6 +21,8 @@ day to day.
 | Locations | Each project's locations, with a status (Considering, Confirmed, Not using; Not using ones are hidden unless you ask, and aren't offered for tasks), a description, an address (the Map column, the panel and the task panel open it in the device's own maps app: Apple Maps on iPhone, iPad and Mac, the default maps app on Android, Google Maps in the browser elsewhere; `src/lib/maps.ts`) an on-site contact name, email and phone, and parking and the nearest hospital for call sheets. Anyone on the project adds and edits them; whoever added one or an admin deletes it. A task can be assigned to a location | Done |
 | Scenes and shot lists | Each project's scenes on its Scenes page, in script order (drag to reorder): number, set, INT/EXT, day or night, pages in eighths, synopsis, characters, needs, location and status (Not scheduled, Scheduled, Shot). Each scene has a shot list in its form: shots in shooting order with size, angle, movement, lens, equipment, estimated minutes and notes, ticked Done on set with one tap. Anyone on the project adds, edits and reorders them; whoever added a scene, or an admin, deletes it (with its shots). See [Scenes](#scenes-and-shot-lists) below | Done |
 | Shoot days and call sheets | Each project's shoot days on its Shoot days page: date, location, crew call, shooting call, lunch, wrap, weather (looked up from the location's address), sunrise and sunset, notes, an ordered schedule of scenes, meal breaks, company moves and notes, and who is called (each person's call time; cast with character, pickup and makeup). Each day's call sheet is built from all that, sent as a new version (by email from your own app, or copied), and confirmed by each person; it prints cleanly. See [Shoot days](#shoot-days-and-call-sheets) below | Done |
+| Scene notes | Any number of notes on a scene, in their own Notes section of the scene form (apart from Details and the Shot list, so those can be folded away). Like task notes: anyone on the project adds them, the author edits their own, and the author or an admin deletes one | Done |
+| Project notes | The Project notes page lists every note on a project, newest first: task notes, scene notes, shot notes, shoot day notes, notes in a day's schedule and notes on people's calls. Each links back to where it was taken (opening that item's form), where it's edited. Separate from the journal | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
 
 ### Tasks
@@ -221,6 +223,8 @@ There are three layers, and each one can be run and tested by itself.
 | Project team | `GET/POST /projects/{id}/members`, `DELETE /projects/{id}/members/{userId}`, `PUT …/roles` |
 | Tasks | `GET/POST /projects/{id}/tasks`, `GET/PATCH/DELETE /tasks/{id}` (deleting a task deletes its sub-tasks) |
 | Task notes | `GET/POST /tasks/{id}/notes`, `PATCH/DELETE /task-notes/{id}` |
+| Scene notes | `GET/POST /scenes/{id}/notes`, `PATCH/DELETE /scene-notes/{id}` |
+| Project notes | `GET /projects/{id}/notes`: every note on the project, each with the item it was taken on |
 | Task categories | `GET/POST /companies/{id}/task-categories`, `PATCH/DELETE /task-categories/{id}` |
 | Scenes | `GET/POST /projects/{id}/scenes` (with shot counts and time), `PUT /projects/{id}/scene-order`, `PATCH/DELETE /scenes/{id}` |
 | Shots | `GET /projects/{id}/shots`, `GET/POST /scenes/{id}/shots`, `PUT /scenes/{id}/shot-order`, `PATCH/DELETE /shots/{id}` |
@@ -265,6 +269,7 @@ There are three layers, and each one can be run and tested by itself.
 | `project_members` | People assigned to a project |
 | `tasks` | Project tasks. `parent_id` makes a sub-task; due date with optional part of day or time |
 | `task_notes` | Notes on a task, with author and time |
+| `scene_notes` | Notes on a scene, with author and time (same rules as task notes) |
 | `task_categories`, `task_tags`, `task_tag_links` | Each company's task categories and tags, and which tags each task has |
 | `scenes` | A project's scenes in order: number, set, INT/EXT, time of day, pages in eighths, synopsis, characters, needs, location, status |
 | `shots` | Each scene's shots in order: size, angle, movement, lens, equipment, estimated minutes, done, notes |
@@ -295,7 +300,7 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   for bigger screens. For example, `flex flex-col gap-3 md:flex-row` stacks on a
   phone and sits side by side on a laptop.
 - **Project pages have a left nav.** A project's areas (Overview, Tasks, Scenes, Shoot days,
-  Locations, Team, Journal) are separate pages under `/projects/:id`, framed by
+  Locations, Team, Project notes, Journal) are separate pages under `/projects/:id`, framed by
   `src/pages/project/ProjectLayout.tsx`: the project's name, and a nav that is a left
   column from `md:` up and a row of tabs (scrolling sideways inside itself) on phones,
   plus links to the company's pages. The layout loads the project, team, roles and
@@ -413,7 +418,7 @@ Every screen is designed for a phone first, then enhanced for larger screens.
 
 ```
 src/                         React app
-  components/                LatticeGrid wrapper, TaskTree (grid + panel), TaskCalendar, TaskGantt, TaskNotes,
+  components/                LatticeGrid wrapper, TaskTree (grid + panel), TaskCalendar, TaskGantt, Notes (task and scene notes),
                              TagPicker, RolePicker, ThemeSwitch
   lib/api.ts                 API client used by every page
   lib/supabase.ts, auth.tsx  Sign-in session only

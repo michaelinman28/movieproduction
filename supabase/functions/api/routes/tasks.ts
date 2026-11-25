@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { authed, found, must } from '../context.ts';
 import { IdParam, Task, TaskCreate, TaskNote, TaskNoteInput, TaskUpdate } from '../schemas.ts';
-import { body, errors, ok, profileFields, router, secured, send } from './common.ts';
+import { body, errors, ok, router, secured, send, withAuthors } from './common.ts';
 
 export const tasks = router();
 const tags = ['Tasks'];
@@ -111,15 +111,6 @@ tasks.openapi(createRoute({
 // ---- Notes ------------------------------------------------------------------
 
 const notesTags = ['Task notes'];
-
-/** Attach each note's author profile. */
-// deno-lint-ignore no-explicit-any
-async function withAuthors(db: any, notes: Row[]) {
-  const ids = [...new Set(notes.map((n) => n.author_id))];
-  const profiles = ids.length ? must<Row[]>(await db.from('profiles').select(profileFields).in('id', ids)) : [];
-  const byId = new Map(profiles.map((p: Row) => [p.id, p]));
-  return notes.map((n) => ({ ...n, author: byId.get(n.author_id) ?? { id: n.author_id, full_name: null, nickname: null, email: null, phone: null, has_account: true } }));
-}
 
 tasks.openapi(createRoute({
   method: 'get', path: '/tasks/{id}/notes', tags: notesTags, security: secured,

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Section } from './Section';
-import { api, type TaskNote } from '../lib/api';
+import { api, type Note } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { displayName, errorText } from '../lib/format';
 import { useUnsaved } from '../lib/unsaved';
@@ -8,11 +8,44 @@ import { useUnsaved } from '../lib/unsaved';
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
+/** Loads, adds, edits and deletes one item's notes. */
+interface NoteStore {
+  list: () => Promise<Note[]>;
+  add: (body: string) => Promise<unknown>;
+  update: (id: string, body: string) => Promise<unknown>;
+  remove: (id: string) => Promise<unknown>;
+}
+
 /** The notes on one task: anyone on the project adds them, authors edit their own. */
 export function TaskNotes({ taskId, canManage }: { taskId: string; canManage: boolean }) {
+  const store = useMemo<NoteStore>(() => ({
+    list: () => api.taskNotes(taskId),
+    add: (body) => api.addTaskNote(taskId, body),
+    update: api.updateTaskNote,
+    remove: api.deleteTaskNote,
+  }), [taskId]);
+  return <Notes sectionId="task.notes" store={store} canManage={canManage} />;
+}
+
+/** The notes on one scene, kept apart from its details and shot list. */
+export function SceneNotes({ sceneId, canManage }: { sceneId: string; canManage: boolean }) {
+  const store = useMemo<NoteStore>(() => ({
+    list: () => api.sceneNotes(sceneId),
+    add: (body) => api.addSceneNote(sceneId, body),
+    update: api.updateSceneNote,
+    remove: api.deleteSceneNote,
+  }), [sceneId]);
+  return <Notes sectionId="project.scenes.notes" store={store} canManage={canManage} />;
+}
+
+/**
+ * An item's notes, oldest first: anyone who can see the item adds them, authors edit
+ * their own, and the author or an admin (canManage) deletes one. Adding happens at once.
+ */
+function Notes({ sectionId, store, canManage }: { sectionId: string; store: NoteStore; canManage: boolean }) {
   const { session } = useAuth();
   const me = session?.user.id;
-  const [notes, setNotes] = useState<TaskNote[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [draft, setDraft] = useState('');
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
@@ -21,9 +54,9 @@ export function TaskNotes({ taskId, canManage }: { taskId: string; canManage: bo
   useUnsaved(Boolean(draft.trim()) || Boolean(editing && editing.body.trim() !== notes.find((n) => n.id === editing.id)?.body));
 
   const load = useCallback(async () => {
-    try { setNotes(await api.taskNotes(taskId)); } catch (e) { setError(errorText(e)); }
+    try { setNotes(await store.list()); } catch (e) { setError(errorText(e)); }
     setLoaded(true);
-  }, [taskId]);
+  }, [store]);
   useEffect(() => { load(); }, [load]);
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -36,20 +69,20 @@ export function TaskNotes({ taskId, canManage }: { taskId: string; canManage: bo
   async function add(e: FormEvent) {
     e.preventDefault();
     const body = draft.trim();
-    if (body && await run(() => api.addTaskNote(taskId, body))) setDraft('');
+    if (body && await run(() => store.add(body))) setDraft('');
   }
 
   async function saveEdit(e: FormEvent) {
     e.preventDefault();
-    if (editing && await run(() => api.updateTaskNote(editing.id, editing.body.trim()))) setEditing(null);
+    if (editing && await run(() => store.update(editing.id, editing.body.trim()))) setEditing(null);
   }
 
-  async function remove(n: TaskNote) {
-    if (window.confirm('Delete this note?')) await run(() => api.deleteTaskNote(n.id));
+  async function remove(n: Note) {
+    if (window.confirm('Delete this note?')) await run(() => store.remove(n.id));
   }
 
   return (
-    <Section id="task.notes" title="Notes" level="h4" summary={notes.length || undefined} bodyClassName="flex flex-col gap-2">
+    <Section id={sectionId} title="Notes" level="h4" summary={notes.length || undefined} bodyClassName="flex flex-col gap-2">
       {error && <p className="error">{error}</p>}
       {!loaded ? <p className="hint">Loading notes…</p> : !notes.length && <p className="hint">No notes yet.</p>}
       <ul className="flex flex-col gap-2">

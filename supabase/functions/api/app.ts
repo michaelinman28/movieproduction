@@ -12,6 +12,7 @@ import { locations } from './routes/locations.ts';
 import { people } from './routes/people.ts';
 import { scenes } from './routes/scenes.ts';
 import { shootDays } from './routes/shootDays.ts';
+import { notes } from './routes/notes.ts';
 
 export const API_VERSION = '0.1.0';
 
@@ -46,6 +47,7 @@ export function createApp(config: ApiConfig) {
   api.route('/', people);
   api.route('/', scenes);
   api.route('/', shootDays);
+  api.route('/', notes);
 
   api.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http', scheme: 'bearer', bearerFormat: 'JWT',

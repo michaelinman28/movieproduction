@@ -29,6 +29,7 @@ const AREAS = [
   { to: 'shoot-days', label: 'Shoot days' },
   { to: 'locations', label: 'Locations' },
   { to: 'team', label: 'Team' },
+  { to: 'notes', label: 'Project notes' },
   { to: 'journal', label: 'Journal' },
 ];
 

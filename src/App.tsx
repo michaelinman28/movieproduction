@@ -5,6 +5,7 @@ import { SignIn } from './pages/SignIn';
 import { Home } from './pages/Home';
 import { CompanyPage } from './pages/CompanyPage';
 import { ProjectJournal, ProjectLayout } from './pages/project/ProjectLayout';
+import { ProjectNotes } from './pages/project/ProjectNotes';
 import { ProjectLocationsPage, ProjectOverview, ProjectTasks } from './pages/project/ProjectOverview';
 import { ProjectTeam } from './pages/project/ProjectTeam';
 import { ProjectScenes } from './pages/project/ProjectScenes';
@@ -67,6 +68,7 @@ export function App() {
             <Route path="shoot-days/:dayId" element={<CallSheetPage />} />
             <Route path="locations" element={<ProjectLocationsPage />} />
             <Route path="team" element={<ProjectTeam />} />
+            <Route path="notes" element={<ProjectNotes />} />
             <Route path="journal" element={<ProjectJournal />} />
           </Route>
           <Route path="/profile" element={<ProfilePage />} />

@@ -121,7 +121,17 @@ export interface LinkedCallSheet {
   next_day: { day: Pick<ShootDay, 'shoot_date' | 'crew_call' | 'title' | 'day_number'>; scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths'>[] } | null;
 }
 
-export interface TaskNote { id: string; task_id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
+/** A note on a task or scene (many per item; the author edits it). */
+export interface Note { id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
+export interface TaskNote extends Note { task_id: string }
+export interface SceneNote extends Note { scene_id: string }
+/** Where a note on the Project Notes page was taken. */
+export type NoteSource = 'task' | 'scene' | 'shot' | 'shoot_day' | 'schedule' | 'call';
+/** A note from anywhere on a project, with the item it belongs to. */
+export interface ProjectNote {
+  key: string; source: NoteSource; note_id: string | null; body: string; author: Profile | null; at: string; edited: boolean;
+  item: { kind: 'task' | 'scene' | 'shoot_day'; id: string; label: string; detail: string | null };
+}
 
 const enc = encodeURIComponent;
 
@@ -224,6 +234,11 @@ export const api = {
   addTaskNote: (taskId: string, body: string) => call<TaskNote>('POST', `/tasks/${enc(taskId)}/notes`, { body }),
   updateTaskNote: (id: string, body: string) => call<TaskNote>('PATCH', `/task-notes/${enc(id)}`, { body }),
   deleteTaskNote: (id: string) => call<void>('DELETE', `/task-notes/${enc(id)}`),
+  sceneNotes: (sceneId: string) => call<SceneNote[]>('GET', `/scenes/${enc(sceneId)}/notes`),
+  addSceneNote: (sceneId: string, body: string) => call<SceneNote>('POST', `/scenes/${enc(sceneId)}/notes`, { body }),
+  updateSceneNote: (id: string, body: string) => call<SceneNote>('PATCH', `/scene-notes/${enc(id)}`, { body }),
+  deleteSceneNote: (id: string) => call<void>('DELETE', `/scene-notes/${enc(id)}`),
+  projectNotes: (projectId: string) => call<ProjectNote[]>('GET', `/projects/${enc(projectId)}/notes`),
 };
 
 export const API_BASE = BASE;

@@ -332,7 +332,22 @@ const [sc3] = await as(U.a, `insert into scenes (project_id,number) values ($1,'
 await expect('only the creator or an admin deletes a scene', () => as(U.b, `delete from scenes where id=$1 returning id`, [sc3.id]), len(0));
 await expect('anyone on the project deletes a shot', () => as(U.b, `delete from shots where id=$1 returning id`, [sh2.id]), len(1));
 await expect('deleting a location clears it from scenes', async () => { await as(U.a, `delete from project_locations where id=$1`, [locF.id]); return as(U.b, `select location_id from scenes where id=$1`, [sc.id]); }, r => r[0]?.location_id === null);
+// scene notes
+const [sn] = await as(U.b, `insert into scene_notes (scene_id,body) values ($1,'  Check the diner sign  ') returning *`, [sc.id]);
+await expect('member adds a scene note, trimmed and signed', () => Promise.resolve([sn]), r => r[0].body === 'Check the diner sign' && r[0].author_id === U.b);
+await expect('many notes per scene', () => as(U.a, `insert into scene_notes (scene_id,body) values ($1,'Admin note') returning id`, [sc.id]), len(1));
+await expect('blank scene note refused', () => as(U.b, `insert into scene_notes (scene_id,body) values ($1,'  ')`, [sc.id]), isErr);
+await expect('cannot post a scene note as someone else', () => as(U.b, `insert into scene_notes (scene_id,body,author_id) values ($1,'x',$2)`, [sc.id, U.a]), isErr);
+await expect('off-project member cannot read scene notes', () => as(U.d, `select * from scene_notes`), len(0));
+await expect('outsider cannot add a scene note', () => as(U.c, `insert into scene_notes (scene_id,body) values ($1,'x')`, [sc.id]), isErr);
+await expect('only the author edits a scene note', () => as(U.a, `update scene_notes set body='hack' where id=$1 returning id`, [sn.id]), len(0));
+await expect('author edits own scene note', () => as(U.b, `update scene_notes set body='Sign is fixed' where id=$1 returning body`, [sn.id]), r => r[0]?.body === 'Sign is fixed');
+await expect('scene note cannot move scene', () => as(U.b, `update scene_notes set scene_id=$1 where id=$2 returning scene_id`, [sc2.id, sn.id]), r => r[0]?.scene_id === sc.id);
+const [an] = await as(U.a, `select id from scene_notes where body='Admin note'`);
+await expect('member cannot delete someone else\'s scene note', () => as(U.b, `delete from scene_notes where id=$1 returning id`, [an.id]), len(0));
+await expect('admin can delete a scene note', () => as(U.a, `delete from scene_notes where id=$1 returning id`, [sn.id]), len(1));
 await expect('deleting a scene deletes its shots', async () => { await as(U.b, `delete from scenes where id=$1`, [sc.id]); return as(U.a, `select * from shots where scene_id=$1`, [sc.id]); }, len(0));
+await expect('deleting a scene deletes its notes', () => as(U.a, `select * from scene_notes where scene_id=$1`, [sc.id]), len(0));
 // shoot days and call sheets
 const [sdLoc] = await as(U.b, `insert into project_locations (project_id,name,parking,nearest_hospital) values ($1,'Diner',' Lot behind ','  St. Mary ER ') returning *`, [lp.id]);
 await expect('location parking and hospital tidied', () => Promise.resolve([sdLoc]), r => r[0].parking === 'Lot behind' && r[0].nearest_hospital === 'St. Mary ER');

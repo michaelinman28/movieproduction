@@ -23,6 +23,8 @@ tasks, sub-tasks and (next) a project journal.
 | Locations | Each project's locations with a status (Considering, Confirmed, Not using), description, address (opens in your phone's or computer's maps app) and contact (name, email, phone); tasks can be assigned to one |
 | Scenes and shot lists | Each project's scenes in script order (set, INT/EXT, day or night, pages, characters, needs, location, status), each with a shot list (size, angle, movement, lens, equipment, time) ticked off on set |
 | Shoot days and call sheets | Each shoot day's location, times, weather, ordered schedule and who is called; its call sheet is built from that, sent as a new version, confirmed by each person, and printable |
+| Scene notes | Any number of notes on each scene, in their own section of the scene form |
+| Project notes | Every note on a project in one list (tasks, scenes, shots, shoot days, schedules, calls), each linking back to where it was taken |
 | Journal | Coming next: private, shared and public entries per project |
 
 A company admin adds people by email. Someone who hasn't signed up yet is added with
@@ -99,6 +101,7 @@ confirmation emails link back to the app.
 | Call sheet | `/projects/:id/shoot-days/:dayId` | A day's call sheet: send, email, copy, print, and confirm your own call |
 | Project locations | `/projects/:id/locations` | The project's locations |
 | Project team | `/projects/:id/team` | Who's on the project and their project roles |
+| Project notes | `/projects/:id/notes` | Every note on the project, linking back to where each was taken |
 | Project journal | `/projects/:id/journal` | Coming next |
 | Profile | `/profile` | Your name and phone number |
 

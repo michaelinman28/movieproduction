@@ -1,6 +1,6 @@
 import { OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
-import type { Env } from '../context.ts';
+import { must, type Env } from '../context.ts';
 import { Error } from '../schemas.ts';
 
 export const router = () => new OpenAPIHono<Env>();
@@ -33,6 +33,16 @@ export function rolesByUser(rows: { user_id: string; role_id: string }[] | null)
 }
 
 export const profileFields = 'id, full_name, nickname, email, phone, has_account';
+
+/** Attach each note's author profile (from author_id). */
+// deno-lint-ignore no-explicit-any
+export async function withAuthors<T extends { author_id: string }>(db: any, notes: T[]) {
+  const ids = [...new Set(notes.map((n) => n.author_id))];
+  // deno-lint-ignore no-explicit-any
+  const profiles: any[] = ids.length ? must(await db.from('profiles').select(profileFields).in('id', ids)) : [];
+  const byId = new Map(profiles.map((p) => [p.id, p]));
+  return notes.map((n) => ({ ...n, author: byId.get(n.author_id) ?? { id: n.author_id, full_name: null, nickname: null, email: null, phone: null, has_account: true } }));
+}
 
 /** Replace the role set of a member: deletes the ones not listed and inserts the new ones. */
 export async function setRoles(
