@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { LatticeGrid, gridDropdown, gridEsc } from '../../components/LatticeGrid';
+import { LatticeGrid, gridDropdown, gridEsc, gridLinkList } from '../../components/LatticeGrid';
+import { OpenLink } from '../../components/OpenLink';
 import { TeamNotes } from '../../components/TeamNotes';
 import { RenameForm } from '../../components/RenameForm';
 import { useAuth } from '../../lib/auth';
 import { Section } from '../../components/Section';
 import { RolePicker } from '../../components/RolePicker';
 import { PersonContacts } from '../../components/PersonContacts';
-import { api, type ProjectMember, type TeamNoteType } from '../../lib/api';
+import { api, type Character, type ProjectMember, type TeamNoteType } from '../../lib/api';
 import { displayName, errorText, roleIdsFor, roleNames } from '../../lib/format';
 import type { Role } from '../../lib/database.types';
 import type { Run } from '../CompanyPage';
@@ -18,7 +19,7 @@ import { emailProblem, formatPhone, phoneOrThrow } from '../../lib/contact';
 import { InviteButtons } from '../../components/InviteButtons';
 import { useProject } from './ProjectLayout';
 
-interface TeamRow { id: string; name: string; nickname: string; roles: string; email: string; phone: string; joined: string; account: string; dietary: string; allergy: string }
+interface TeamRow { id: string; name: string; nickname: string; roles: string; email: string; phone: string; joined: string; account: string; dietary: string; allergy: string; plays: string }
 
 /** The project's team: who's assigned, and their project roles. */
 export function ProjectTeam() {
@@ -31,6 +32,11 @@ export function ProjectTeam() {
     try { setTypes(await api.teamNoteTypes(project.company_id)); } catch (e) { setError(errorText(e)); }
   }, [project.company_id]);
   useEffect(() => { loadTypes(); }, [loadTypes]);
+  // The characters each person plays (set on the Characters page).
+  const [characters, setCharacters] = useState<Character[]>([]);
+  useEffect(() => { api.characters(projectId).then(setCharacters).catch((e) => setError(errorText(e))); }, [projectId, team]);
+  const playsOf = useCallback((userId: string) => characters.filter((c) => c.actor_id === userId), [characters]);
+  const charLabel = (c: Character) => (c.cast_number != null ? `${c.name} (#${c.cast_number})` : c.name);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const load = reload;
@@ -100,7 +106,8 @@ export function ProjectTeam() {
     id: t.user_id, name: displayName(t.profile), nickname: t.profile.nickname ?? '', email: t.profile.email ?? '', phone: t.profile.phone ?? '',
     roles: roleNames(t.role_ids, roles), joined: t.joined_at.slice(0, 10), account: t.profile.has_account === false ? 'Not yet' : 'Yes',
     dietary: t.dietary ?? '', allergy: t.dietary_allergy ? 'Yes' : 'No',
-  })).sort((a, b) => a.name.localeCompare(b.name)), [team, roles]);
+    plays: playsOf(t.user_id).map(charLabel).join(', '),
+  })).sort((a, b) => a.name.localeCompare(b.name)), [team, roles, playsOf]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const teamOptions = useMemo(() => ({
     rowId: (r: TeamRow) => r.id,
@@ -117,6 +124,14 @@ export function ProjectTeam() {
         tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
       },
       {
+        // Set on the Characters page (or by picking a character on a shoot day call).
+        field: 'plays', header: 'Plays', width: 170, filter: 'set', filterSplit: ',',
+        tooltip: () => 'The characters they play. Change casting on the Characters page.',
+        render: ({ data }: { data: TeamRow }) => gridLinkList(playsOf(data.id).map((c) => ({
+          text: charLabel(c), to: itemPath.character(projectId, c.id), title: `Open ${c.name} on the Characters page`,
+        }))),
+      },
+      {
         field: 'dietary', header: 'Dietary needs', width: 200, editable: (r: TeamRow) => isAdmin || r.id === me,
         tooltip: () => 'Shown on the call sheet for catering',
         render: ({ value, data }: { value: string; data: TeamRow }) => (data.allergy === 'Yes' && value ? `<span class="task-overdue">${gridEsc(value)}</span>` : gridEsc(value)),
@@ -131,7 +146,7 @@ export function ProjectTeam() {
         tooltip: (r: TeamRow) => r.account === 'Yes' ? 'Signed up' : 'Added before signing up. They join when they sign up with this email.' },
       { field: 'joined', header: 'Assigned', type: 'date', width: 120 },
     ],
-  }), [isAdmin, me]);
+  }), [isAdmin, me, playsOf, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveTeamCell(e: { data: TeamRow; column: string; newValue: unknown }) {
     if (e.column === 'dietary' || e.column === 'allergy') {
@@ -214,6 +229,7 @@ export function ProjectTeam() {
               member={selected}
               roles={roles}
               types={types}
+              plays={playsOf(selected.user_id)}
               isMe={selected.user_id === me}
               isAdmin={isAdmin}
               run={run}
@@ -235,9 +251,9 @@ export function ProjectTeam() {
   );
 }
 
-function TeamPanel({ projectId, companyId, companyName, projectName, member, roles, types, isMe, isAdmin, run, onRemoved }: {
+function TeamPanel({ projectId, companyId, companyName, projectName, member, roles, types, plays, isMe, isAdmin, run, onRemoved }: {
   projectId: string; companyId: string; companyName: string; projectName: string; member: ProjectMember; roles: Role[];
-  types: TeamNoteType[]; isMe: boolean; isAdmin: boolean; run: Run; onRemoved: () => void;
+  types: TeamNoteType[]; plays: Character[]; isMe: boolean; isAdmin: boolean; run: Run; onRemoved: () => void;
 }) {
   const name = displayName(member.profile);
   const roleIds = new Set(member.role_ids);
@@ -277,6 +293,20 @@ function TeamPanel({ projectId, companyId, companyName, projectName, member, rol
         <InviteButtons info={{ name, email: member.profile.email ?? '', company: companyName, project: projectName }} />
       )}
       <PersonContacts userId={member.user_id} name={name} canEdit={false} />
+      {plays.length > 0 && (
+        <Section id="project.person.characters" title="Characters" level="h4" summary={plays.map((c) => c.name).join(', ')}>
+          <ul className="flex flex-col">
+            {plays.map((c) => (
+              <li key={c.id}>
+                <OpenLink to={itemPath.character(projectId, c.id)} title={`Open ${c.name} on the Characters page`}>
+                  {c.cast_number != null ? `#${c.cast_number} ` : ''}{c.name}
+                </OpenLink>
+              </li>
+            ))}
+          </ul>
+          <p className="hint">Change casting on the Characters page.</p>
+        </Section>
+      )}
       <form className="flex flex-col gap-2" onSubmit={save}>
         <Section id="project.person.roles" title="Project roles" level="h4" summary={isAdmin ? (draft.roles.length ? `${draft.roles.length} picked` : 'None') : undefined}>
           {isAdmin

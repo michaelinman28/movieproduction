@@ -5,7 +5,7 @@ import { OpenLink } from '../../components/OpenLink';
 import { Section } from '../../components/Section';
 import { ItemHistory } from '../../components/ItemHistory';
 import {
-  api, type Location, type Scene, type ShootDay, type ShootDayCall, type ShootDayCallInput, type ShootDayInput, type ShootDayItem, type ShootItemKind,
+  api, type Character, type Location, type Scene, type ShootDay, type ShootDayCall, type ShootDayCallInput, type ShootDayInput, type ShootDayItem, type ShootItemKind,
 } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import {
@@ -520,14 +520,19 @@ interface CallRow {
 function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<void> }) {
   const { projectId, team, roles } = useProject();
   const [calls, setCalls] = useState<ShootDayCall[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addId, setAddId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
 
   const load = useCallback(async () => {
-    try { setCalls(await api.shootDayCalls(day.id)); } catch (e) { setError(errorText(e)); }
-  }, [day.id]);
+    try {
+      const [c, ch] = await Promise.all([api.shootDayCalls(day.id), api.characters(projectId)]);
+      setCalls(c);
+      setCharacters(ch);
+    } catch (e) { setError(errorText(e)); }
+  }, [day.id, projectId]);
   useEffect(() => { load(); }, [load]);
 
   const run: Run = async (fn) => {
@@ -560,14 +565,22 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
       },
       { field: 'department', header: 'Department', width: 130, filter: 'set' },
       { field: 'roles', header: 'Roles', width: 180, filterSplit: ',' },
-      { field: 'character', header: 'Character', width: 150, editable: true, tooltip: () => 'From the Characters page, unless you type one here' },
+      {
+        // Picking a character makes this person its actor on the Characters page.
+        field: 'character', header: 'Character', width: 170, editable: true, editor: 'select', editorOptions: [NONE, ...characters.map((c) => c.name)],
+        render: ({ value, data }: { value: string; data: CallRow }) => {
+          const ch = characters.find((c) => c.actor_id === data.id);
+          return gridDropdown(gridEsc(value || NONE), ch ? { to: itemPath.character(projectId, ch.id), title: `Open ${ch.name} on the Characters page` } : null);
+        },
+        tooltip: () => 'Pick the character they play. It sets them as the actor on the Characters page.',
+      },
       { field: 'call', header: 'Call', width: 110, editable: true, render: ({ value }: { value: string }) => gridEsc(value || (crewCall ? `${crewCall} (crew)` : '')) },
       { field: 'pickup', header: 'Pickup', width: 100, editable: true },
       { field: 'makeup', header: 'Makeup', width: 100, editable: true },
       { field: 'note', header: 'Note', width: 200, editable: true },
       { field: 'status', header: 'Call sheet', width: 130, filter: 'set' },
     ],
-  }), [crewCall, projectId]);
+  }), [crewCall, projectId, characters]);
 
   async function saveCell(e: { data: CallRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
@@ -575,12 +588,26 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
     await run(async () => {
       const patch: ShootDayCallInput = {};
       if (timeKey) patch[timeKey] = parseTime(v);
-      // Blank, or the characters they're cast as, means no typed-in character.
-      else if (e.column === 'character') patch.character_name = v && v !== castLabel({ characters: calls.find((c) => c.user_id === e.data.id)?.characters, character_name: null }) ? v : null;
+      else if (e.column === 'character') {
+        const ch = characters.find((c) => c.name === v);
+        if (!ch && v && v !== NONE) return; // their current list of characters, unchanged
+        return castAs(e.data.id, ch?.id ?? null);
+      }
       else if (e.column === 'note') patch.note = v || null;
       else return;
       return api.setShootDayCall(day.id, e.data.id, patch);
     });
+  }
+
+  /**
+   * Cast someone as a character: they become its actor on the Characters page, and any
+   * character typed on their calls is cleared. With no character, they're taken off
+   * every character they play.
+   */
+  async function castAs(userId: string, characterId: string | null) {
+    if (characterId) await api.updateCharacter(characterId, { actor_id: userId });
+    else for (const ch of characters.filter((c) => c.actor_id === userId)) await api.updateCharacter(ch.id, { actor_id: null });
+    if (calls.find((c) => c.user_id === userId)?.character_name) await api.setShootDayCall(day.id, userId, { character_name: null });
   }
 
   const called = new Set(calls.map((c) => c.user_id));
@@ -623,11 +650,11 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
             cellValueChanged: saveCell,
             selectionChanged: (r: CallRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
           }} />
-        {selected && <CallForm key={selected.user_id} day={day} call={selected} run={run} onRemoved={() => setSelectedId(null)} />}
+        {selected && <CallForm key={selected.user_id} day={day} call={selected} characters={characters} castAs={castAs} run={run} onRemoved={() => setSelectedId(null)} />}
       </div>
       {rows.length > 0 && (
         <p className="hint mt-2">
-          A blank call means the general crew call{crewCall ? ` (${crewCall})` : ''}. Give actors their character and they're listed as cast.
+          A blank call means the general crew call{crewCall ? ` (${crewCall})` : ''}. Pick an actor's character and they're listed as cast; that also sets them as the actor on the Characters page.
           Add people to the project on the Team page first.
         </p>
       )}
@@ -635,11 +662,17 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
   );
 }
 
-function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDayCall; run: Run; onRemoved: () => void }) {
+const TYPED = 'typed';
+
+function CallForm({ day, call, characters, castAs, run, onRemoved }: {
+  day: ShootDay; call: ShootDayCall; characters: Character[]; castAs: (userId: string, characterId: string | null) => Promise<void>; run: Run; onRemoved: () => void;
+}) {
   const { projectId } = useProject();
+  const plays = characters.filter((c) => c.actor_id === call.user_id);
   const initial = useMemo(() => ({
-    character: call.character_name ?? '', call: clockValue(call.call_time), pickup: clockValue(call.pickup_time), makeup: clockValue(call.makeup_time), note: call.note ?? '',
-  }), [call]);
+    // The character they play (the first, if several); an older typed-in character shows as itself.
+    character: plays[0]?.id ?? (call.character_name ? TYPED : ''), call: clockValue(call.call_time), pickup: clockValue(call.pickup_time), makeup: clockValue(call.makeup_time), note: call.note ?? '',
+  }), [call, plays[0]?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   type Draft = typeof initial;
   const [draft, setDraft] = useState(initial);
   const keys = Object.keys(initial) as (keyof Draft)[];
@@ -665,12 +698,14 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
     e.preventDefault();
     const d = Object.fromEntries(keys.map((k) => [k, draft[k].trim()])) as Draft;
     const patch: ShootDayCallInput = {};
-    if (d.character !== initial.character) patch.character_name = d.character || null;
     if (d.call !== initial.call) patch.call_time = d.call || null;
     if (d.pickup !== initial.pickup) patch.pickup_time = d.pickup || null;
     if (d.makeup !== initial.makeup) patch.makeup_time = d.makeup || null;
     if (d.note !== initial.note) patch.note = d.note || null;
-    if (await run(() => api.setShootDayCall(day.id, call.user_id, patch))) setDraft(d);
+    if (await run(async () => {
+      if (d.character !== initial.character) await castAs(call.user_id, d.character || null);
+      if (Object.keys(patch).length) await api.setShootDayCall(day.id, call.user_id, patch);
+    })) setDraft(d);
   }
   async function remove() {
     if (window.confirm(`Remove ${name} from day ${day.day_number}? They won't be on its call sheet.`) && await run(() => api.removeShootDayCall(day.id, call.user_id))) onRemoved();
@@ -684,7 +719,22 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
       </p>
       <form className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-x-4" onSubmit={save}>
         <label className="label">Character (cast only)
-          <input className="field" value={draft.character} maxLength={120} placeholder={castLabel({ ...call, character_name: null }) || 'Maya'} onChange={set('character')} />
+          <select className="field" value={draft.character} onChange={set('character')}>
+            <option value="">{NONE}</option>
+            {draft.character === TYPED && <option value={TYPED}>{call.character_name} (typed, not on the Characters page)</option>}
+            {characters.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.cast_number != null ? `${c.name} (#${c.cast_number})` : c.name}
+                {c.actor_id && c.actor_id !== call.user_id ? ' (has an actor)' : ''}
+              </option>
+            ))}
+          </select>
+          {(() => {
+            const ch = characters.find((c) => c.id === draft.character);
+            return ch ? <OpenLink to={itemPath.character(projectId, ch.id)}>Open {ch.name} on the Characters page</OpenLink> : null;
+          })()}
+          {plays.length > 1 && <span className="hint font-normal">Also plays {plays.slice(1).map((c) => c.name).join(', ')}.</span>}
+          <span className="hint font-normal">Picking a character sets them as its actor on the Characters page.</span>
         </label>
         <label className="label">Call time
           <input className="field" type="time" value={draft.call} onChange={set('call')} />
