@@ -113,7 +113,25 @@ day to day.
   (producer, director, ADs, location manager and others found by role), scenes with
   breaks and page total, cast, crew grouped by department, notes, and the next day's
   scenes. People called see their own call at the top and **Confirm I got it**; opening
-  the sheet marks it viewed. **Print** prints just the sheet.
+  the sheet marks it viewed. The sheet itself is one designed, read-only component
+  (`src/components/CallSheetDocument.tsx`, styles under `.cs` in `src/styles.css`):
+  a green header band with the crew call, the reader's own call, time tiles, location,
+  weather, hospital and key-contact cards, then schedule, cast, crew, notes and the next
+  day. **Print or save as PDF** lays the same design out on US Letter paper (light
+  colors always; the printer's own "your call" box is left out).
+- **Personal links:** everyone called has a private, unguessable link
+  (`shoot_day_calls.link_token`, made by the database and never changed) to their own
+  view-only page at `/sheet/{token}` (`src/pages/SheetLinkPage.tsx`). It needs no
+  sign-in, sits outside the app (its own top bar with a link back to the site, Print
+  and the theme switch), shows the sent sheet with their call at the top, and lets them
+  confirm but change nothing else. It works only once the sheet is sent, stops working when the person
+  is taken off the day. Opening it counts as viewed, and its **Confirm I got it** button
+  confirms the sent version for that person (`confirm_call_sheet_link`, `POST /call-sheet-links/{token}/confirm`); that's the
+  only thing the page can change. It shows names, roles, calls
+  and phones but no emails. The data comes from `call_sheet_for_link(token)` (security
+  definer, callable without signing in) through the public `GET /call-sheet-links/{token}`.
+  The call sheet page's **Personal links** list opens, copies, emails (mailto) or texts
+  (sms:) each person their own link.
 - **Sending:** there's no mail server yet, so **Send version N** stamps the next version
   (`publish_call_sheet`), then **Email everyone** opens the sender's email app with
   everyone called in Bcc and the sheet as text (`src/lib/callSheet.ts`), or **Copy
@@ -207,7 +225,7 @@ There are three layers, and each one can be run and tested by itself.
 | Scenes | `GET/POST /projects/{id}/scenes` (with shot counts and time), `PUT /projects/{id}/scene-order`, `PATCH/DELETE /scenes/{id}` |
 | Shots | `GET /projects/{id}/shots`, `GET/POST /scenes/{id}/shots`, `PUT /scenes/{id}/shot-order`, `PATCH/DELETE /shots/{id}` |
 | Shoot days | `GET/POST /projects/{id}/shoot-days`, `PATCH/DELETE /shoot-days/{id}`, `POST /shoot-days/{id}/items`, `PUT /shoot-days/{id}/item-order`, `PATCH/DELETE /shoot-day-items/{id}`, `GET /shoot-days/{id}/calls`, `PUT/DELETE /shoot-days/{id}/calls/{userId}`, `POST /shoot-days/{id}/calls/everyone`, `POST /shoot-days/{id}/weather` |
-| Call sheets | `GET /shoot-days/{id}/call-sheet`, `POST /shoot-days/{id}/send`, `POST /shoot-days/{id}/viewed`, `POST /shoot-days/{id}/confirm` |
+| Call sheets | `GET /shoot-days/{id}/call-sheet`, `POST /shoot-days/{id}/send`, `POST /shoot-days/{id}/viewed`, `POST /shoot-days/{id}/confirm`, `GET /call-sheet-links/{token}` (no sign-in) |
 | Task tags | `GET/POST /companies/{id}/task-tags`, `PATCH/DELETE /task-tags/{id}`; a task's `tag_ids` are set with `PATCH /tasks/{id}` |
 
 ### 3. Database (`supabase/migrations`)
@@ -252,7 +270,7 @@ There are three layers, and each one can be run and tested by itself.
 | `shots` | Each scene's shots in order: size, angle, movement, lens, equipment, estimated minutes, done, notes |
 | `shoot_days` | A project's shoot days: date, title, location, crew call, shooting call, lunch, wrap, weather, sunrise, sunset, notes, call sheet version and when and by whom it was sent |
 | `shoot_day_items` | Each day's schedule in order: a scene, meal break, company move or note, with an optional time |
-| `shoot_day_calls` | Who is called on each day: call, pickup and makeup times, character, note, and which version they viewed and confirmed |
+| `shoot_day_calls` | Who is called on each day: call, pickup and makeup times, character, note, which version they viewed and confirmed, and their personal link token |
 | `journal_entries`, `journal_entry_shares` | The project journal and who private entries are shared with |
 
 ## Technologies

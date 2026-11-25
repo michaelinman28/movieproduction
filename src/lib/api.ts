@@ -97,12 +97,28 @@ export interface ShootDayCall {
   /** Null means the day's crew call. */
   call_time: string | null; character_name: string | null; pickup_time: string | null; makeup_time: string | null; note: string | null;
   viewed_version: number; viewed_at: string | null; confirmed_version: number; confirmed_at: string | null; created_at: string;
+  /** Their personal, view-only call sheet link: /sheet/{link_token} in the app. */
+  link_token: string;
   profile: Profile; role_ids: string[];
 }
 export type ShootDayCallInput = Partial<Pick<ShootDayCall, 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note'>>;
 export interface CallSheet {
   day: ShootDay; location: Location | null; items: ShootDayItem[]; scenes: Scene[]; calls: ShootDayCall[];
   next_day: { day: ShootDay; scenes: Scene[] } | null;
+}
+/** What a personal call sheet link shows: the sent sheet, view only, no emails. */
+export interface LinkedCallSheet {
+  me: string;
+  /** Whether they have confirmed the version sent. */
+  confirmed: boolean;
+  project: { name: string; company_name: string };
+  day: Pick<ShootDay, 'id' | 'shoot_date' | 'title' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes' | 'version' | 'sent_at' | 'day_number' | 'total_days'>;
+  location: Pick<Location, 'name' | 'description' | 'address' | 'parking' | 'nearest_hospital' | 'contact_name' | 'contact_phone'> | null;
+  items: Pick<ShootDayItem, 'id' | 'kind' | 'scene_id' | 'label' | 'at_time'>[];
+  scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths' | 'synopsis' | 'characters' | 'needs'>[];
+  calls: (Pick<ShootDayCall, 'user_id' | 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note' | 'role_ids'> & { profile: { id: string; full_name: string | null; nickname: string | null; phone: string | null } })[];
+  roles: { id: string; name: string; department: string | null; sort_order: number | null }[];
+  next_day: { day: Pick<ShootDay, 'shoot_date' | 'crew_call' | 'title' | 'day_number'>; scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths'>[] } | null;
 }
 
 export interface TaskNote { id: string; task_id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
@@ -185,6 +201,8 @@ export const api = {
   callSheet: (dayId: string) => call<CallSheet>('GET', `/shoot-days/${enc(dayId)}/call-sheet`),
   sendCallSheet: (dayId: string) => call<ShootDay>('POST', `/shoot-days/${enc(dayId)}/send`),
   viewedCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/viewed`),
+  linkedCallSheet: (token: string) => call<LinkedCallSheet>('GET', `/call-sheet-links/${enc(token)}`),
+  confirmLinkedCallSheet: (token: string) => call<void>('POST', `/call-sheet-links/${enc(token)}/confirm`),
   confirmCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/confirm`),
   lookUpWeather: (dayId: string) => call<{ weather: string; sunrise: string; sunset: string; place: string }>('POST', `/shoot-days/${enc(dayId)}/weather`),
 

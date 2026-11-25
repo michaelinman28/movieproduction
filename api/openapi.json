@@ -3026,6 +3026,12 @@
               "null"
             ]
           },
+          "link_token": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "Their personal call sheet link: /call-sheet-links/{token}, and the app page /sheet/{token}"
+          },
           "created_at": {
             "type": "string"
           },
@@ -3055,6 +3061,7 @@
           "viewed_at",
           "confirmed_version",
           "confirmed_at",
+          "link_token",
           "created_at",
           "profile",
           "role_ids"
@@ -3156,6 +3163,101 @@
           "scenes",
           "calls",
           "next_day"
+        ]
+      },
+      "LinkedCallSheet": {
+        "type": "object",
+        "properties": {
+          "me": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "The person the link belongs to"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Whether they have confirmed the version sent"
+          },
+          "project": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "company_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "company_name"
+            ]
+          },
+          "day": {
+            "description": "The day: date, title, times, weather, notes, version, sent_at, day_number, total_days"
+          },
+          "location": {
+            "description": "Name, description, address, parking, nearest hospital and on-site contact"
+          },
+          "items": {
+            "type": "array",
+            "items": {},
+            "description": "The schedule in order: id, kind, scene_id, label, at_time"
+          },
+          "scenes": {
+            "type": "array",
+            "items": {},
+            "description": "The scenes on the day, in order"
+          },
+          "calls": {
+            "type": "array",
+            "items": {},
+            "description": "Everyone called: their call, character, pickup, makeup, note, name, nickname, phone and role ids (no emails)"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "department": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sort_order": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "department",
+                "sort_order"
+              ]
+            }
+          },
+          "next_day": {}
+        },
+        "required": [
+          "me",
+          "confirmed",
+          "project",
+          "items",
+          "scenes",
+          "calls",
+          "roles"
         ]
       },
       "WeatherResult": {
@@ -8314,6 +8416,84 @@
           },
           "401": {
             "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/call-sheet-links/{token}": {
+      "get": {
+        "tags": [
+          "Call sheets"
+        ],
+        "summary": "A personal call sheet link: the sent call sheet, view only, with no sign-in",
+        "description": "Each person called on a day has their own link token (ShootDayCall.link_token). Whoever has the link can read that day's sent call sheet and see which call is theirs (`me`); nothing can be changed through it. Opening it counts as that person viewing the sent version. Unknown links, and sheets not sent yet, give 404.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedCallSheet"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/call-sheet-links/{token}/confirm": {
+      "post": {
+        "tags": [
+          "Call sheets"
+        ],
+        "summary": "Confirm, from a personal call sheet link, that its person got the sent version (no sign-in)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Confirmed"
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
             "content": {
               "application/json": {
                 "schema": {

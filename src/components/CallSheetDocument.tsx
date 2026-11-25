@@ -1,0 +1,283 @@
+import type { ReactNode } from 'react';
+import type { LinkedCallSheet } from '../lib/api';
+import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, clockLabel, labelOf, longDate, pagesLabel, shortDate } from '../lib/format';
+import { mapsLinkProps } from '../lib/maps';
+import { Section } from './Section';
+
+/** What the call sheet shows. A personal link gets exactly this; the project's call sheet page maps its data to it. */
+export type SheetData = Omit<LinkedCallSheet, 'me' | 'confirmed'>;
+type SheetCall = SheetData['calls'][number];
+
+// Roles listed as key contacts near the top, in this order.
+const KEY_ROLES = ['Producer', 'Line Producer', 'Production Manager', 'Director', '1st Assistant Director', '2nd Assistant Director', 'Production Coordinator', 'Location Manager'];
+const DEPARTMENTS = ['Producing', 'Directing', 'Camera', 'Grip', 'Lighting', 'Sound', 'Art', 'Wardrobe', 'Locations', 'Cast', 'Casting', 'Writing', 'Post', 'Accounts', 'Other'];
+
+const tel = (p: string) => `tel:${p.replace(/[^\d+]/g, '')}`;
+const nameOf = (c: SheetCall) => c.profile.full_name?.trim() || 'Unknown';
+
+function Phone({ phone }: { phone: string | null | undefined }) {
+  return phone ? <a className="cs-phone" href={tel(phone)}>{phone}</a> : null;
+}
+
+/** A labelled time, or nothing when it isn't set. */
+function TimeChip({ label, time, strong }: { label: string; time: string | null | undefined; strong?: boolean }) {
+  const t = clockLabel(time);
+  if (!t) return null;
+  return <span className={`cs-chip ${strong ? 'cs-chip-strong' : ''}`}><span>{label}</span> {t}</span>;
+}
+
+function Card({ title, tone, children }: { title: string; tone?: 'alert'; children: ReactNode }) {
+  return (
+    <div className={`cs-card ${tone === 'alert' ? 'cs-card-alert' : ''}`}>
+      <h3 className="cs-card-h">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A designed, read-only call sheet: a header band with the day and crew call, the
+ * reader's own call, the day's times, location, weather, hospital and key contacts,
+ * then the schedule, cast, crew, notes and the next day. The same layout prints to a
+ * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
+ * call sheet page and by each person's private link.
+ */
+export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNote, youAction }: {
+  sheet: SheetData;
+  /** The person reading it: their call is shown at the top and their rows are marked. */
+  me?: string | null;
+  /** Section ids, so each page remembers its own opened and closed sections. */
+  sectionPrefix: string;
+  /** Each person's call sheet status (on the project's page only; not printed). */
+  status?: (userId: string) => string;
+  /** Shown under the header, e.g. "Draft, not sent". */
+  versionNote?: string;
+  /** Shown in the reader's "Your call" box, e.g. a Confirm button. */
+  youAction?: ReactNode;
+}) {
+  const { day, location: loc, project } = sheet;
+  const roleById = new Map(sheet.roles.map((r) => [r.id, r]));
+  const rolesOf = (c: SheetCall) => c.role_ids.map((id) => roleById.get(id)).filter((r): r is NonNullable<typeof r> => Boolean(r))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const roleNames = (c: SheetCall) => rolesOf(c).map((r) => r.name).join(', ');
+  const department = (c: SheetCall) => rolesOf(c).find((r) => r.department)?.department || 'Other';
+  const crewCall = clockLabel(day.crew_call);
+  const callOf = (c: SheetCall) => clockLabel(c.call_time) || crewCall;
+  const byName = (a: SheetCall, b: SheetCall) => nameOf(a).localeCompare(nameOf(b));
+
+  const cast = sheet.calls.filter((c) => c.character_name).sort((a, b) => (a.call_time ?? '').localeCompare(b.call_time ?? '') || byName(a, b));
+  const depts = new Map<string, SheetCall[]>();
+  for (const c of sheet.calls.filter((x) => !x.character_name)) depts.set(department(c), [...(depts.get(department(c)) ?? []), c]);
+  const rank = (d: string) => (DEPARTMENTS.includes(d) ? DEPARTMENTS.indexOf(d) : DEPARTMENTS.length);
+  const crew = [...depts.entries()].sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0])).map(([d, list]) => [d, list.sort(byName)] as const);
+  const keys: { role: string; c: SheetCall }[] = [];
+  for (const role of KEY_ROLES) {
+    for (const c of sheet.calls) if (rolesOf(c).some((r) => r.name === role) && !keys.some((k) => k.c.user_id === c.user_id)) keys.push({ role, c });
+  }
+  const mine = me ? sheet.calls.find((c) => c.user_id === me) ?? null : null;
+  const totalPages = sheet.scenes.reduce((n, s) => n + (s.pages_eighths ?? 0), 0);
+  const sceneLine = (s: { int_ext: SheetData['scenes'][number]['int_ext']; time_of_day: SheetData['scenes'][number]['time_of_day'] }) =>
+    [s.int_ext && labelOf(SCENE_INT_EXT, s.int_ext), s.time_of_day && labelOf(SCENE_TIMES, s.time_of_day)].filter(Boolean) as string[];
+  const isMe = (c: SheetCall) => c.user_id === me;
+  // The day's other times, leaving out any that aren't set.
+  const times = ([
+    ['Shooting call', day.shooting_call], ['Lunch', day.lunch], ['Est. wrap', day.wrap], ['Sunrise', day.sunrise], ['Sunset', day.sunset],
+  ] as const).filter(([, t]) => t);
+
+  const person = (c: SheetCall, sub: ReactNode, times: ReactNode) => (
+    <li key={c.user_id} className={`cs-person ${isMe(c) ? 'cs-me' : ''}`}>
+      <div className="cs-person-who">
+        <p className="cs-person-name">
+          {nameOf(c)}{c.profile.nickname && <span className="cs-nick"> “{c.profile.nickname}”</span>}
+          {isMe(c) && <span className="cs-you-badge">You</span>}
+        </p>
+        {sub}
+        {c.note && <p className="cs-person-note">{c.note}</p>}
+      </div>
+      <div className="cs-person-times">
+        {times}
+        {status && <span className="cs-status no-print">{status(c.user_id)}</span>}
+      </div>
+    </li>
+  );
+
+  return (
+    <article className="cs">
+      <header className="cs-hero">
+        <div className="cs-hero-main">
+          <p className="cs-eyebrow">{project.company_name} · Call sheet</p>
+          <h1 className="cs-title">{project.name}</h1>
+          <p className="cs-date">
+            <span className="cs-day">Day {day.day_number} of {day.total_days}</span>
+            <span>{longDate(day.shoot_date)}</span>
+          </p>
+          {day.title && <p className="cs-subtitle">{day.title}</p>}
+        </div>
+        <div className="cs-hero-call">
+          <span className="cs-hero-label">Crew call</span>
+          <strong className="cs-hero-time">{crewCall || 'TBD'}</strong>
+          <span className="cs-hero-version">{versionNote ?? (day.version ? `Version ${day.version}` : 'Draft')}</span>
+        </div>
+      </header>
+
+      {mine && (
+        <section className="cs-you" aria-label="Your call">
+          <div>
+            <p className="cs-you-label">Your call</p>
+            <p className="cs-you-time">{callOf(mine) || 'Not set yet'}</p>
+          </div>
+          <div className="cs-you-details">
+            <p className="cs-you-name">{nameOf(mine)}{mine.character_name ? <> as <strong>{mine.character_name}</strong></> : roleNames(mine) ? <span className="cs-muted"> · {roleNames(mine)}</span> : null}</p>
+            <div className="cs-chips">
+              <TimeChip label="Pickup" time={mine.pickup_time} />
+              <TimeChip label="Makeup" time={mine.makeup_time} />
+              {loc && <span className="cs-chip"><span>At</span> {loc.name}</span>}
+            </div>
+            {mine.note && <p className="cs-you-note">{mine.note}</p>}
+          </div>
+          {youAction && <div className="cs-you-action">{youAction}</div>}
+        </section>
+      )}
+
+      {times.length > 0 && (
+        <dl className="cs-times">
+          {times.map(([label, t]) => <div key={label} className="cs-time"><dt>{label}</dt><dd>{clockLabel(t)}</dd></div>)}
+        </dl>
+      )}
+
+      <div className="cs-info">
+        <Card title="Location">
+          {loc ? (
+            <>
+              <p className="cs-strong">{loc.name}</p>
+              {loc.address && <p><a {...mapsLinkProps(loc.address)}>{loc.address}</a></p>}
+              {loc.parking && <p className="cs-small"><span className="cs-muted">Parking:</span> {loc.parking}</p>}
+              {loc.contact_name && <p className="cs-small"><span className="cs-muted">On site:</span> {loc.contact_name} <Phone phone={loc.contact_phone} /></p>}
+            </>
+          ) : <p className="cs-muted">To be confirmed</p>}
+        </Card>
+        <Card title="Weather">
+          <p>{day.weather || <span className="cs-muted">Not set</span>}</p>
+          {(day.sunrise || day.sunset) && <p className="cs-small cs-muted">Sunrise {clockLabel(day.sunrise) || '—'} · Sunset {clockLabel(day.sunset) || '—'}</p>}
+        </Card>
+        <Card title="Nearest hospital" tone="alert">
+          {loc?.nearest_hospital
+            ? <p><a {...mapsLinkProps(loc.nearest_hospital)}>{loc.nearest_hospital}</a></p>
+            : <p className="cs-muted">Not set</p>}
+          <p className="cs-small cs-muted">In an emergency call 911.</p>
+        </Card>
+        <Card title="Key contacts">
+          {keys.length ? (
+            <ul className="cs-keys">
+              {keys.map(({ role, c }) => (
+                <li key={c.user_id}><span className="cs-muted">{role}</span><span>{nameOf(c)}</span><Phone phone={c.profile.phone} /></li>
+              ))}
+            </ul>
+          ) : <p className="cs-muted cs-small">None listed</p>}
+        </Card>
+      </div>
+
+      <div className="cs-body">
+        <Section id={`${sectionPrefix}.schedule`} title="Schedule" summary={sheet.scenes.length ? `${sheet.scenes.length} scenes · ${pagesLabel(totalPages)} pages` : undefined}>
+          {sheet.items.length ? (
+            <ol className="cs-schedule">
+              {sheet.items.map((i) => {
+                const time = clockLabel(i.at_time);
+                if (i.kind !== 'scene') {
+                  return (
+                    <li key={i.id} className={`cs-row cs-row-break cs-row-${i.kind}`}>
+                      <span className="cs-row-time">{time}</span>
+                      <div className="cs-row-body"><strong>{labelOf(SHOOT_ITEM_KINDS, i.kind)}</strong>{i.label ? <span> · {i.label}</span> : null}</div>
+                    </li>
+                  );
+                }
+                const s = sheet.scenes.find((x) => x.id === i.scene_id);
+                if (!s) return null;
+                return (
+                  <li key={i.id} className="cs-row">
+                    <span className="cs-row-time">{time}</span>
+                    <div className="cs-row-body">
+                      <div className="cs-row-head">
+                        <span className="cs-scene-no">Sc {s.number}</span>
+                        <span className="cs-row-set">{s.set_name || 'Scene'}</span>
+                        {sceneLine(s).map((t) => <span key={t} className="cs-pill">{t}</span>)}
+                        {s.pages_eighths != null && <span className="cs-pages">{pagesLabel(s.pages_eighths)} pg</span>}
+                      </div>
+                      {s.synopsis && <p className="cs-row-text">{s.synopsis}</p>}
+                      {(s.characters || s.needs) && (
+                        <p className="cs-row-meta">
+                          {s.characters && <span><b>Cast</b> {s.characters}</span>}
+                          {s.needs && <span><b>Needs</b> {s.needs}</span>}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : <p className="cs-muted">Nothing scheduled yet</p>}
+        </Section>
+
+        <Section id={`${sectionPrefix}.cast`} title="Cast" summary={cast.length ? String(cast.length) : undefined}>
+          {cast.length ? (
+            <ul className="cs-people">
+              {cast.map((c) => person(c,
+                <p className="cs-person-sub">as <strong>{c.character_name}</strong></p>,
+                <><TimeChip label="Pickup" time={c.pickup_time} /><TimeChip label="Makeup" time={c.makeup_time} /><span className="cs-chip cs-chip-strong"><span>On set</span> {callOf(c) || '—'}</span></>))}
+            </ul>
+          ) : <p className="cs-muted">No cast called</p>}
+        </Section>
+
+        <Section id={`${sectionPrefix}.crew`} title="Crew" summary={String(sheet.calls.length - cast.length)}>
+          {crew.length ? (
+            <div className="cs-depts">
+              {crew.map(([dept, list]) => (
+                <div key={dept} className="cs-dept">
+                  <h4 className="cs-dept-h">{dept}</h4>
+                  <ul className="cs-people">
+                    {list.map((c) => person(c,
+                      <p className="cs-person-sub">{roleNames(c) || 'Crew'}{c.profile.phone && <> · <Phone phone={c.profile.phone} /></>}</p>,
+                      <span className="cs-chip cs-chip-strong"><span>Call</span> {callOf(c) || '—'}</span>))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : <p className="cs-muted">No crew called yet</p>}
+        </Section>
+
+        {day.notes && (
+          <Section id={`${sectionPrefix}.notes`} title="Notes">
+            <p className="cs-notes">{day.notes}</p>
+          </Section>
+        )}
+
+        <Section id={`${sectionPrefix}.next`} title="Advance schedule" summary={sheet.next_day ? shortDate(sheet.next_day.day.shoot_date) : 'Last day'}>
+          {sheet.next_day ? (
+            <div className="cs-next">
+              <p className="cs-strong">
+                Day {sheet.next_day.day.day_number} · {longDate(sheet.next_day.day.shoot_date)}
+                {sheet.next_day.day.crew_call && <span className="cs-muted"> · crew call {clockLabel(sheet.next_day.day.crew_call)}</span>}
+              </p>
+              {sheet.next_day.scenes.length ? (
+                <ul className="cs-next-list">
+                  {sheet.next_day.scenes.map((s) => (
+                    <li key={s.id}>
+                      <span className="cs-scene-no">Sc {s.number}</span> {s.set_name}
+                      {sceneLine(s).length > 0 && <span className="cs-muted"> · {sceneLine(s).join(' ')}</span>}
+                      {s.pages_eighths != null && <span className="cs-muted"> · {pagesLabel(s.pages_eighths)} pg</span>}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="cs-muted cs-small">No scenes scheduled yet</p>}
+            </div>
+          ) : <p className="cs-muted">This is the last shoot day scheduled.</p>}
+        </Section>
+      </div>
+
+      <footer className="cs-footer">
+        <span>{project.name} · Day {day.day_number} · {longDate(day.shoot_date)}{day.version ? ` · Version ${day.version}` : ''}</span>
+        <span>Confidential: for cast and crew only</span>
+      </footer>
+    </article>
+  );
+}
