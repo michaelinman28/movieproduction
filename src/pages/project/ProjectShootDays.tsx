@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { LatticeGrid, gridDropdown, gridEsc, gridLink, gridLinkHtml, gridLinkList } from '../../components/LatticeGrid';
 import { OpenLink } from '../../components/OpenLink';
 import { Section } from '../../components/Section';
+import { ItemHistory } from '../../components/ItemHistory';
 import {
   api, type Location, type Scene, type ShootDay, type ShootDayCall, type ShootDayCallInput, type ShootDayInput, type ShootDayItem, type ShootItemKind,
 } from '../../lib/api';
@@ -197,7 +198,7 @@ export function ProjectShootDays() {
 function DayPanel({ day, scenes, run, onChanged, canDelete, onDeleted }: {
   day: ShootDay; scenes: Scene[]; run: Run; onChanged: () => Promise<void>; canDelete: boolean; onDeleted: () => void;
 }) {
-  const { projectId, locations } = useProject();
+  const { projectId, locations, project, isAdmin } = useProject();
   async function remove() {
     if (window.confirm(`Delete day ${day.day_number} (${shortDate(day.shoot_date)}) with its schedule and calls?`)
       && await run(() => api.deleteShootDay(day.id), `Deleted day ${day.day_number}.`)) onDeleted();
@@ -212,6 +213,7 @@ function DayPanel({ day, scenes, run, onChanged, canDelete, onDeleted }: {
       <DayDetails day={day} locations={locations} run={run} />
       <DaySchedule day={day} scenes={scenes} onChanged={onChanged} />
       <DayCalls day={day} onChanged={onChanged} />
+      {isAdmin && <ItemHistory companyId={project.company_id} kind="shoot_days" id={day.id} refresh={day.updated_at} />}
       {canDelete && <button className="btn btn-danger sm:w-auto sm:self-start" onClick={remove}>Delete shoot day</button>}
     </aside>
   );

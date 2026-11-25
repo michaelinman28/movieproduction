@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LatticeGrid, gridDropdown, gridEsc, gridLink } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
+import { ItemHistory } from '../components/ItemHistory';
 import { PersonContacts } from '../components/PersonContacts';
 import { RolePicker } from '../components/RolePicker';
 import { useAuth } from '../lib/auth';
@@ -268,6 +269,7 @@ export function CompanyPage() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <Link to={`/companies/${companyId}/roles`} className="btn btn-secondary no-underline">{isAdmin ? 'Manage roles' : 'Roles'}</Link>
             <Link to={`/companies/${companyId}/task-settings`} className="btn btn-secondary no-underline">Task categories and tags</Link>
+            {isAdmin && <Link to={`/companies/${companyId}/activity`} className="btn btn-secondary no-underline">Activity</Link>}
             {isAdmin && <button className="btn btn-secondary" onClick={startEdit}>Edit company</button>}
           </div>
         </header>
@@ -436,6 +438,7 @@ function MemberPanel({ companyId, companyName, member, roles, isAdmin, isMe, run
             {changed && <p className="hint">Unsaved changes.</p>}
           </form>
           <PersonContacts userId={member.user_id} name={name} canEdit />
+          <ItemHistory companyId={companyId} kind="person" id={member.user_id} refresh={`${member.title}${member.is_admin}${member.role_ids.join()}${member.profile.full_name}${member.profile.phone}${member.profile.nickname}`} />
           <button className="btn btn-danger" onClick={remove}>{isMe ? 'Leave company' : 'Remove from company'}</button>
         </>
       ) : (

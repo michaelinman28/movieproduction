@@ -34,6 +34,8 @@ export function CallSheetPage() {
     try { setSheet(await api.callSheet(dayId)); } catch (e) { setError(errorText(e)); }
   }, [dayId]);
   useEffect(() => { load(); }, [load]);
+  // Each opening of the call sheet page goes in the activity log.
+  useEffect(() => { api.openedCallSheet(dayId).catch(() => undefined); }, [dayId]);
 
   const mine = sheet?.calls.find((c) => c.user_id === me) ?? null;
   // Opening a sent sheet you're called on counts as viewing it.

@@ -13,6 +13,7 @@ import { people } from './routes/people.ts';
 import { scenes } from './routes/scenes.ts';
 import { shootDays } from './routes/shootDays.ts';
 import { notes } from './routes/notes.ts';
+import { audit } from './routes/audit.ts';
 
 export const API_VERSION = '0.1.0';
 
@@ -48,6 +49,7 @@ export function createApp(config: ApiConfig) {
   api.route('/', scenes);
   api.route('/', shootDays);
   api.route('/', notes);
+  api.route('/', audit);
 
   api.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http', scheme: 'bearer', bearerFormat: 'JWT',
@@ -81,6 +83,7 @@ export function createApp(config: ApiConfig) {
       { name: 'Scenes', description: 'A project\'s scenes in order: set, interior or exterior, time of day, pages, characters, needs and location' },
       { name: 'Shots', description: 'Each scene\'s shot list, in shooting order, ticked off on set' },
       { name: 'Shoot days', description: 'Each day of filming: location, times, weather, the day\'s schedule of scenes and breaks, and who is called when' },
+      { name: 'Activity', description: 'The audit trail: every add, change and delete, sign-ins and call sheet views. Company admins only' },
       { name: 'Call sheets', description: 'The call sheet built from a shoot day: send a new version, and each person opens and confirms it' },
     ],
   }));

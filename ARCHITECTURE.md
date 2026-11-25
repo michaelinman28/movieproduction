@@ -167,6 +167,42 @@ day to day.
    Database: migration `20261124040000_people_without_accounts.sql`
    (`add_company_person`, `add_project_person`).
 
+### Activity log (audit trail)
+
+Every add, change and delete on every table is recorded by the database itself, so
+nothing is missed whichever way a change is made (the API, a database function, a
+cascade, a personal call sheet link, or a fix made straight in the database). Migration
+`20261126000000_audit_log.sql`.
+
+- **Where:** `audit_log`, one row per change: when, who (`actor_id`, and their name at
+  the time), `source` (app, link, system), the action, the kind of item (`table_name`),
+  its id (`row_key`), a readable label kept after the item is gone, what it belongs to
+  (`parent_table`/`parent_key`, e.g. a note's task), its company and project, the person
+  it's about (`subject_user_id`), full `before`/`after` values and the `changed` fields.
+  `tx` groups everything done in one save (e.g. a project and all it held).
+- **How:** the trigger `"Audit change"` (function `audit_row()`) on every table. Its
+  name sorts before Postgres's own foreign-key triggers, so a deleted item is logged
+  before the things deleted with it. Saves that change nothing but `updated_at` aren't
+  logged. **A new table needs the same trigger** and a branch in `audit_row()`.
+- **Also logged:** sign-ins (a trigger on `auth.sessions`), and each opening of a call
+  sheet: in the app (`log_call_sheet_view`, `POST /shoot-days/{id}/opened`) and through
+  a personal link (`call_sheet_for_link`, which also logs as the link's person).
+- **Who sees it:** company admins only (row-level security). Entries about a person
+  that aren't tied to a company (profile changes, sign-ins) show to admins of any
+  company that person is in. Nobody can add, change or delete entries directly.
+- **Private journal entries** are logged in full, but their content goes to
+  `audit_private`, which nobody can read through the API; the log shows only that one
+  was added, changed or deleted.
+- **Kept forever**, with no foreign keys, so a deleted project's log stays.
+  `audit_cleanup()` lets admins remove entries for now (each use leaves its own entry,
+  which is never removed). It's temporary: switch it off for good by making
+  `audit_cleanup_enabled()` return false in a new migration.
+- **Viewing:** `supabase/functions/api/routes/audit.ts` turns entries into readable
+  changes (names for linked ids, even deleted ones). The app shows them on the company's
+  Activity page (`/companies/:id/activity`), the project's Activity page, and a closed
+  History section on task, scene, shoot day, location and person forms
+  (`src/components/ActivityLog.tsx`, `ItemHistory.tsx`, `src/lib/activity.ts`).
+
 ## Architecture
 
 ```

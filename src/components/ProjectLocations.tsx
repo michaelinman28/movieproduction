@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { LatticeGrid, gridDropdown, gridEsc, gridMapLink } from './LatticeGrid';
 import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
+import { ItemHistory } from './ItemHistory';
+import { useProject } from '../pages/project/ProjectLayout';
 import { api, type Location, type LocationInput, type LocationStatus } from '../lib/api';
 import { emailOrThrow, emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
 
@@ -170,6 +172,7 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
   run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
   canDelete: boolean; onDeleted: () => void;
 }) {
+  const { project, isAdmin } = useProject();
   // Every field here, status included, is held until Save.
   const initial = useMemo(() => ({ ...toRow(location), status: location.status as string }), [location]);
   const [draft, setDraft] = useState(initial);
@@ -248,6 +251,7 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
           {initial.contact_email && <a href={`mailto:${initial.contact_email}`}>Email {initial.contact_name || 'contact'}</a>}
         </p>
       )}
+      {isAdmin && <ItemHistory companyId={project.company_id} kind="project_locations" id={location.id} refresh={location.updated_at} />}
       {canDelete && <button className="btn btn-danger sm:w-auto sm:self-start" onClick={remove}>Delete location</button>}
     </aside>
   );

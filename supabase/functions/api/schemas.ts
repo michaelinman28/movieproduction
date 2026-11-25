@@ -567,3 +567,63 @@ export const WeatherResult = z.object({
   sunrise: clock, sunset: clock,
   place: z.string().openapi({ example: 'Hudson, New York' }),
 }).openapi('WeatherResult');
+
+// ---- Activity (audit trail) ------------------------------------------------------
+
+export const AuditAction = z.enum(['insert', 'update', 'delete', 'view', 'sign_in', 'cleanup']).openapi('AuditAction', {
+  description: 'insert = added, update = changed, delete = deleted, view = opened a call sheet, sign_in = signed in, cleanup = an admin removed log entries',
+});
+export const AuditChange = z.object({
+  field: z.string().openapi({ example: 'due_date' }),
+  before: z.string().nullable(),
+  after: z.string().nullable(),
+  type: z.enum(['text', 'date', 'time', 'datetime']).openapi({ description: 'How the app should show the values' }),
+}).openapi('AuditChange');
+export const AuditEntry = z.object({
+  id: z.number().int(),
+  at: z.string(),
+  action: AuditAction,
+  source: z.enum(['app', 'link', 'system']).openapi({ description: 'app = signed in; link = a personal call sheet link with no sign-in; system = a setup or data change made outside the app' }),
+  kind: z.string().openapi({ description: 'The kind of item: the table name, e.g. tasks', example: 'tasks' }),
+  item_id: z.string(),
+  item_label: z.string().nullable(),
+  parent_kind: z.string().nullable(),
+  parent_id: z.string().nullable(),
+  parent_label: z.string().nullable(),
+  company_id: z.uuid().nullable(),
+  project_id: z.uuid().nullable(),
+  project_name: z.string().nullable(),
+  actor: z.object({ id: z.uuid().nullable(), name: z.string().nullable() }),
+  subject_id: z.uuid().nullable().openapi({ description: 'The person the entry is about, if any' }),
+  private: z.boolean().openapi({ description: 'A private journal entry: only the fact that it happened is shown, never its content' }),
+  detail: z.string().nullable(),
+  item_exists: z.boolean().openapi({ description: 'Whether the item (or, for a note, the item it is on) still exists' }),
+  changes: z.array(AuditChange),
+}).openapi('AuditEntry');
+export const AuditPage = z.object({
+  entries: z.array(AuditEntry),
+  next_before: z.number().int().nullable().openapi({ description: 'Pass as before= to get the next, older page; null when there are no more' }),
+}).openapi('AuditPage');
+export const AuditQuery = z.object({
+  project_id: Uuid.optional(),
+  kind: z.string().max(60).optional(),
+  action: AuditAction.optional(),
+  person_id: Uuid.optional().openapi({ description: 'Entries done by this person' }),
+  from: z.string().optional().openapi({ description: 'Earliest time, ISO date or date-time' }),
+  to: z.string().optional().openapi({ description: 'Up to (not including) this time' }),
+  before: z.coerce.number().int().optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(200),
+});
+export const AuditItemQuery = z.object({
+  kind: z.string().max(60).openapi({ description: 'tasks, scenes, shoot_days, project_locations, projects, companies, roles, task_categories, task_tags, journal_entries, or person', example: 'tasks' }),
+  id: z.string().max(80),
+  company_id: Uuid.openapi({ description: 'The company whose log to read' }),
+});
+export const AuditCleanupInput = z.object({
+  project_id: Uuid.nullable().optional(),
+  kind: z.string().max(60).nullable().optional(),
+  item_id: z.string().max(80).nullable().optional(),
+  from: z.string().nullable().optional(),
+  to: z.string().nullable().optional(),
+}).openapi('AuditCleanupInput');
+export const AuditCleanupResult = z.object({ removed: z.number().int() }).openapi('AuditCleanupResult');

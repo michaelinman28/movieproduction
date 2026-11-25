@@ -4,6 +4,7 @@ import { OpenLink } from '../../components/OpenLink';
 import { SceneNotes } from '../../components/Notes';
 import { itemPath } from '../../lib/links';
 import { Section } from '../../components/Section';
+import { ItemHistory } from '../../components/ItemHistory';
 import { api, type Location, type Scene, type SceneInput, type Shot, type ShotInput } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import {
@@ -201,6 +202,7 @@ export function ProjectScenes() {
 function ScenePanel({ scene, locations, run, isAdmin, canDelete, onDeleted, onShotsChanged }: {
   scene: Scene; locations: Location[]; run: Run; isAdmin: boolean; canDelete: boolean; onDeleted: () => void; onShotsChanged: () => Promise<void>;
 }) {
+  const { project } = useProject();
   // Every field here is held until Save.
   const initial = useMemo(() => ({
     number: scene.number, set_name: scene.set_name ?? '', int_ext: scene.int_ext ?? '', time_of_day: scene.time_of_day ?? '',
@@ -298,6 +300,7 @@ function ScenePanel({ scene, locations, run, isAdmin, canDelete, onDeleted, onSh
       {/* Notes have their own section, so they stay at hand with Details and the shot list folded away. */}
       <SceneNotes sceneId={scene.id} canManage={isAdmin} />
       <ShotList scene={scene} onChanged={onShotsChanged} />
+      {isAdmin && <ItemHistory companyId={project.company_id} kind="scenes" id={scene.id} refresh={`${scene.updated_at}${scene.shots}`} />}
       {canDelete && <button className="btn btn-danger sm:w-auto sm:self-start" onClick={remove}>Delete scene</button>}
     </aside>
   );

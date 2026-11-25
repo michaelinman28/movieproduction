@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
 import { Section } from './Section';
+import { ItemHistory } from './ItemHistory';
 import { TagPicker } from './TagPicker';
 import { TaskNotes } from './Notes';
 import { TaskSummaryBar } from './TaskSummaryBar';
@@ -813,6 +814,8 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
           </label>
           <button type="submit" className="btn btn-secondary">Add sub-task</button>
         </form>
+
+        {canManage && <ItemHistory companyId={companyId} kind="tasks" id={task.id} refresh={task.updated_at} />}
 
         <button type="button" className="btn btn-danger" onClick={remove}>Delete task</button>
       </div>

@@ -6,6 +6,7 @@ const db = new PGlite();
 await db.exec(`
 create schema auth;
 create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz default now());
+create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid, user_agent text, created_at timestamptz default now());
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.sub', true), '')::uuid $$;
 create role authenticated;
 create role anon;
@@ -411,5 +412,76 @@ const [day2] = await as(U.a, `insert into shoot_days (project_id,shoot_date) val
 await expect('only the creator or an admin deletes a day', () => as(U.b, `delete from shoot_days where id=$1 returning id`, [day2.id]), len(0));
 await expect('leaving the project removes their calls', async () => { await as(U.a, `delete from project_members where project_id=$1 and user_id=$2`, [lp.id, U.b]); return as(U.a, `select * from shoot_day_calls where shoot_day_id=$1`, [day.id]); }, len(0));
 await expect('deleting a scene removes it from days', async () => { await as(U.a, `delete from scenes where id=$1`, [scA.id]); return as(U.a, `select * from shoot_day_items where shoot_day_id=$1 and kind='scene'`, [day.id]); }, len(0));
+// ---- audit trail ----
+const [ac] = await as(U.a, `insert into companies (name) values ('Audit Co') returning id`);
+await as(U.a, `insert into company_members (company_id,user_id) values ($1,$2),($1,$3)`, [ac.id, U.b, U.c]);
+const [ap] = await as(U.a, `insert into projects (company_id,name) values ($1,'Audit Film') returning id`, [ac.id]);
+await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2),($1,$3)`, [ap.id, U.b, U.c]);
+const [at1] = await as(U.b, `insert into tasks (project_id,title) values ($1,'Book crane') returning id`, [ap.id]);
+await expect('adding a task is logged with who and what', () => as(U.a, `select * from audit_log where table_name='tasks' and row_key=$1`, [at1.id]),
+  r => r.length === 1 && r[0].action === 'insert' && r[0].actor_id === U.b && !!r[0].actor_name && r[0].item_label === 'Book crane' && r[0].project_id === ap.id && r[0].company_id === ac.id && r[0].after?.title === 'Book crane' && r[0].before === null && r[0].source === 'app');
+await as(U.b, `update tasks set title='Book big crane', status='in_progress' where id=$1`, [at1.id]);
+await expect('a change keeps before, after and the changed fields', () => as(U.a, `select * from audit_log where table_name='tasks' and row_key=$1 and action='update'`, [at1.id]),
+  r => r.length === 1 && r[0].before.title === 'Book crane' && r[0].after.title === 'Book big crane' && JSON.stringify(r[0].changed) === '["status","title"]');
+await as(U.b, `update tasks set title=title where id=$1`, [at1.id]);
+await expect('a save that changes nothing is not logged', () => as(U.a, `select * from audit_log where table_name='tasks' and row_key=$1 and action='update'`, [at1.id]), len(1));
+await expect('members who are not admins cannot read the log', () => as(U.b, `select * from audit_log where company_id=$1`, [ac.id]), len(0));
+await expect('admins of other companies cannot read it', () => as(U.d, `select * from audit_log where company_id=$1`, [ac.id]), len(0));
+await expect('nobody can write to the log directly', () => as(U.a, `insert into audit_log (action,table_name,row_key) values ('insert','tasks','x')`), isErr);
+await expect('nobody can change entries', () => as(U.a, `update audit_log set actor_name='X' where company_id=$1 returning id`, [ac.id]), r => r instanceof Error || r.length === 0);
+await expect('nobody can delete entries directly', () => as(U.a, `delete from audit_log where company_id=$1 returning id`, [ac.id]), r => r instanceof Error || r.length === 0);
+await as(U.c, `insert into task_notes (task_id,body) values ($1,'Call Joe') returning id`, [at1.id]);
+const [atag] = await as(U.b, `insert into task_tags (company_id,name) values ($1,'Rigging') returning id`, [ac.id]);
+await as(U.b, `insert into task_tag_links (task_id,tag_id) values ($1,$2)`, [at1.id, atag.id]);
+await expect('notes and tags are logged under their task', () => as(U.a, `select table_name, item_label from audit_log where parent_table='tasks' and parent_key=$1 order by id`, [at1.id]),
+  r => r.length === 2 && r[0].table_name === 'task_notes' && r[1].item_label === 'Rigging');
+await as(U.a, `delete from tasks where id=$1`, [at1.id]);
+await expect('deleting a task logs the things deleted with it, with their project', () => as(U.a, `select table_name, project_id, company_id from audit_log where action='delete' and (row_key=$1 or parent_key=$1) order by id`, [at1.id]),
+  r => r.length === 3 && r[0].table_name === 'tasks' && r.every((x) => x.project_id === ap.id && x.company_id === ac.id));
+await expect('a deleted task keeps its last values', () => as(U.a, `select before from audit_log where action='delete' and table_name='tasks' and row_key=$1`, [at1.id]), r => r[0]?.before?.title === 'Book big crane');
+// private journal entries
+const [pj] = await as(U.b, `insert into journal_entries (project_id,title,body) values ($1,'My worries','Budget is tight') returning id`, [ap.id]);
+await as(U.b, `insert into journal_entry_shares (entry_id,user_id) values ($1,$2)`, [pj.id, U.c]);
+await expect('a private entry shows only that it happened', () => as(U.a, `select * from audit_log where row_key=$1 or parent_key=$1 order by id`, [pj.id]),
+  r => r.length === 2 && r.every((x) => x.private && x.before === null && x.after === null) && r[0].item_label === 'Private journal entry' && !JSON.stringify(r).includes('worries') && !JSON.stringify(r).includes('Budget'));
+await expect('its content is kept but cannot be read', () => as(U.a, `select * from audit_private`), r => r instanceof Error || r.length === 0);
+await expect('the full content is stored', () => db.query(`select p.after->>'body' b from audit_private p join audit_log l on l.id=p.audit_id where l.row_key=$1`, [pj.id]).then((r) => r.rows), r => r[0]?.b === 'Budget is tight');
+const [pub] = await as(U.b, `insert into journal_entries (project_id,title,body,visibility) values ($1,'Wrap','Day 1 done','public') returning id`, [ap.id]);
+await expect('a public entry is logged in full', () => as(U.a, `select after from audit_log where row_key=$1`, [pub.id]), r => r[0]?.after?.body === 'Day 1 done');
+// people
+await as(U.a, `update profiles set phone='9195550100' where id=$1`, [U.c]);
+await expect('profile changes show to admins of the person\'s companies', () => as(U.a, `select changed from audit_log where table_name='profiles' and row_key=$1 and action='update'`, [U.c]), r => r.length >= 1 && r.at(-1).changed.includes('phone'));
+await expect('but not to people who are not their admins', () => as(U.b, `select * from audit_log where table_name='profiles' and row_key=$1`, [U.c]), len(0));
+// sign-ins
+await db.query(`insert into auth.sessions (user_id, user_agent) values ($1, 'Test browser')`, [U.c]);
+await expect('sign-ins are logged', () => as(U.a, `select * from audit_log where action='sign_in' and subject_user_id=$1`, [U.c]), r => r.length === 1 && r[0].actor_id === U.c && r[0].detail === 'Test browser');
+// call sheet views
+const [aday] = await as(U.b, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-04-01') returning id`, [ap.id]);
+await as(U.b, `insert into shoot_day_calls (shoot_day_id,user_id) values ($1,$2)`, [aday.id, U.c]);
+await as(U.b, `select publish_call_sheet($1)`, [aday.id]);
+await as(U.b, `select log_call_sheet_view($1)`, [aday.id]);
+await expect('opening the call sheet in the app is logged', () => as(U.a, `select * from audit_log where action='view' and row_key=$1`, [aday.id]), r => r.length === 1 && r[0].actor_id === U.b && r[0].source === 'app');
+await expect('outsiders cannot log views', () => as(U.d, `select log_call_sheet_view($1)`, [aday.id]), isErr);
+const [cTok] = await as(U.c, `select link_token from shoot_day_calls where shoot_day_id=$1`, [aday.id]);
+await asAnon(`select call_sheet_for_link($1)`, [cTok.link_token]);
+await asAnon(`select call_sheet_for_link($1)`, [cTok.link_token]);
+await expect('each opening of a personal link is logged for that person', () => as(U.a, `select * from audit_log where action='view' and row_key=$1 and source='link'`, [aday.id]), r => r.length === 2 && r.every((x) => x.actor_id === U.c));
+await expect('opening a link is not also logged as a change', () => as(U.a, `select * from audit_log where company_id=$1 and table_name='shoot_day_calls' and action='update' and 'viewed_at'=any(changed)`, [ac.id]), len(0));
+await asAnon(`select confirm_call_sheet_link($1)`, [cTok.link_token]);
+await expect('confirming from a link is logged as that person', () => as(U.a, `select * from audit_log where company_id=$1 and table_name='shoot_day_calls' and action='update' and source='link'`, [ac.id]), r => r.length === 1 && r[0].actor_id === U.c && r[0].changed.includes('confirmed_at'));
+await expect('link codes are not kept in the log', () => as(U.a, `select * from audit_log where table_name='shoot_day_calls'`), r => r.length > 0 && !JSON.stringify(r).includes(cTok.link_token));
+// deleting a project keeps its log
+await as(U.a, `delete from projects where id=$1`, [ap.id]);
+await expect('deleting a project keeps its log, with its company', () => as(U.a, `select count(*)::int n from audit_log where project_id=$1 and company_id=$2`, [ap.id, ac.id]), r => r[0].n > 10);
+await expect('things deleted with the project are logged in the same group', () => as(U.a, `select count(*)::int n from audit_log where tx=(select tx from audit_log where table_name='projects' and row_key=$1 and action='delete')`, [ap.id]), r => r[0].n >= 5);
+// clean-up
+await expect('non-admins cannot clean up', () => as(U.b, `select audit_cleanup($1)`, [ac.id]), isErr);
+const jBefore = (await as(U.a, `select count(*)::int n from audit_log where company_id=$1 and table_name='journal_entries'`, [ac.id]))[0].n;
+await expect('admins can remove entries of one kind', () => as(U.a, `select audit_cleanup($1, null, 'journal_entries') n`, [ac.id]), r => r[0].n === jBefore && jBefore > 0);
+await expect('clean-up leaves its own entry', () => as(U.a, `select * from audit_log where action='cleanup' and company_id=$1`, [ac.id]), r => r.length === 1 && r[0].actor_id === U.a && r[0].after.removed === jBefore);
+await expect('clean-up also removes the private content', () => db.query(`select count(*)::int n from audit_private p join audit_log l on l.id=p.audit_id where l.row_key=$1`, [pj.id]).then((r) => r.rows), r => r[0].n === 0);
+await as(U.a, `select audit_cleanup($1)`, [ac.id]);
+await expect('clean-up entries are never removed', () => as(U.a, `select action from audit_log where company_id=$1`, [ac.id]), r => r.length === 2 && r.every((x) => x.action === 'cleanup'));
+await expect('clean-up of everything includes the company\'s people', () => as(U.a, `select * from audit_log where action='sign_in' and subject_user_id=$1`, [U.c]), len(0));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
