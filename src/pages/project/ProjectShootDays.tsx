@@ -476,7 +476,7 @@ function ItemForm({ item, scene, run, onDeleted }: { item: ShootDayItem; scene?:
     }));
   }
   async function remove() {
-    if (window.confirm(`Take ${name} off this day?`) && await run(() => api.deleteShootDayItem(item.id))) onDeleted();
+    if (window.confirm(`Delete ${name} from this day's schedule?`) && await run(() => api.deleteShootDayItem(item.id))) onDeleted();
   }
 
   return (
@@ -503,7 +503,7 @@ function ItemForm({ item, scene, run, onDeleted }: { item: ShootDayItem; scene?:
         </div>
         {changed && <p className="hint md:col-span-2">Unsaved changes.</p>}
       </form>
-      <button className="btn btn-danger sm:w-auto sm:self-start" onClick={remove}>Take off this day</button>
+      <button className="btn btn-danger sm:w-auto sm:self-start" onClick={remove}>Delete from schedule</button>
     </div>
   );
 }
@@ -670,7 +670,7 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
     if (await run(() => api.setShootDayCall(day.id, call.user_id, patch))) setDraft(d);
   }
   async function remove() {
-    if (window.confirm(`Take ${name} off day ${day.day_number}?`) && await run(() => api.removeShootDayCall(day.id, call.user_id))) onRemoved();
+    if (window.confirm(`Remove ${name} from day ${day.day_number}? They won't be on its call sheet.`) && await run(() => api.removeShootDayCall(day.id, call.user_id))) onRemoved();
   }
 
   return (
@@ -702,7 +702,7 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
         </div>
         {changed && <p className="hint md:col-span-2">Unsaved changes.</p>}
       </form>
-      <button className="btn btn-danger sm:w-auto sm:self-start" onClick={remove}>Take off this day</button>
+      <button className="btn btn-danger sm:w-auto sm:self-start" onClick={remove}>Remove from this day</button>
     </div>
   );
 }
