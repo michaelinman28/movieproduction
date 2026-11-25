@@ -282,7 +282,7 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
 /** A cell link for a column's render option: { render: ({ data }) => gridLink(data.name, `/x/${data.id}`) }. */
 export function gridLink(text: string, to: string): HTMLAnchorElement {
   const a = document.createElement('a');
-  a.href = import.meta.env.BASE_URL.replace(/\/$/, '') + to;
+  a.href = appPath(to);
   a.dataset.to = to;
   a.textContent = text;
   a.className = 'grid-link';
@@ -303,6 +303,25 @@ export function gridMapLink(text: string, address: string): HTMLAnchorElement {
 /** Escapes text for a cell render that returns HTML. */
 export const gridEsc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-/** Cell HTML for a pick-list column: the value with a caret, so it reads as a dropdown. */
-export const gridDropdown = (html: string) =>
-  `<span class="cell-dd"><span class="cell-dd-value">${html}</span><span class="cell-dd-caret">▾</span></span>`;
+const appPath = (to: string) => import.meta.env.BASE_URL.replace(/\/$/, '') + to;
+
+/** Cell HTML for a link to an item's home page (see itemPath in src/lib/links.ts). */
+export const gridLinkHtml = (text: string, to: string, title?: string) =>
+  `<a class="grid-link" href="${gridEsc(appPath(to))}" data-to="${gridEsc(to)}"${title ? ` title="${gridEsc(title)}"` : ''}>${gridEsc(text)}</a>`;
+
+/** Cell HTML for a list of items (e.g. a day's scenes), each linking to its home page. */
+export const gridLinkList = (items: { text: string; to: string; title?: string }[]) =>
+  items.map((i) => gridLinkHtml(i.text, i.to, i.title)).join(', ');
+
+const OPEN_ICON = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M6 3h7v7M13 3 4 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/**
+ * Cell HTML for a pick-list column: the value with a caret, so it reads as a dropdown.
+ * When the value is another item (a location, a person, a category), pass `open` to add
+ * a small open button that goes to that item's home page; a click elsewhere in the cell
+ * still opens the list.
+ */
+export const gridDropdown = (html: string, open?: { to: string; title: string } | null) =>
+  `<span class="cell-dd"><span class="cell-dd-value">${html}</span>${open
+    ? `<a class="cell-open" href="${gridEsc(appPath(open.to))}" data-to="${gridEsc(open.to)}" title="${gridEsc(open.title)}" aria-label="${gridEsc(open.title)}">${OPEN_ICON}</a>`
+    : ''}<span class="cell-dd-caret">▾</span></span>`;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { LatticeGrid, gridDropdown, gridEsc, gridLink } from '../../components/LatticeGrid';
+import { LatticeGrid, gridDropdown, gridEsc, gridLink, gridLinkHtml, gridLinkList } from '../../components/LatticeGrid';
+import { OpenLink } from '../../components/OpenLink';
 import { Section } from '../../components/Section';
 import {
   api, type Location, type Scene, type ShootDay, type ShootDayCall, type ShootDayCallInput, type ShootDayInput, type ShootDayItem, type ShootItemKind,
@@ -10,15 +11,14 @@ import {
   NONE, SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, clockLabel, clockValue, displayName, errorText, labelOf, pagesLabel, parseTime, shortDate,
 } from '../../lib/format';
 import type { Role } from '../../lib/database.types';
-import { scrollToForm } from '../../lib/reveal';
+import { scrollToForm, useOpenFromLink } from '../../lib/reveal';
+import { itemPath } from '../../lib/links';
 import { confirmDiscard, useUnsaved } from '../../lib/unsaved';
 import type { LatticeGridInstance } from '../../vendor/lattice-grid/lattice-grid';
 import { useProject } from './ProjectLayout';
 
 type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
 
-/** A pick-list cell: the label with a caret, or a dash when nothing is picked. */
-const dd = ({ value }: { value: string }) => gridDropdown(gridEsc(value || NONE));
 
 /** Where a day can be: every location not marked Not using, plus its current one. */
 const locationChoices = (locations: Location[], currentId?: string | null) =>
@@ -46,6 +46,7 @@ interface DayRow {
   id: string; day: string; date: string; title: string; location: string;
   crew_call: string; shooting_call: string; lunch: string; wrap: string;
   scenes: string; pages: string; sent: string; confirmed: string; open: string;
+  locationId: string | null; sceneIds: string[];
 }
 
 /**
@@ -85,12 +86,21 @@ export function ProjectShootDays() {
   };
 
   const sceneNumber = useCallback((id: string) => scenes.find((s) => s.id === id)?.number ?? '?', [scenes]);
+  /** Selects a day, highlights it and opens its form. */
+  function open(id: string) {
+    setSelectedId(id);
+    setReveal({ id, n: Date.now() });
+    scrollToForm(id);
+  }
+  // A link from elsewhere (?open=<day>) opens that day's form.
+  useOpenFromLink((id) => days.some((d) => d.id === id), open);
   const rows = useMemo(() => days.map((d): DayRow => ({
     id: d.id, day: `${d.day_number} of ${d.total_days}`, date: d.shoot_date, title: d.title ?? '',
     location: locations.find((l) => l.id === d.location_id)?.name ?? '',
     crew_call: clockLabel(d.crew_call), shooting_call: clockLabel(d.shooting_call), lunch: clockLabel(d.lunch), wrap: clockLabel(d.wrap),
     scenes: d.scene_ids.map(sceneNumber).join(', '), pages: pagesLabel(d.pages_eighths || null),
     sent: d.version ? `Version ${d.version}` : 'Not sent', confirmed: d.version ? `${d.confirmed} of ${d.called}` : '', open: 'Call sheet',
+    locationId: d.location_id, sceneIds: d.scene_ids,
   })), [days, locations, sceneNumber]);
   const locationNames = useMemo(() => locationChoices(locations).map((l) => l.name), [locations]);
 
@@ -104,17 +114,26 @@ export function ProjectShootDays() {
       { field: 'date', header: 'Date', type: 'date', width: 130, editable: true, render: ({ value }: { value: string }) => gridEsc(value ? shortDate(value) : '') },
       { field: 'open', header: '', width: 110, sortable: false, filter: false, render: ({ data }: { data: DayRow }) => gridLink('Call sheet', `/projects/${projectId}/shoot-days/${data.id}`) },
       { field: 'title', header: 'Title', width: 160, editable: true },
-      { field: 'location', header: 'Location', width: 170, editable: true, editor: 'select', editorOptions: [NONE, ...locationNames], render: dd },
+      {
+        field: 'location', header: 'Location', width: 170, editable: true, editor: 'select', editorOptions: [NONE, ...locationNames],
+        render: ({ value, data }: { value: string; data: DayRow }) => gridDropdown(gridEsc(value || NONE),
+          data.locationId && value ? { to: itemPath.location(projectId, data.locationId), title: `Open ${value} on the Locations page` } : null),
+      },
       { field: 'crew_call', header: 'Crew call', width: 110, editable: true },
       { field: 'shooting_call', header: 'Shooting call', width: 120, editable: true },
       { field: 'lunch', header: 'Lunch', width: 100, editable: true },
       { field: 'wrap', header: 'Est. wrap', width: 110, editable: true },
-      { field: 'scenes', header: 'Scenes', width: 150, filterSplit: ',' },
+      {
+        field: 'scenes', header: 'Scenes', width: 150, filterSplit: ',',
+        render: ({ data }: { data: DayRow }) => gridLinkList(data.sceneIds.map((id) => ({
+          text: sceneNumber(id), to: itemPath.scene(projectId, id), title: `Open scene ${sceneNumber(id)} on the Scenes page`,
+        }))),
+      },
       { field: 'pages', header: 'Pages', width: 90, filter: false },
       { field: 'sent', header: 'Sent', width: 110, filter: 'set' },
       { field: 'confirmed', header: 'Confirmed', width: 110, filter: false },
     ],
-  }), [locationNames, projectId]);
+  }), [locationNames, projectId, sceneNumber]);
 
   async function saveCell(e: { data: DayRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
@@ -137,9 +156,7 @@ export function ProjectShootDays() {
     if (await run(async () => { id = (await api.createShootDay(projectId, { shoot_date: newDate })).id; },
       `Added ${shortDate(newDate)}. Set its location and times, add scenes and call people in the form below the table.`)) {
       setNewDate('');
-      setSelectedId(id);
-      setReveal({ id, n: Date.now() });
-      scrollToForm(id);
+      open(id);
     }
   }
 
@@ -201,6 +218,7 @@ function DayPanel({ day, scenes, run, onChanged, canDelete, onDeleted }: {
 }
 
 function DayDetails({ day, locations, run }: { day: ShootDay; locations: Location[]; run: Run }) {
+  const { projectId } = useProject();
   const initial = useMemo(() => ({
     shoot_date: day.shoot_date, title: day.title ?? '', location_id: day.location_id ?? '',
     crew_call: clockValue(day.crew_call), shooting_call: clockValue(day.shooting_call), lunch: clockValue(day.lunch), wrap: clockValue(day.wrap),
@@ -274,6 +292,10 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
             {locationChoices(locations, day.location_id).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
           <span className="hint font-normal">Its address, parking and nearest hospital go on the call sheet; edit them on the Locations page.</span>
+          {(() => {
+            const at = locations.find((l) => l.id === draft.location_id);
+            return at ? <OpenLink to={itemPath.location(projectId, at.id)}>Open {at.name} on the Locations page</OpenLink> : null;
+          })()}
         </label>
         {timeInput('crew_call', 'General crew call')}
         {timeInput('shooting_call', 'Shooting call')}
@@ -306,9 +328,10 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
 
 // ---- The day's schedule -------------------------------------------------------
 
-interface ItemRow { id: string; time: string; what: string; set_name: string; dn: string; pages: string; cast: string; synopsis: string; kind: ShootItemKind }
+interface ItemRow { id: string; time: string; what: string; set_name: string; dn: string; pages: string; cast: string; synopsis: string; kind: ShootItemKind; sceneId: string | null }
 
 function DaySchedule({ day, scenes, onChanged }: { day: ShootDay; scenes: Scene[]; onChanged: () => Promise<void> }) {
+  const { projectId } = useProject();
   const [items, setItems] = useState<ShootDayItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [kind, setKind] = useState<ShootItemKind>('scene');
@@ -337,7 +360,7 @@ function DaySchedule({ day, scenes, onChanged }: { day: ShootDay; scenes: Scene[
     const s = sceneOf(i.scene_id);
     const what = i.kind === 'scene' ? `Scene ${s?.number ?? '?'}` : `${labelOf(SHOOT_ITEM_KINDS, i.kind)}${i.label ? `: ${i.label}` : ''}`;
     return {
-      id: i.id, kind: i.kind, time: clockLabel(i.at_time), what,
+      id: i.id, kind: i.kind, sceneId: i.scene_id, time: clockLabel(i.at_time), what,
       set_name: s?.set_name ?? '', dn: s ? [s.int_ext ? labelOf(SCENE_INT_EXT, s.int_ext) : '', s.time_of_day ? labelOf(SCENE_TIMES, s.time_of_day) : ''].filter(Boolean).join(' / ') : '',
       pages: pagesLabel(s?.pages_eighths), cast: s?.characters ?? '', synopsis: s?.synopsis ?? '',
     };
@@ -350,14 +373,19 @@ function DaySchedule({ day, scenes, onChanged }: { day: ShootDay; scenes: Scene[
     emptyMessage: 'Nothing scheduled yet',
     columns: [
       { field: 'time', header: 'Time', width: 100, editable: true, filter: false },
-      { field: 'what', header: 'What', width: 220, editable: true },
+      {
+        // A scene links to it on the Scenes page; breaks and moves are typed here.
+        field: 'what', header: 'What', width: 220, editable: (r: ItemRow) => r.kind !== 'scene',
+        render: ({ value, data }: { value: string; data: ItemRow }) => data.kind === 'scene' && data.sceneId
+          ? gridLinkHtml(value, itemPath.scene(projectId, data.sceneId), `Open ${value.toLowerCase()} on the Scenes page`) : gridEsc(value),
+      },
       { field: 'set_name', header: 'Set', width: 200 },
       { field: 'dn', header: 'I/E, D/N', width: 120, filter: 'set' },
       { field: 'pages', header: 'Pages', width: 80, filter: false },
       { field: 'cast', header: 'Characters', width: 180, filterSplit: ',' },
       { field: 'synopsis', header: 'Synopsis', width: 240 },
     ],
-  }), []);
+  }), [projectId]);
 
   async function saveCell(e: { data: ItemRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
@@ -432,6 +460,7 @@ function DaySchedule({ day, scenes, onChanged }: { day: ShootDay; scenes: Scene[
 }
 
 function ItemForm({ item, scene, run, onDeleted }: { item: ShootDayItem; scene?: Scene; run: Run; onDeleted: () => void }) {
+  const { projectId } = useProject();
   const initial = useMemo(() => ({ time: clockValue(item.at_time), label: item.label ?? '' }), [item]);
   const [draft, setDraft] = useState(initial);
   const changed = draft.time !== initial.time || draft.label.trim() !== initial.label;
@@ -462,7 +491,12 @@ function ItemForm({ item, scene, run, onDeleted }: { item: ShootDayItem; scene?:
             <input className="field" value={draft.label} maxLength={300} required={item.kind !== 'meal'} onChange={(e) => setDraft({ ...draft, label: e.target.value })} />
           </label>
         )}
-        {scene && <p className="hint md:col-span-2">Change the scene itself (set, pages, characters) on the Scenes page.</p>}
+        {scene && (
+          <p className="hint flex flex-col md:col-span-2">
+            Change the scene itself (set, pages, characters) on the Scenes page.
+            <OpenLink to={itemPath.scene(projectId, scene.id)}>Open scene {scene.number} on the Scenes page</OpenLink>
+          </p>
+        )}
         <div className="flex gap-2 md:col-span-2">
           <button type="submit" className="btn flex-1 whitespace-nowrap md:flex-none" disabled={!changed} data-pin="2">Save item</button>
           <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
@@ -482,7 +516,7 @@ interface CallRow {
 }
 
 function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<void> }) {
-  const { team, roles } = useProject();
+  const { projectId, team, roles } = useProject();
   const [calls, setCalls] = useState<ShootDayCall[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addId, setAddId] = useState('');
@@ -518,7 +552,10 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
     selection: 'single', rowClickSelection: true,
     emptyMessage: 'Nobody called yet',
     columns: [
-      { field: 'name', header: 'Name', width: 170, pinned: 'left' },
+      {
+        field: 'name', header: 'Name', width: 170, pinned: 'left',
+        render: ({ value, data }: { value: string; data: CallRow }) => gridLinkHtml(value, itemPath.teamMember(projectId, data.id), `Open ${value} on the Team page`),
+      },
       { field: 'department', header: 'Department', width: 130, filter: 'set' },
       { field: 'roles', header: 'Roles', width: 180, filterSplit: ',' },
       { field: 'character', header: 'Character', width: 130, editable: true },
@@ -528,7 +565,7 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
       { field: 'note', header: 'Note', width: 200, editable: true },
       { field: 'status', header: 'Call sheet', width: 130, filter: 'set' },
     ],
-  }), [crewCall]);
+  }), [crewCall, projectId]);
 
   async function saveCell(e: { data: CallRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
@@ -596,6 +633,7 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
 }
 
 function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDayCall; run: Run; onRemoved: () => void }) {
+  const { projectId } = useProject();
   const initial = useMemo(() => ({
     character: call.character_name ?? '', call: clockValue(call.call_time), pickup: clockValue(call.pickup_time), makeup: clockValue(call.makeup_time), note: call.note ?? '',
   }), [call]);
@@ -637,7 +675,10 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
 
   return (
     <div data-pin-scope data-form-for={call.user_id} className="flex flex-col gap-2 rounded-md border border-line p-3">
-      <p className="font-semibold">{name} <span className="font-normal text-muted">({callStatus(day, call)})</span></p>
+      <p className="font-semibold">
+        <Link to={itemPath.teamMember(projectId, call.user_id)} title={`Open ${name} on the Team page`}>{name}</Link>
+        {' '}<span className="font-normal text-muted">({callStatus(day, call)})</span>
+      </p>
       <form className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-x-4" onSubmit={save}>
         <label className="label">Character (cast only)
           <input className="field" value={draft.character} maxLength={120} placeholder="Maya" onChange={set('character')} />

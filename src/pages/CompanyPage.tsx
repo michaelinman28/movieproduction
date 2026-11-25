@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LatticeGrid, gridDropdown, gridEsc, gridLink } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { PersonContacts } from '../components/PersonContacts';
 import { RolePicker } from '../components/RolePicker';
 import { useAuth } from '../lib/auth';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
-import { scrollToForm } from '../lib/reveal';
+import { scrollToForm, useOpenFromLink } from '../lib/reveal';
 import { api, type Company, type CompanyMember, type Project } from '../lib/api';
 import { emailOrThrow, emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
 import { InviteButtons } from '../components/InviteButtons';
@@ -144,16 +144,12 @@ export function CompanyPage() {
   // ---- People --------------------------------------------------------------
   const [newPerson, setNewPerson] = useState({ email: '', name: '', phone: '', title: '', admin: false });
   const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
-  // A link such as ?person=<id> (from a project's team) opens that person's form.
-  const [params, setParams] = useSearchParams();
-  const linkedPerson = params.get('person');
-  useEffect(() => {
-    if (!linkedPerson || !members.some((m) => m.user_id === linkedPerson)) return;
-    setSelectedId(linkedPerson);
-    setReveal({ id: linkedPerson, n: Date.now() });
-    scrollToForm(linkedPerson);
-    setParams({}, { replace: true });
-  }, [linkedPerson, members]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A link such as ?open=<id> (from a project's team) opens that person's form;
+  // ?person=<id> is the older form of the same link.
+  const openPerson = (id: string) => { setSelectedId(id); setReveal({ id, n: Date.now() }); scrollToForm(id); };
+  const isMember = (id: string) => members.some((m) => m.user_id === id);
+  useOpenFromLink(isMember, openPerson);
+  useOpenFromLink(isMember, openPerson, 'person');
   async function addPerson(e: FormEvent) {
     e.preventDefault();
     const email = newPerson.email.trim();

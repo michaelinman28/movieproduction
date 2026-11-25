@@ -9,7 +9,8 @@ import { displayName, errorText, roleIdsFor, roleNames } from '../../lib/format'
 import type { Role } from '../../lib/database.types';
 import type { Run } from '../CompanyPage';
 import { confirmDiscard, useUnsaved } from '../../lib/unsaved';
-import { scrollToForm } from '../../lib/reveal';
+import { scrollToForm, useOpenFromLink } from '../../lib/reveal';
+import { itemPath } from '../../lib/links';
 import { emailProblem, formatPhone, phoneOrThrow } from '../../lib/contact';
 import { InviteButtons } from '../../components/InviteButtons';
 import { useProject } from './ProjectLayout';
@@ -123,6 +124,12 @@ export function ProjectTeam() {
   }
 
   const selected = team.find((t) => t.user_id === selectedId) ?? null;
+  // A link from elsewhere (?open=<person>, e.g. from a call sheet or a task) opens their form.
+  useOpenFromLink((id) => team.some((t) => t.user_id === id), (id) => {
+    setSelectedId(id);
+    setReveal({ id, n: Date.now() });
+    scrollToForm(id);
+  });
 
   return (
     <>
@@ -216,7 +223,7 @@ function TeamPanel({ projectId, companyId, companyName, projectName, member, rol
   return (
     <aside data-pin-scope data-form-for={member.user_id} className="card gap-2">
       {/* The person's name opens them on the company's People list, with all their details. */}
-      <h3><Link to={`/companies/${companyId}?person=${member.user_id}`} title={`Open ${name} in the company's people`}>{name}</Link></h3>
+      <h3><Link to={itemPath.person(companyId, member.user_id)} title={`Open ${name} in the company's people`}>{name}</Link></h3>
       <p className="hint mt-2">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>
       {member.profile.has_account === false && isAdmin && (
         <InviteButtons info={{ name, email: member.profile.email ?? '', company: companyName, project: projectName }} />

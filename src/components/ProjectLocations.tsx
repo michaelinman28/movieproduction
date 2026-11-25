@@ -10,7 +10,7 @@ const tidyContact = (f: string, v: string): string | null =>
   f === 'contact_phone' ? phoneOrThrow(v) : f === 'contact_email' ? emailOrThrow(v) : v.trim() || null;
 import { useAuth } from '../lib/auth';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
-import { scrollToForm } from '../lib/reveal';
+import { scrollToForm, useOpenFromLink } from '../lib/reveal';
 import { LOCATION_STATUSES, errorText, labelOf, valueOf } from '../lib/format';
 
 interface LocationRow {
@@ -114,11 +114,22 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
     let id = '';
     if (await run(async () => { id = (await api.createLocation(projectId, { name })).id; }, `Added ${name}. Fill in its address and contact in the form below the table.`)) {
       setNewName('');
-      setSelectedId(id);
-      setReveal({ id, n: Date.now() });
-      scrollToForm(id);
+      open(id);
     }
   }
+
+  /** Selects a location, highlights it and opens its form. */
+  function open(id: string) {
+    setSelectedId(id);
+    setReveal({ id, n: Date.now() });
+    scrollToForm(id);
+  }
+  // A link from elsewhere (?open=<location>, e.g. from a task or shoot day) opens its
+  // form, showing the ones not in use too if it's one of them.
+  useOpenFromLink((id) => locations.some((l) => l.id === id), (id) => {
+    if (!showUnused && locations.find((l) => l.id === id)?.status === 'not_using') setShowUnused(true);
+    open(id);
+  });
 
   const selected = locations.find((l) => l.id === selectedId) ?? null;
 

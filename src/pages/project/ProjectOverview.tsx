@@ -7,6 +7,7 @@ import { api, type Scene, type ShootDay, type Task } from '../../lib/api';
 import { PROJECT_STATUSES, clockLabel, dueWhen, errorText, isOverdue, minutesLabel, pagesLabel } from '../../lib/format';
 import type { ProjectStatus } from '../../lib/database.types';
 import { useUnsaved } from '../../lib/unsaved';
+import { itemPath } from '../../lib/links';
 import { useProject } from './ProjectLayout';
 
 /** 'YYYY-MM-DD' to e.g. 'Mon, Nov 23'. */
@@ -169,7 +170,7 @@ export function ProjectOverview() {
       <Section id="project.shootdays" title="Shoot days" summary={days?.length ? `${daysAhead.length} ahead of ${days.length}` : undefined}>
         {days === null ? <p className="hint">Loading…</p> : !days.length ? <p className="hint">No shoot days yet. Plan them on the Shoot days page.</p> : (
           <>
-            {nextDay ? <NextShootDay day={nextDay} today={today} base={base} scenes={scenes ?? []} locationName={locations.find((l) => l.id === nextDay.location_id)?.name} />
+            {nextDay ? <NextShootDay day={nextDay} today={today} base={base} projectId={projectId} scenes={scenes ?? []} locationName={locations.find((l) => l.id === nextDay.location_id)?.name} />
               : <p className="hint">All {days.length} shoot days are behind you.</p>}
             {daysAhead.length > 1 && (
               <ul className="flex flex-col">
@@ -198,9 +199,11 @@ export function ProjectOverview() {
         {upcoming.length ? (
           <ul className="flex flex-col">
             {upcoming.map((t) => (
-              <li key={t.id} className="flex min-h-11 items-center gap-3 border-b border-line last:border-b-0">
-                <span className="w-32 shrink-0 text-sm text-muted">{shortDate(t.due_date!)}{dueWhen(t) ? `, ${dueWhen(t)}` : ''}</span>
-                <span className="min-w-0 flex-1 truncate">{t.title}</span>
+              <li key={t.id} className="border-b border-line last:border-b-0">
+                <Link to={itemPath.task(projectId, t.id)} className="flex min-h-11 items-center gap-3 text-fg no-underline hover:text-accent">
+                  <span className="w-32 shrink-0 text-sm text-muted">{shortDate(t.due_date!)}{dueWhen(t) ? `, ${dueWhen(t)}` : ''}</span>
+                  <span className="min-w-0 flex-1 truncate">{t.title}</span>
+                </Link>
               </li>
             ))}
           </ul>
@@ -270,29 +273,47 @@ function SheetPill({ day }: { day: ShootDay }) {
 }
 
 /** The next shoot day, in more detail. */
-function NextShootDay({ day, today, base, scenes, locationName }: { day: ShootDay; today: string; base: string; scenes: Scene[]; locationName?: string }) {
+function NextShootDay({ day, today, base, projectId, scenes, locationName }: {
+  day: ShootDay; today: string; base: string; projectId: string; scenes: Scene[]; locationName?: string;
+}) {
   const byId = new Map(scenes.map((sc) => [sc.id, sc]));
   const dayScenes = day.scene_ids.map((id) => byId.get(id)).filter((sc): sc is Scene => !!sc);
   const times = ([['Crew call', day.crew_call], ['Shooting call', day.shooting_call], ['Lunch', day.lunch], ['Wrap', day.wrap]] as const).filter(([, t]) => t);
   return (
-    <Link to={`${base}/shoot-days/${day.id}`} className="card gap-2 text-fg no-underline hover:border-accent">
+    // The day opens its call sheet; its location and scenes open on their own pages.
+    <div className="card gap-2">
       <span className="text-sm font-semibold text-muted">{day.shoot_date === today ? 'Shooting today' : 'Next shoot day'}</span>
-      <span className="text-xl font-bold">{shortDate(day.shoot_date)}: Day {day.day_number} of {day.total_days}</span>
-      {(day.title || locationName) && <span>{[day.title, locationName].filter(Boolean).join(' at ')}</span>}
+      <Link to={`${base}/shoot-days/${day.id}`} className="text-xl font-bold text-fg no-underline hover:text-accent">
+        {shortDate(day.shoot_date)}: Day {day.day_number} of {day.total_days}
+      </Link>
+      {(day.title || locationName) && (
+        <span>
+          {day.title}{day.title && locationName ? ' at ' : ''}
+          {locationName && day.location_id && <Link to={itemPath.location(projectId, day.location_id)} title={`Open ${locationName} on the Locations page`}>{locationName}</Link>}
+        </span>
+      )}
       {times.length > 0 && (
         <span className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
           {times.map(([label, t]) => <span key={label}><span className="text-muted">{label}</span> {clockLabel(t)}</span>)}
         </span>
       )}
       <span className="text-sm">
-        {dayScenes.length ? `${dayScenes.length === 1 ? 'Scene' : 'Scenes'} ${dayScenes.map((sc) => sc.number).join(', ')}` : 'No scenes scheduled yet'}
+        {dayScenes.length ? (
+          <>
+            {dayScenes.length === 1 ? 'Scene' : 'Scenes'}{' '}
+            {dayScenes.map((sc, i) => (
+              <span key={sc.id}>{i > 0 && ', '}<Link to={itemPath.scene(projectId, sc.id)} title={`Open scene ${sc.number} on the Scenes page`}>{sc.number}</Link></span>
+            ))}
+          </>
+        ) : 'No scenes scheduled yet'}
         {day.pages_eighths ? ` (${pagesLabel(day.pages_eighths)} ${day.pages_eighths <= 8 ? 'page' : 'pages'})` : ''}
       </span>
       <span className="flex flex-wrap items-center gap-2">
         <SheetPill day={day} />
         <span className="text-sm text-muted">{day.called} called</span>
+        <Link to={`${base}/shoot-days/${day.id}`} className="btn-link text-sm">Open call sheet</Link>
       </span>
-    </Link>
+    </div>
   );
 }
 
