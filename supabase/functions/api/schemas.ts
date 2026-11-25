@@ -324,3 +324,83 @@ export const LocationInput = z.object({
 }).openapi('LocationInput');
 
 export const LocationUpdate = LocationInput.partial().openapi('LocationUpdate');
+
+// ---- Scenes and shots -------------------------------------------------------
+
+export const SceneIntExt = z.enum(['int', 'ext', 'int_ext']).openapi('SceneIntExt', { description: 'Interior, exterior, or both' });
+export const SceneTime = z.enum(['day', 'night', 'dawn', 'dusk']).openapi('SceneTime');
+export const SceneStatus = z.enum(['not_scheduled', 'scheduled', 'shot']).openapi('SceneStatus');
+
+export const Scene = z.object({
+  id: Uuid,
+  project_id: Uuid,
+  number: z.string().openapi({ example: '12A' }),
+  set_name: nullableText.openapi({ example: 'INT. DINER' }),
+  int_ext: SceneIntExt.nullable(),
+  time_of_day: SceneTime.nullable(),
+  pages_eighths: z.number().int().nullable().openapi({ description: 'Length in eighths of a page (11 = 1 3/8 pages)', example: 11 }),
+  synopsis: nullableText.openapi({ example: 'Maya confronts Leo about the money' }),
+  characters: nullableText.openapi({ example: 'Maya, Leo, Waitress' }),
+  needs: nullableText.openapi({ example: 'Practical neon sign, rain on windows' }),
+  location_id: Uuid.nullable().openapi({ description: 'One of the project\'s locations' }),
+  status: SceneStatus,
+  sort_order: z.number().int(),
+  created_by: Uuid.nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  shots: z.number().int().openapi({ description: 'How many shots the scene has' }),
+  shots_done: z.number().int().openapi({ description: 'How many of them are done' }),
+  est_minutes: z.number().int().openapi({ description: 'The shots\' estimated minutes added up' }),
+}).openapi('Scene');
+
+export const SceneInput = z.object({
+  number: z.string().trim().min(1).max(20).openapi({ example: '12A' }),
+  set_name: optText(200),
+  int_ext: SceneIntExt.nullable().optional(),
+  time_of_day: SceneTime.nullable().optional(),
+  pages_eighths: z.number().int().min(0).max(8000).nullable().optional(),
+  synopsis: optText(1000),
+  characters: optText(1000),
+  needs: optText(2000),
+  location_id: Uuid.nullable().optional(),
+  status: SceneStatus.optional().openapi({ description: 'Defaults to not_scheduled' }),
+}).openapi('SceneInput');
+
+export const SceneUpdate = SceneInput.partial().openapi('SceneUpdate');
+
+export const Shot = z.object({
+  id: Uuid,
+  scene_id: Uuid,
+  project_id: Uuid,
+  sort_order: z.number().int(),
+  description: z.string().openapi({ example: 'Wide of diner, Maya enters' }),
+  size: nullableText.openapi({ example: 'Wide' }),
+  angle: nullableText.openapi({ example: 'Eye level' }),
+  movement: nullableText.openapi({ example: 'Dolly' }),
+  lens: nullableText.openapi({ example: '24mm' }),
+  equipment: nullableText.openapi({ example: 'Dolly and track' }),
+  est_minutes: z.number().int().nullable().openapi({ example: 30 }),
+  done: z.boolean(),
+  notes: nullableText,
+  created_by: Uuid.nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('Shot');
+
+export const ShotInput = z.object({
+  description: z.string().trim().min(1).max(500).openapi({ example: 'Wide of diner, Maya enters' }),
+  size: optText(40),
+  angle: optText(40),
+  movement: optText(40),
+  lens: optText(40),
+  equipment: optText(300),
+  est_minutes: z.number().int().min(0).max(1440).nullable().optional(),
+  done: z.boolean().optional(),
+  notes: optText(2000),
+}).openapi('ShotInput');
+
+export const ShotUpdate = ShotInput.partial().openapi('ShotUpdate');
+
+export const OrderInput = z.object({
+  ids: z.array(Uuid).min(1).max(1000).openapi({ description: 'Every id, in the new order' }),
+}).openapi('OrderInput');

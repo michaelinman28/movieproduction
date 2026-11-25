@@ -100,3 +100,59 @@ export const LOCATION_STATUSES: { value: 'considering' | 'confirmed' | 'not_usin
   { value: 'confirmed', label: 'Confirmed' },
   { value: 'not_using', label: 'Not using' },
 ];
+
+// ---- Scenes and shots -------------------------------------------------------
+
+export type SceneIntExt = 'int' | 'ext' | 'int_ext';
+export type SceneTime = 'day' | 'night' | 'dawn' | 'dusk';
+export type SceneStatus = 'not_scheduled' | 'scheduled' | 'shot';
+
+export const SCENE_INT_EXT: { value: SceneIntExt; label: string }[] = [
+  { value: 'int', label: 'INT' },
+  { value: 'ext', label: 'EXT' },
+  { value: 'int_ext', label: 'INT/EXT' },
+];
+export const SCENE_TIMES: { value: SceneTime; label: string }[] = [
+  { value: 'day', label: 'Day' },
+  { value: 'night', label: 'Night' },
+  { value: 'dawn', label: 'Dawn' },
+  { value: 'dusk', label: 'Dusk' },
+];
+export const SCENE_STATUSES: { value: SceneStatus; label: string }[] = [
+  { value: 'not_scheduled', label: 'Not scheduled' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'shot', label: 'Shot' },
+];
+
+/** Shown in a pick-list for "nothing picked". */
+export const NONE = '—';
+
+// Shot pick-lists. They're stored as text, so a company can add its own values later.
+export const SHOT_SIZES = ['Extreme wide', 'Wide', 'Full', 'Medium wide', 'Medium', 'Medium close-up', 'Close-up', 'Extreme close-up', 'Insert', 'Over the shoulder', 'Two shot', 'POV'];
+export const SHOT_ANGLES = ['Eye level', 'High', 'Low', 'Overhead', 'Ground level', 'Dutch'];
+export const SHOT_MOVEMENTS = ['Static', 'Pan', 'Tilt', 'Push in', 'Pull out', 'Dolly', 'Tracking', 'Handheld', 'Steadicam', 'Crane', 'Drone', 'Zoom'];
+
+/** A scene's length from eighths of a page: 11 -> '1 3/8', 3 -> '3/8', 16 -> '2'. */
+export function pagesLabel(eighths: number | null | undefined) {
+  if (eighths == null) return '';
+  const whole = Math.floor(eighths / 8), part = eighths % 8;
+  if (!part) return String(whole);
+  return whole ? `${whole} ${part}/8` : `${part}/8`;
+}
+
+/** Pages as typed ('1 3/8', '3/8', '2', '1.5') to eighths; blank is null. Throws if it can't be read. */
+export function parsePages(text: string): number | null {
+  const t = text.trim();
+  if (!t) return null;
+  const m = t.match(/^(\d+)?\s*(?:(\d)\s*\/\s*8)?$/);
+  if (m && (m[1] || m[2]) && Number(m[2] ?? 0) < 8) return Number(m[1] ?? 0) * 8 + Number(m[2] ?? 0);
+  if (/^\d*\.\d+$/.test(t)) return Math.round(Number(t) * 8);
+  throw new Error('Write pages as whole pages and eighths, like 1 3/8, 3/8 or 2.');
+}
+
+/** 90 -> '1h 30m', 45 -> '45m', 0 or null -> ''. */
+export function minutesLabel(m: number | null | undefined) {
+  if (!m) return '';
+  const h = Math.floor(m / 60), r = m % 60;
+  return h ? (r ? `${h}h ${r}m` : `${h}h`) : `${r}m`;
+}

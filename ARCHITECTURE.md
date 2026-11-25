@@ -19,6 +19,7 @@ day to day.
 | Tasks | A tree of tasks and sub-tasks (any depth) on each project's Tasks page. See [Tasks](#tasks) below | Done |
 | Task categories and tags | Each company has its own task categories (12 starter ones) that admins add, rename, reorder and delete, and its own tags, which anyone in the company can add and admins can rename or delete | Done |
 | Locations | Each project's locations, with a status (Considering, Confirmed, Not using; Not using ones are hidden unless you ask, and aren't offered for tasks), a description, an address (the Map column, the panel and the task panel open it in the device's own maps app: Apple Maps on iPhone, iPad and Mac, the default maps app on Android, Google Maps in the browser elsewhere; `src/lib/maps.ts`) and an on-site contact name, email and phone. Anyone on the project adds and edits them; whoever added one or an admin deletes it. A task can be assigned to a location | Done |
+| Scenes and shot lists | Each project's scenes on its Scenes page, in script order (drag to reorder): number, set, INT/EXT, day or night, pages in eighths, synopsis, characters, needs, location and status (Not scheduled, Scheduled, Shot). Each scene has a shot list in its form: shots in shooting order with size, angle, movement, lens, equipment, estimated minutes and notes, ticked Done on set with one tap. Anyone on the project adds, edits and reorders them; whoever added a scene, or an admin, deletes it (with its shots). First step toward shoot days and call sheets. See [Scenes](#scenes-and-shot-lists) below | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
 
 ### Tasks
@@ -64,6 +65,28 @@ day to day.
   Only the author edits a note; the author or a company admin deletes it.
 - **Tags:** start typing in the panel's tag box to pick an existing company tag, or
   press Enter on a new name to create it.
+
+### Scenes and shot lists
+
+- **Where:** a project's Scenes page (`/projects/:id/scenes`, `src/pages/project/ProjectScenes.tsx`).
+  Scenes are typed in for now; script import can fill them in later. They are the shared
+  piece that shoot days and call sheets will be built from.
+- **Scenes table:** every field is editable in place (I/E, D/N, location and status are
+  dropdowns). Pages are typed as whole pages and eighths (`1 3/8`, `3/8`, `2`) and stored
+  as eighths (`scenes.pages_eighths`; `pagesLabel`/`parsePages` in `src/lib/format.ts`).
+  Drag the handle at the left of a row to change the order (lattice-grid `rowReorder`,
+  saved with `PUT /projects/{id}/scene-order`; paused while a sort or filter is on).
+  Shots done and total shot time come from the shot list.
+- **Scene form** (select a scene; changes wait for **Save scene**): the same fields, then
+  the **Shot list**.
+- **Shot list:** a grid of the scene's shots in shooting order (drag to reorder, `PUT
+  /scenes/{id}/shot-order`). Size, angle and movement are pick-lists (`SHOT_SIZES`,
+  `SHOT_ANGLES`, `SHOT_MOVEMENTS`), stored as text so a company can add its own later.
+  The Done box ticks a shot done with one tap (saved at once). Select a shot to edit it
+  in its form under the grid (**Save shot**).
+- **Rules:** a scene number is unique in its project (any case); a location must be on
+  the same project; a shot stays in its scene and takes its project. New scenes and
+  shots go to the end of their list. Migration `20261125000000_scenes_shots.sql`.
 
 ### How people join
 
@@ -144,6 +167,8 @@ There are three layers, and each one can be run and tested by itself.
 | Tasks | `GET/POST /projects/{id}/tasks`, `GET/PATCH/DELETE /tasks/{id}` (deleting a task deletes its sub-tasks) |
 | Task notes | `GET/POST /tasks/{id}/notes`, `PATCH/DELETE /task-notes/{id}` |
 | Task categories | `GET/POST /companies/{id}/task-categories`, `PATCH/DELETE /task-categories/{id}` |
+| Scenes | `GET/POST /projects/{id}/scenes` (with shot counts and time), `PUT /projects/{id}/scene-order`, `PATCH/DELETE /scenes/{id}` |
+| Shots | `GET /projects/{id}/shots`, `GET/POST /scenes/{id}/shots`, `PUT /scenes/{id}/shot-order`, `PATCH/DELETE /shots/{id}` |
 | Task tags | `GET/POST /companies/{id}/task-tags`, `PATCH/DELETE /task-tags/{id}`; a task's `tag_ids` are set with `PATCH /tasks/{id}` |
 
 ### 3. Database (`supabase/migrations`)
@@ -157,6 +182,8 @@ There are three layers, and each one can be run and tested by itself.
     add notes. Only a note's author edits it; the author or an admin can delete it.
   - Company members see the company's task categories and tags. Admins manage
     categories; anyone in the company can create tags; admins rename or delete them.
+  - Everyone on a project (and admins) sees, adds, edits and reorders its scenes and
+    shots. Whoever added a scene, or an admin, deletes it; anyone on the project deletes a shot.
   - Private journal entries are visible only to the author and the people they
     share them with. Only the author can edit them.
 - Integrity rules live in the database too. A company always keeps at least one
@@ -179,6 +206,8 @@ There are three layers, and each one can be run and tested by itself.
 | `tasks` | Project tasks. `parent_id` makes a sub-task; due date with optional part of day or time |
 | `task_notes` | Notes on a task, with author and time |
 | `task_categories`, `task_tags`, `task_tag_links` | Each company's task categories and tags, and which tags each task has |
+| `scenes` | A project's scenes in order: number, set, INT/EXT, time of day, pages in eighths, synopsis, characters, needs, location, status |
+| `shots` | Each scene's shots in order: size, angle, movement, lens, equipment, estimated minutes, done, notes |
 | `journal_entries`, `journal_entry_shares` | The project journal and who private entries are shared with |
 
 ## Technologies
@@ -202,7 +231,7 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   styles. Add `sm:` (640px), `md:` (768px) and `lg:` (1024px) only to adapt
   for bigger screens. For example, `flex flex-col gap-3 md:flex-row` stacks on a
   phone and sits side by side on a laptop.
-- **Project pages have a left nav.** A project's areas (Overview, Tasks, Locations,
+- **Project pages have a left nav.** A project's areas (Overview, Tasks, Scenes, Locations,
   Team, Journal) are separate pages under `/projects/:id`, framed by
   `src/pages/project/ProjectLayout.tsx`: the project's name, and a nav that is a left
   column from `md:` up and a row of tabs (scrolling sideways inside itself) on phones,
@@ -358,4 +387,5 @@ Checks: `npm run typecheck` (app and API), `npm run test:db` (security rules), `
 2. Companies, projects and people (done)
 3. Roles: manage custom roles per company (done)
 4. Tasks and sub-tasks in a lattice-grid tree, with due times, notes, categories and tags (done)
-5. Project journal with private, shared and public entries
+5. Scenes and shot lists (done); next shoot days and call sheets
+6. Project journal with private, shared and public entries

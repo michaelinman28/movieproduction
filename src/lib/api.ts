@@ -2,6 +2,7 @@
 // writes all data through the API; Supabase is used here only to keep the user
 // signed in and supply their access token.
 import { supabase } from './supabase';
+import type { SceneIntExt, SceneStatus, SceneTime } from './format';
 import type { DayPart, ProjectStatus, Role, Task as TaskRow, TaskPriority, TaskStatus } from './database.types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://localhost:8787';
@@ -60,6 +61,24 @@ export type LocationInput = Partial<Pick<Location, 'name' | 'description' | 'add
 /** considering (being scouted), confirmed (booked), or not_using (ruled out). */
 export type LocationStatus = 'considering' | 'confirmed' | 'not_using';
 
+export type { SceneIntExt, SceneStatus, SceneTime } from './format';
+export interface Scene {
+  id: string; project_id: string; number: string; set_name: string | null; int_ext: SceneIntExt | null; time_of_day: SceneTime | null;
+  /** Length in eighths of a page (11 = 1 3/8). */
+  pages_eighths: number | null; synopsis: string | null; characters: string | null; needs: string | null;
+  location_id: string | null; status: SceneStatus; sort_order: number;
+  created_by: string | null; created_at: string; updated_at: string;
+  shots: number; shots_done: number; est_minutes: number;
+}
+export type SceneInput = Partial<Pick<Scene, 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths' | 'synopsis' | 'characters' | 'needs' | 'location_id' | 'status'>>;
+export interface Shot {
+  id: string; scene_id: string; project_id: string; sort_order: number; description: string;
+  size: string | null; angle: string | null; movement: string | null; lens: string | null; equipment: string | null;
+  est_minutes: number | null; done: boolean; notes: string | null;
+  created_by: string | null; created_at: string; updated_at: string;
+}
+export type ShotInput = Partial<Pick<Shot, 'description' | 'size' | 'angle' | 'movement' | 'lens' | 'equipment' | 'est_minutes' | 'done' | 'notes'>>;
+
 export interface TaskNote { id: string; task_id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }
 
 const enc = encodeURIComponent;
@@ -112,6 +131,17 @@ export const api = {
   createLocation: (projectId: string, b: LocationInput & { name: string }) => call<Location>('POST', `/projects/${enc(projectId)}/locations`, b),
   updateLocation: (id: string, b: LocationInput) => call<Location>('PATCH', `/locations/${enc(id)}`, b),
   deleteLocation: (id: string) => call<void>('DELETE', `/locations/${enc(id)}`),
+
+  scenes: (projectId: string) => call<Scene[]>('GET', `/projects/${enc(projectId)}/scenes`),
+  createScene: (projectId: string, b: SceneInput & { number: string }) => call<Scene>('POST', `/projects/${enc(projectId)}/scenes`, b),
+  updateScene: (id: string, b: SceneInput) => call<Scene>('PATCH', `/scenes/${enc(id)}`, b),
+  deleteScene: (id: string) => call<void>('DELETE', `/scenes/${enc(id)}`),
+  orderScenes: (projectId: string, ids: string[]) => call<void>('PUT', `/projects/${enc(projectId)}/scene-order`, { ids }),
+  shots: (sceneId: string) => call<Shot[]>('GET', `/scenes/${enc(sceneId)}/shots`),
+  createShot: (sceneId: string, b: ShotInput & { description: string }) => call<Shot>('POST', `/scenes/${enc(sceneId)}/shots`, b),
+  updateShot: (id: string, b: ShotInput) => call<Shot>('PATCH', `/shots/${enc(id)}`, b),
+  deleteShot: (id: string) => call<void>('DELETE', `/shots/${enc(id)}`),
+  orderShots: (sceneId: string, ids: string[]) => call<void>('PUT', `/scenes/${enc(sceneId)}/shot-order`, { ids }),
 
   tasks: (projectId: string) => call<Task[]>('GET', `/projects/${enc(projectId)}/tasks`),
   createTask: (projectId: string, b: TaskInput & { title: string }) => call<Task>('POST', `/projects/${enc(projectId)}/tasks`, b),

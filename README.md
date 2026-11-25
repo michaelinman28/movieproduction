@@ -21,6 +21,7 @@ tasks, sub-tasks and (next) a project journal.
 | Tasks | A tree of tasks and sub-tasks per project, with category, tags, status, priority, assignee, and a due date with an optional time of day (Morning, Afternoon, Evening) or exact time. Each task has a description and any number of notes. A calendar view shows tasks by due date |
 | Task categories and tags | Each company has its own category list (admins set it up) and its own tags (anyone can add them while tagging a task) |
 | Locations | Each project's locations with a status (Considering, Confirmed, Not using), description, address (opens in your phone's or computer's maps app) and contact (name, email, phone); tasks can be assigned to one |
+| Scenes and shot lists | Each project's scenes in script order (set, INT/EXT, day or night, pages, characters, needs, location, status), each with a shot list (size, angle, movement, lens, equipment, time) ticked off on set. Shoot days and call sheets build on these next |
 | Journal | Coming next: private, shared and public entries per project |
 
 A company admin adds people by email. Someone who hasn't signed up yet is added with
@@ -92,6 +93,7 @@ confirmation emails link back to the app.
 | Task categories and tags | `/companies/:id/task-settings` | The company's category list (admins add, rename, reorder, delete) and its tags |
 | Project overview | `/projects/:id` | Details (admins edit them), counts of open and overdue tasks, locations and people, and what's coming up |
 | Project tasks | `/projects/:id/tasks` | The task tree, calendar, overdue list, grouped lists and My tasks, with each task's form under the table |
+| Project scenes | `/projects/:id/scenes` | The project's scenes and, under the table, the selected scene's form and shot list |
 | Project locations | `/projects/:id/locations` | The project's locations |
 | Project team | `/projects/:id/team` | Who's on the project and their project roles |
 | Project journal | `/projects/:id/journal` | Coming next |
@@ -108,6 +110,8 @@ confirmation emails link back to the app.
 - Anyone in a company can create task tags; admins can rename or delete them.
 - Everyone on a project can add and edit its locations; whoever added one, or an admin,
   can delete it.
+- Everyone on a project can add, edit and reorder its scenes and shots; whoever added a
+  scene, or an admin, can delete it.
 - Journal entries: private ones are seen only by the author and the people they share
   them with; public ones by everyone on the project.
 

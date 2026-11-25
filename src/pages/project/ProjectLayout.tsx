@@ -25,6 +25,7 @@ export const useProject = () => useOutletContext<ProjectContext>();
 const AREAS = [
   { to: '', label: 'Overview', end: true },
   { to: 'tasks', label: 'Tasks' },
+  { to: 'scenes', label: 'Scenes' },
   { to: 'locations', label: 'Locations' },
   { to: 'team', label: 'Team' },
   { to: 'journal', label: 'Journal' },

@@ -7,6 +7,7 @@ import { CompanyPage } from './pages/CompanyPage';
 import { ProjectJournal, ProjectLayout } from './pages/project/ProjectLayout';
 import { ProjectLocationsPage, ProjectOverview, ProjectTasks } from './pages/project/ProjectOverview';
 import { ProjectTeam } from './pages/project/ProjectTeam';
+import { ProjectScenes } from './pages/project/ProjectScenes';
 import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
 import { TaskSettingsPage } from './pages/TaskSettingsPage';
@@ -50,6 +51,7 @@ export function App() {
           <Route path="/projects/:projectId" element={<ProjectLayout />}>
             <Route index element={<ProjectOverview />} />
             <Route path="tasks" element={<ProjectTasks />} />
+            <Route path="scenes" element={<ProjectScenes />} />
             <Route path="locations" element={<ProjectLocationsPage />} />
             <Route path="team" element={<ProjectTeam />} />
             <Route path="journal" element={<ProjectJournal />} />
