@@ -1,6 +1,6 @@
 /**
  * How a person has set up each table: which columns show, their widths and order,
- * and the sort. Kept for the browser session (sessionStorage), so moving between
+ * the sort and rows per page. Kept for the browser session (sessionStorage), so moving between
  * pages or reloading keeps their view. Keyed by the table's `stateId`, e.g.
  * "project.tasks". Columns added later show at their default place and width.
  */
@@ -11,7 +11,12 @@ export interface GridView {
   /** The tree / group column's size. */
   group?: { width: number; flex: number };
   sorts: { id: string; dir: 'asc' | 'desc' }[];
+  /** Rows per page (see PAGE_SIZE). */
+  pageSize?: number;
 }
+
+/** Rows per page a table starts with. The pager shows only when there's more than one page. */
+export const PAGE_SIZE = 50;
 
 const key = (stateId: string) => `mp-grid-view:${stateId}`;
 

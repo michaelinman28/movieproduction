@@ -4353,6 +4353,86 @@
           "item"
         ]
       },
+      "ProjectNotePage": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectNote"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Notes matching the filters, on every page"
+          },
+          "facets": {
+            "type": "object",
+            "properties": {
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "count"
+                  ]
+                }
+              },
+              "authors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The writer's id, or \"none\""
+                    },
+                    "author": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Profile"
+                        },
+                        {
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "author",
+                    "count"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "sources",
+              "authors"
+            ]
+          }
+        },
+        "required": [
+          "notes",
+          "total",
+          "facets"
+        ]
+      },
       "AuditPage": {
         "type": "object",
         "properties": {
@@ -4368,11 +4448,16 @@
               "null"
             ],
             "description": "Pass as before= to get the next, older page; null when there are no more"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Entries matching the filters, on every page"
           }
         },
         "required": [
           "entries",
-          "next_before"
+          "next_before",
+          "total"
         ]
       },
       "AuditEntry": {
@@ -11661,6 +11746,124 @@
         }
       }
     },
+    "/projects/{id}/notes/page": {
+      "get": {
+        "tags": [
+          "Project notes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "One page of the project's notes, filtered and searched",
+        "description": "The same notes as /projects/{id}/notes, one page at a time. Filter by where the note was taken (`sources`) and who wrote it (`author_ids`, \"none\" for unknown), search the note and what it was taken on (`q`), and sort newest or oldest first. `total` counts every match; `facets` count every note by where and by whom, for the filter lists.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Comma-separated: task, scene, shot, shoot_day, schedule, call, character, team"
+            },
+            "required": false,
+            "description": "Comma-separated: task, scene, shot, shoot_day, schedule, call, character, team",
+            "name": "sources",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 4000,
+              "description": "Comma-separated ids of who wrote the note; \"none\" for notes with no known writer"
+            },
+            "required": false,
+            "description": "Comma-separated ids of who wrote the note; \"none\" for notes with no known writer",
+            "name": "author_ids",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Words to find in the note, what it was taken on, or who wrote it"
+            },
+            "required": false,
+            "description": "Words to find in the note, what it was taken on, or who wrote it",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest"
+              ],
+              "default": "newest"
+            },
+            "required": false,
+            "name": "order",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectNotePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/companies/{id}/activity": {
       "get": {
         "tags": [
@@ -11672,7 +11875,7 @@
           }
         ],
         "summary": "The company's activity log, newest first (company admins only)",
-        "description": "Every add, change and delete in the company and its projects, plus sign-ins and call sheet views by its people. Private journal entries show only that something happened, never their content. Pages of up to `limit` entries: pass `next_before` as `before` for the next one.",
+        "description": "Every add, change and delete in the company and its projects, plus sign-ins and call sheet views by its people. Private journal entries show only that something happened, never their content. Pages of up to `limit` entries: pass `offset` for page by page (with `total`), or `next_before` as `before` for the next one. Filter with kinds, actions, person_ids, project_ids, from/to and q (search).",
         "parameters": [
           {
             "schema": {
@@ -11764,6 +11967,88 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "description": "Skip this many entries (page by offset instead of before=)"
+            },
+            "required": false,
+            "description": "Skip this many entries (page by offset instead of before=)",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Comma-separated kinds (table names); entries of any of them"
+            },
+            "required": false,
+            "description": "Comma-separated kinds (table names); entries of any of them",
+            "name": "kinds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Comma-separated actions, e.g. insert,update"
+            },
+            "required": false,
+            "description": "Comma-separated actions, e.g. insert,update",
+            "name": "actions",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 4000,
+              "description": "Comma-separated ids of who did it; \"system\" for setup changes"
+            },
+            "required": false,
+            "description": "Comma-separated ids of who did it; \"system\" for setup changes",
+            "name": "person_ids",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 4000,
+              "description": "Comma-separated project ids (company log)"
+            },
+            "required": false,
+            "description": "Comma-separated project ids (company log)",
+            "name": "project_ids",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Search item names, who did it and details"
+            },
+            "required": false,
+            "description": "Search item names, who did it and details",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest"
+              ],
+              "default": "newest"
+            },
+            "required": false,
+            "name": "order",
             "in": "query"
           }
         ],
@@ -11894,6 +12179,88 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "description": "Skip this many entries (page by offset instead of before=)"
+            },
+            "required": false,
+            "description": "Skip this many entries (page by offset instead of before=)",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Comma-separated kinds (table names); entries of any of them"
+            },
+            "required": false,
+            "description": "Comma-separated kinds (table names); entries of any of them",
+            "name": "kinds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Comma-separated actions, e.g. insert,update"
+            },
+            "required": false,
+            "description": "Comma-separated actions, e.g. insert,update",
+            "name": "actions",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 4000,
+              "description": "Comma-separated ids of who did it; \"system\" for setup changes"
+            },
+            "required": false,
+            "description": "Comma-separated ids of who did it; \"system\" for setup changes",
+            "name": "person_ids",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 4000,
+              "description": "Comma-separated project ids (company log)"
+            },
+            "required": false,
+            "description": "Comma-separated project ids (company log)",
+            "name": "project_ids",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Search item names, who did it and details"
+            },
+            "required": false,
+            "description": "Search item names, who did it and details",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest"
+              ],
+              "default": "newest"
+            },
+            "required": false,
+            "name": "order",
             "in": "query"
           }
         ],

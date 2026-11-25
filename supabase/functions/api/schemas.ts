@@ -297,6 +297,22 @@ export const ProjectNote = z.object({
     detail: z.string().nullable().openapi({ description: 'Where on the item, e.g. "Shot 3" or "Call for Ava"', example: 'Shot 3' }),
   }),
 }).openapi('ProjectNote');
+export const ProjectNoteQuery = z.object({
+  offset: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
+  sources: z.string().max(200).optional().openapi({ description: 'Comma-separated: task, scene, shot, shoot_day, schedule, call, character, team' }),
+  author_ids: z.string().max(4000).optional().openapi({ description: 'Comma-separated ids of who wrote the note; "none" for notes with no known writer' }),
+  q: z.string().max(200).optional().openapi({ description: 'Words to find in the note, what it was taken on, or who wrote it' }),
+  order: z.enum(['newest', 'oldest']).default('newest'),
+});
+export const ProjectNotePage = z.object({
+  notes: z.array(ProjectNote),
+  total: z.number().int().openapi({ description: 'Notes matching the filters, on every page' }),
+  facets: z.object({
+    sources: z.array(z.object({ source: z.string(), count: z.number().int() })),
+    authors: z.array(z.object({ id: z.string().openapi({ description: 'The writer\'s id, or "none"' }), author: Profile.nullable(), count: z.number().int() })),
+  }),
+}).openapi('ProjectNotePage');
 
 // ---- Task categories and tags ----------------------------------------------
 
@@ -626,6 +642,7 @@ export const AuditEntry = z.object({
 export const AuditPage = z.object({
   entries: z.array(AuditEntry),
   next_before: z.number().int().nullable().openapi({ description: 'Pass as before= to get the next, older page; null when there are no more' }),
+  total: z.number().int().openapi({ description: 'Entries matching the filters, on every page' }),
 }).openapi('AuditPage');
 export const AuditQuery = z.object({
   project_id: Uuid.optional(),
@@ -636,6 +653,13 @@ export const AuditQuery = z.object({
   to: z.string().optional().openapi({ description: 'Up to (not including) this time' }),
   before: z.coerce.number().int().optional(),
   limit: z.coerce.number().int().min(1).max(500).default(200),
+  offset: z.coerce.number().int().min(0).optional().openapi({ description: 'Skip this many entries (page by offset instead of before=)' }),
+  kinds: z.string().max(2000).optional().openapi({ description: 'Comma-separated kinds (table names); entries of any of them' }),
+  actions: z.string().max(200).optional().openapi({ description: 'Comma-separated actions, e.g. insert,update' }),
+  person_ids: z.string().max(4000).optional().openapi({ description: 'Comma-separated ids of who did it; "system" for setup changes' }),
+  project_ids: z.string().max(4000).optional().openapi({ description: 'Comma-separated project ids (company log)' }),
+  q: z.string().max(200).optional().openapi({ description: 'Search item names, who did it and details' }),
+  order: z.enum(['newest', 'oldest']).default('newest'),
 });
 export const AuditItemQuery = z.object({
   kind: z.string().max(60).openapi({ description: 'tasks, scenes, shoot_days, project_locations, projects, companies, roles, task_categories, task_tags, journal_entries, or person', example: 'tasks' }),

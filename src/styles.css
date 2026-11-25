@@ -340,3 +340,12 @@
   .cs-shared .cs-you, .cs-shared .cs-you-badge { display: none; }
   .cs-shared .cs-me { background: none; }
 }
+
+/* Table pager (lattice-grid's, and ServerPager for server-paged tables): tap-sized on phones. */
+.lg-pager { gap: 6px 10px; padding: 4px 10px; }
+.lg-pager .lg-btn { min-width: 44px; min-height: 44px; height: auto; font-size: 16px; }
+.lg-pager select { height: 36px; }
+@media (min-width: 640px) {
+  .lg-pager .lg-btn { min-width: 32px; min-height: 28px; font-size: 14px; }
+  .lg-pager select { height: 26px; }
+}

@@ -172,6 +172,11 @@ export interface ProjectNote {
   key: string; source: NoteSource; note_id: string | null; body: string; author: Profile | null; at: string; edited: boolean;
   item: { kind: 'task' | 'scene' | 'shoot_day' | 'character' | 'team_member'; id: string; label: string; detail: string | null };
 }
+export interface ProjectNoteQuery { offset?: number; limit?: number; sources?: string; author_ids?: string; q?: string; order?: 'newest' | 'oldest' }
+export interface ProjectNotePage {
+  notes: ProjectNote[]; total: number;
+  facets: { sources: { source: NoteSource; count: number }[]; authors: { id: string; author: Profile | null; count: number }[] };
+}
 
 const enc = encodeURIComponent;
 
@@ -186,8 +191,10 @@ export interface AuditEntry {
   actor: { id: string | null; name: string | null }; subject_id: string | null;
   private: boolean; detail: string | null; item_exists: boolean; changes: AuditChange[];
 }
-export interface AuditPage { entries: AuditEntry[]; next_before: number | null }
-export interface AuditFilters { project_id?: string; kind?: string; action?: AuditAction; person_id?: string; from?: string; to?: string; before?: number; limit?: number }
+export interface AuditPage { entries: AuditEntry[]; next_before: number | null; total: number }
+export interface AuditFilters { project_id?: string; kind?: string; action?: AuditAction; person_id?: string; from?: string; to?: string; before?: number; limit?: number;
+  /** Page by offset (with total), and lists of choices, comma-separated. */
+  offset?: number; kinds?: string; actions?: string; person_ids?: string; project_ids?: string; q?: string; order?: 'newest' | 'oldest' }
 export interface AuditCleanup { project_id?: string | null; kind?: string | null; item_id?: string | null; from?: string | null; to?: string | null }
 const query = (o: object) => {
   const q = new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)])).toString();
@@ -324,6 +331,7 @@ export const api = {
   updateSceneNote: (id: string, body: string) => call<SceneNote>('PATCH', `/scene-notes/${enc(id)}`, { body }),
   deleteSceneNote: (id: string) => call<void>('DELETE', `/scene-notes/${enc(id)}`),
   projectNotes: (projectId: string) => call<ProjectNote[]>('GET', `/projects/${enc(projectId)}/notes`),
+  projectNotesPage: (projectId: string, q: ProjectNoteQuery) => call<ProjectNotePage>('GET', `/projects/${enc(projectId)}/notes/page${query(q)}`),
 
   companyActivity: (companyId: string, f: AuditFilters = {}) => call<AuditPage>('GET', `/companies/${enc(companyId)}/activity${query(f)}`),
   projectActivity: (projectId: string, f: Omit<AuditFilters, 'project_id'> = {}) => call<AuditPage>('GET', `/projects/${enc(projectId)}/activity${query(f)}`),

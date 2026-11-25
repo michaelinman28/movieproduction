@@ -168,21 +168,43 @@ const toTime = (s: string | undefined, name: string) => {
   return d.toISOString();
 };
 
+const list = (s: string | undefined) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : []);
+/** Text that is safe inside a PostgREST or() filter. */
+const searchable = (s: string) => s.replace(/[,()*\\%_"]/g, ' ').trim();
+
 // deno-lint-ignore no-explicit-any
-function filtered(q: any, f: z.infer<typeof AuditQuery>) {
+function filtered(q: any, f: z.infer<typeof AuditQuery>, scope?: string) {
+  // Conditions that each need an OR go into one logic tree (and(...)), so they all apply.
+  const all: string[] = scope ? [scope] : [];
   if (f.kind) q = q.eq('table_name', f.kind);
   if (f.action) q = q.eq('action', f.action);
   if (f.person_id) q = q.eq('actor_id', f.person_id);
+  const kinds = list(f.kinds); if (kinds.length) q = q.in('table_name', kinds);
+  const actions = list(f.actions); if (actions.length) q = q.in('action', actions);
+  const people = list(f.person_ids);
+  if (people.length) {
+    const ids = people.filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+    const or = [...(ids.length ? [`actor_id.in.(${ids.join(',')})`] : []), ...(people.includes('system') ? ['source.eq.system'] : [])];
+    if (or.length) all.push(`or(${or.join(',')})`); else q = q.eq('id', -1);
+  }
+  const projects = list(f.project_ids).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  if (list(f.project_ids).length) q = projects.length ? q.in('project_id', projects) : q.eq('id', -1);
+  const words = searchable(f.q ?? '').split(/\s+/).filter(Boolean);
+  // Every word must appear in the item's name, who did it or the details.
+  for (const w of words) all.push(`or(item_label.ilike.*${w}*,actor_name.ilike.*${w}*,detail.ilike.*${w}*)`);
+  if (all.length) q = q.or(`and(${all.join(',')})`);
   const from = toTime(f.from, 'from'); if (from) q = q.gte('at', from);
   const to = toTime(f.to, 'to'); if (to) q = q.lt('at', to);
   if (f.before) q = q.lt('id', f.before);
-  return q.order('id', { ascending: false }).limit(f.limit + 1);
+  q = q.order('id', { ascending: f.order === 'oldest' });
+  return f.offset !== undefined ? q.range(f.offset, f.offset + f.limit) : q.limit(f.limit + 1);
 }
 
-async function page(db: Db, rows: Row[], limit: number) {
+async function page(db: Db, r: { data: unknown; error: unknown; count?: number | null }, limit: number) {
+  const rows = must<Row[]>(r as never);
   const more = rows.length > limit;
   const kept = rows.slice(0, limit);
-  return { entries: await present(db, kept), next_before: more ? Number(kept[kept.length - 1].id) : null };
+  return { entries: await present(db, kept), next_before: more ? Number(kept[kept.length - 1].id) : null, total: r.count ?? kept.length };
 }
 
 /** People in the company, for the entries about a person that aren't tied to a company (profile changes, sign-ins). */
@@ -196,7 +218,7 @@ audit.openapi(createRoute({
   method: 'get', path: '/companies/{id}/activity', tags, security: secured,
   summary: 'The company\'s activity log, newest first (company admins only)',
   description: 'Every add, change and delete in the company and its projects, plus sign-ins and call sheet views by its people. '
-    + 'Private journal entries show only that something happened, never their content. Pages of up to `limit` entries: pass `next_before` as `before` for the next one.',
+    + 'Private journal entries show only that something happened, never their content. Pages of up to `limit` entries: pass `offset` for page by page (with `total`), or `next_before` as `before` for the next one. Filter with kinds, actions, person_ids, project_ids, from/to and q (search).',
   request: { params: IdParam, query: AuditQuery },
   responses: { 200: ok(AuditPage), 401: errors[401], 403: errors[403] },
 }), async (c) => {
@@ -204,13 +226,15 @@ audit.openapi(createRoute({
   const { id } = c.req.valid('param');
   const f = c.req.valid('query');
   await mustBeAdmin(db, userId, id);
-  let q = db.from('audit_log').select('*');
+  let q = db.from('audit_log').select('*', { count: 'exact' });
+  let scope: string | undefined;
   if (f.project_id) q = q.eq('project_id', f.project_id);
   else {
     const people = await memberIds(db, id);
-    q = people.length ? q.or(`company_id.eq.${id},and(company_id.is.null,subject_user_id.in.(${people.join(',')}))`) : q.eq('company_id', id);
+    if (people.length) scope = `or(company_id.eq.${id},and(company_id.is.null,subject_user_id.in.(${people.join(',')})))`;
+    else q = q.eq('company_id', id);
   }
-  return send(c, await page(db, must<Row[]>(await filtered(q, f)), f.limit), 200);
+  return send(c, await page(db, await filtered(q, f, scope), f.limit), 200);
 });
 
 audit.openapi(createRoute({
@@ -226,7 +250,7 @@ audit.openapi(createRoute({
   const proj = must<Row[]>(await db.from('projects').select('company_id').eq('id', id))[0];
   if (!proj) throw new HTTPException(404, { message: 'Not found, or you do not have access to it.' });
   await mustBeAdmin(db, userId, proj.company_id);
-  return send(c, await page(db, must<Row[]>(await filtered(db.from('audit_log').select('*').eq('project_id', id), f)), f.limit), 200);
+  return send(c, await page(db, await filtered(db.from('audit_log').select('*', { count: 'exact' }).eq('project_id', id), f), f.limit), 200);
 });
 
 audit.openapi(createRoute({
