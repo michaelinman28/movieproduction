@@ -262,6 +262,35 @@ export const TaskNoteInput = z.object({
   body: z.string().trim().min(1).max(5000).openapi({ example: 'Called the venue; load-in moved to 7 AM.' }),
 }).openapi('TaskNoteInput');
 
+export const SceneNote = z.object({
+  id: Uuid,
+  scene_id: Uuid,
+  author_id: Uuid,
+  author: Profile,
+  body: z.string().openapi({ example: 'The diner sign needs repainting before we shoot.' }),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('SceneNote');
+
+/** A note from anywhere on a project, for the Project Notes page. */
+export const ProjectNote = z.object({
+  key: z.string().openapi({ description: 'Unique across every kind of note, e.g. task_note:<id>', example: 'task_note:6f1c…' }),
+  source: z.enum(['task', 'scene', 'shot', 'shoot_day', 'schedule', 'call']).openapi({
+    description: 'Where the note was taken: a task\'s or scene\'s notes, a shot\'s Notes field, a shoot day\'s Notes, a note in a day\'s schedule, or the note on someone\'s call.',
+  }),
+  note_id: Uuid.nullable().openapi({ description: 'The task or scene note\'s id; null for notes kept in a field of another item.' }),
+  body: z.string(),
+  author: Profile.nullable().openapi({ description: 'Who wrote it (task and scene notes only).' }),
+  at: z.string().openapi({ description: 'When the note was written, or when its item was last changed for notes kept in a field.' }),
+  edited: z.boolean(),
+  item: z.object({
+    kind: z.enum(['task', 'scene', 'shoot_day']).openapi({ description: 'The page that holds the note' }),
+    id: Uuid,
+    label: z.string().openapi({ example: 'Scene 12A: INT. DINER' }),
+    detail: z.string().nullable().openapi({ description: 'Where on the item, e.g. "Shot 3" or "Call for Ava"', example: 'Shot 3' }),
+  }),
+}).openapi('ProjectNote');
+
 // ---- Task categories and tags ----------------------------------------------
 
 export const TaskCategory = z.object({

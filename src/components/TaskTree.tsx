@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
 import { Section } from './Section';
 import { TagPicker } from './TagPicker';
-import { TaskNotes } from './TaskNotes';
+import { TaskNotes } from './Notes';
 import { TaskSummaryBar } from './TaskSummaryBar';
 import { TaskCalendar, isoDate } from './TaskCalendar';
 import { TaskGantt, type GanttRow } from './TaskGantt';

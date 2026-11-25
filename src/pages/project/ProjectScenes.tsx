@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { LatticeGrid, gridDropdown, gridEsc } from '../../components/LatticeGrid';
 import { OpenLink } from '../../components/OpenLink';
+import { SceneNotes } from '../../components/Notes';
 import { itemPath } from '../../lib/links';
 import { Section } from '../../components/Section';
 import { api, type Location, type Scene, type SceneInput, type Shot, type ShotInput } from '../../lib/api';
@@ -184,7 +185,7 @@ export function ProjectScenes() {
           }} />
         {selected && (
           <ScenePanel key={selected.id} scene={selected} locations={locations} run={run}
-            canDelete={isAdmin || selected.created_by === me} onDeleted={() => setSelectedId(null)} onShotsChanged={load} />
+            isAdmin={isAdmin} canDelete={isAdmin || selected.created_by === me} onDeleted={() => setSelectedId(null)} onShotsChanged={load} />
         )}
       </div>
       {rows.length > 0 && (
@@ -197,8 +198,8 @@ export function ProjectScenes() {
   );
 }
 
-function ScenePanel({ scene, locations, run, canDelete, onDeleted, onShotsChanged }: {
-  scene: Scene; locations: Location[]; run: Run; canDelete: boolean; onDeleted: () => void; onShotsChanged: () => Promise<void>;
+function ScenePanel({ scene, locations, run, isAdmin, canDelete, onDeleted, onShotsChanged }: {
+  scene: Scene; locations: Location[]; run: Run; isAdmin: boolean; canDelete: boolean; onDeleted: () => void; onShotsChanged: () => Promise<void>;
 }) {
   // Every field here is held until Save.
   const initial = useMemo(() => ({
@@ -294,6 +295,8 @@ function ScenePanel({ scene, locations, run, canDelete, onDeleted, onShotsChange
           {changed && <p className="hint md:col-span-2">Unsaved changes.</p>}
         </form>
       </Section>
+      {/* Notes have their own section, so they stay at hand with Details and the shot list folded away. */}
+      <SceneNotes sceneId={scene.id} canManage={isAdmin} />
       <ShotList scene={scene} onChanged={onShotsChanged} />
       {canDelete && <button className="btn btn-danger sm:w-auto sm:self-start" onClick={remove}>Delete scene</button>}
     </aside>
