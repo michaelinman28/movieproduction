@@ -22,7 +22,7 @@ export interface ProjectContext {
 export const useProject = () => useOutletContext<ProjectContext>();
 
 // The project's areas, in the left nav. `end` keeps Overview from matching every page.
-const AREAS = [
+const AREAS: { to: string; label: string; end?: boolean; admin?: boolean }[] = [
   { to: '', label: 'Overview', end: true },
   { to: 'tasks', label: 'Tasks' },
   { to: 'scenes', label: 'Scenes' },
@@ -31,6 +31,7 @@ const AREAS = [
   { to: 'team', label: 'Team' },
   { to: 'notes', label: 'Project notes' },
   { to: 'journal', label: 'Journal' },
+  { to: 'activity', label: 'Activity', admin: true },
 ];
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -110,7 +111,7 @@ export function ProjectLayout() {
           {/* Phones: one row of tabs that scrolls sideways inside itself, never the page. */}
           {/* Each tab stays on one line; the open one scrolls into view, and the edges fade while there's more to scroll to. */}
           <ul ref={tabs} onScroll={fade} className="project-tabs relative flex gap-1 overflow-x-auto border-b border-line px-4 pb-2 md:flex-col md:overflow-visible md:border-b-0 md:px-0 md:pb-0">
-            {AREAS.map((a) => (
+            {AREAS.filter((a) => !a.admin || ctx.isAdmin).map((a) => (
               <li key={a.label} className="shrink-0"><NavLink to={a.to ? `${base}/${a.to}` : base} end={a.end} className={navClass}>{a.label}</NavLink></li>
             ))}
           </ul>
@@ -120,6 +121,7 @@ export function ProjectLayout() {
               <li><NavLink to={company} end className={navClass}>Projects and people</NavLink></li>
               <li><NavLink to={`${company}/roles`} className={navClass}>Roles</NavLink></li>
               <li><NavLink to={`${company}/task-settings`} className={navClass}>Task settings</NavLink></li>
+              {ctx.isAdmin && <li><NavLink to={`${company}/activity`} className={navClass}>Company activity</NavLink></li>}
             </ul>
           </div>
         </nav>

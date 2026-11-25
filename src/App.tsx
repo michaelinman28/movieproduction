@@ -14,6 +14,8 @@ import { CallSheetPage } from './pages/project/CallSheetPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
 import { TaskSettingsPage } from './pages/TaskSettingsPage';
+import { ActivityPage } from './pages/ActivityPage';
+import { ProjectActivity } from './pages/project/ProjectActivity';
 import { SheetLinkPage } from './pages/SheetLinkPage';
 import { ThemeSwitch } from './components/ThemeSwitch';
 import { PinnedAction } from './components/PinnedAction';
@@ -60,6 +62,7 @@ export function App() {
           <Route path="/companies/:companyId" element={<CompanyPage />} />
           <Route path="/companies/:companyId/roles" element={<RolesPage />} />
           <Route path="/companies/:companyId/task-settings" element={<TaskSettingsPage />} />
+          <Route path="/companies/:companyId/activity" element={<ActivityPage />} />
           <Route path="/projects/:projectId" element={<ProjectLayout />}>
             <Route index element={<ProjectOverview />} />
             <Route path="tasks" element={<ProjectTasks />} />
@@ -70,6 +73,7 @@ export function App() {
             <Route path="team" element={<ProjectTeam />} />
             <Route path="notes" element={<ProjectNotes />} />
             <Route path="journal" element={<ProjectJournal />} />
+            <Route path="activity" element={<ProjectActivity />} />
           </Route>
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<Home />} />

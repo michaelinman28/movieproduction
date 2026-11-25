@@ -72,6 +72,10 @@
       "description": "Each day of filming: location, times, weather, the day's schedule of scenes and breaks, and who is called when"
     },
     {
+      "name": "Activity",
+      "description": "The audit trail: every add, change and delete, sign-ins and call sheet views. Company admins only"
+    },
+    {
       "name": "Call sheets",
       "description": "The call sheet built from a shoot day: send a new version, and each person opens and confirms it"
     }
@@ -3449,6 +3453,273 @@
           "edited",
           "item"
         ]
+      },
+      "AuditPage": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            }
+          },
+          "next_before": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Pass as before= to get the next, older page; null when there are no more"
+          }
+        },
+        "required": [
+          "entries",
+          "next_before"
+        ]
+      },
+      "AuditEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "at": {
+            "type": "string"
+          },
+          "action": {
+            "$ref": "#/components/schemas/AuditAction"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "app",
+              "link",
+              "system"
+            ],
+            "description": "app = signed in; link = a personal call sheet link with no sign-in; system = a setup or data change made outside the app"
+          },
+          "kind": {
+            "type": "string",
+            "description": "The kind of item: the table name, e.g. tasks",
+            "example": "tasks"
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "item_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "company_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "project_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "project_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "subject_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The person the entry is about, if any"
+          },
+          "private": {
+            "type": "boolean",
+            "description": "A private journal entry: only the fact that it happened is shown, never its content"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "item_exists": {
+            "type": "boolean",
+            "description": "Whether the item (or, for a note, the item it is on) still exists"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditChange"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "action",
+          "source",
+          "kind",
+          "item_id",
+          "item_label",
+          "parent_kind",
+          "parent_id",
+          "parent_label",
+          "company_id",
+          "project_id",
+          "project_name",
+          "actor",
+          "subject_id",
+          "private",
+          "detail",
+          "item_exists",
+          "changes"
+        ]
+      },
+      "AuditAction": {
+        "type": "string",
+        "enum": [
+          "insert",
+          "update",
+          "delete",
+          "view",
+          "sign_in",
+          "cleanup"
+        ],
+        "description": "insert = added, update = changed, delete = deleted, view = opened a call sheet, sign_in = signed in, cleanup = an admin removed log entries"
+      },
+      "AuditChange": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "example": "due_date"
+          },
+          "before": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "date",
+              "time",
+              "datetime"
+            ],
+            "description": "How the app should show the values"
+          }
+        },
+        "required": [
+          "field",
+          "before",
+          "after",
+          "type"
+        ]
+      },
+      "AuditCleanupResult": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed"
+        ]
+      },
+      "AuditCleanupInput": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 60
+          },
+          "item_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80
+          },
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       }
     },
     "parameters": {}
@@ -9035,6 +9306,499 @@
           },
           "401": {
             "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{id}/activity": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The company's activity log, newest first (company admins only)",
+        "description": "Every add, change and delete in the company and its projects, plus sign-ins and call sheet views by its people. Private journal entries show only that something happened, never their content. Pages of up to `limit` entries: pass `next_before` as `before` for the next one.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": false,
+            "name": "project_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/AuditAction"
+            },
+            "required": false,
+            "description": "insert = added, update = changed, delete = deleted, view = opened a call sheet, sign_in = signed in, cleanup = an admin removed log entries",
+            "name": "action",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+              "description": "Entries done by this person"
+            },
+            "required": false,
+            "description": "Entries done by this person",
+            "name": "person_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Earliest time, ISO date or date-time"
+            },
+            "required": false,
+            "description": "Earliest time, ISO date or date-time",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Up to (not including) this time"
+            },
+            "required": false,
+            "description": "Up to (not including) this time",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/activity": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "A project's activity log, newest first (company admins only)",
+        "description": "Like the company log, for one project. It stays after the project is deleted.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/AuditAction"
+            },
+            "required": false,
+            "description": "insert = added, update = changed, delete = deleted, view = opened a call sheet, sign_in = signed in, cleanup = an admin removed log entries",
+            "name": "action",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+              "description": "Entries done by this person"
+            },
+            "required": false,
+            "description": "Entries done by this person",
+            "name": "person_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Earliest time, ISO date or date-time"
+            },
+            "required": false,
+            "description": "Earliest time, ISO date or date-time",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Up to (not including) this time"
+            },
+            "required": false,
+            "description": "Up to (not including) this time",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activity/item": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The history of one item, newest first (company admins only)",
+        "description": "Everything logged about the item, and about what belongs to it (a task's notes and tags, a scene's shots and notes, a shoot day's schedule and calls). For `kind=person`, `id` is the person's id: their membership, roles, profile, contacts, calls and sign-ins.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60,
+              "description": "tasks, scenes, shoot_days, project_locations, projects, companies, roles, task_categories, task_tags, journal_entries, or person",
+              "example": "tasks"
+            },
+            "required": true,
+            "description": "tasks, scenes, shoot_days, project_locations, projects, companies, roles, task_categories, task_tags, journal_entries, or person",
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+              "description": "The company whose log to read"
+            },
+            "required": true,
+            "description": "The company whose log to read",
+            "name": "company_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntry"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{id}/activity/cleanup": {
+      "post": {
+        "tags": [
+          "Activity"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove activity log entries (company admins only, temporary)",
+        "description": "Removes the company's entries that match every filter given (none = all of them); with no project, the company's people's sign-ins and profile changes too. Each clean-up adds its own entry saying who removed how many, and those are never removed. This tool will be switched off once the log is in real use.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditCleanupInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditCleanupResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shoot-days/{id}/opened": {
+      "post": {
+        "tags": [
+          "Call sheets"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Log that you opened a shoot day's call sheet page",
+        "description": "Every opening is logged in the activity log (unlike /viewed, which records the first view of each sent version).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Logged"
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
             "content": {
               "application/json": {
                 "schema": {

@@ -20,6 +20,7 @@ Read ARCHITECTURE.md first. These are the standards every change follows.
 ## Data and API
 - The app reads and writes data only through the API client in `src/lib/api.ts`.
 - API routes live in `supabase/functions/api/routes/`, with zod schemas in `schemas.ts`; run `npm run api:spec` after changing them.
+- **Every table is audited.** A new table gets the `"Audit change"` trigger and a branch in `audit_row()` (see the activity log in ARCHITECTURE.md), and a new kind of item gets a History section on its form for admins (`ItemHistory`).
 - Database changes are a new numbered file in `supabase/migrations` (never edit an applied one), with tests in `tests/schema.test.mjs`. Security rules live in the database (row-level security).
 
 ## Checks

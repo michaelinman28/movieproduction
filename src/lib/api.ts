@@ -135,6 +135,25 @@ export interface ProjectNote {
 
 const enc = encodeURIComponent;
 
+/** One entry in the activity log (audit trail). See AuditEntry in the API. */
+export type AuditAction = 'insert' | 'update' | 'delete' | 'view' | 'sign_in' | 'cleanup';
+export interface AuditChange { field: string; before: string | null; after: string | null; type: 'text' | 'date' | 'time' | 'datetime' }
+export interface AuditEntry {
+  id: number; at: string; action: AuditAction; source: 'app' | 'link' | 'system';
+  kind: string; item_id: string; item_label: string | null;
+  parent_kind: string | null; parent_id: string | null; parent_label: string | null;
+  company_id: string | null; project_id: string | null; project_name: string | null;
+  actor: { id: string | null; name: string | null }; subject_id: string | null;
+  private: boolean; detail: string | null; item_exists: boolean; changes: AuditChange[];
+}
+export interface AuditPage { entries: AuditEntry[]; next_before: number | null }
+export interface AuditFilters { project_id?: string; kind?: string; action?: AuditAction; person_id?: string; from?: string; to?: string; before?: number; limit?: number }
+export interface AuditCleanup { project_id?: string | null; kind?: string | null; item_id?: string | null; from?: string | null; to?: string | null }
+const query = (o: object) => {
+  const q = new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)])).toString();
+  return q ? `?${q}` : '';
+};
+
 export const api = {
   me: () => call<Profile>('GET', '/me'),
   updateMe: (b: { full_name?: string; nickname?: string | null; phone?: string | null }) => call<Profile>('PATCH', '/me', b),
@@ -239,6 +258,12 @@ export const api = {
   updateSceneNote: (id: string, body: string) => call<SceneNote>('PATCH', `/scene-notes/${enc(id)}`, { body }),
   deleteSceneNote: (id: string) => call<void>('DELETE', `/scene-notes/${enc(id)}`),
   projectNotes: (projectId: string) => call<ProjectNote[]>('GET', `/projects/${enc(projectId)}/notes`),
+
+  companyActivity: (companyId: string, f: AuditFilters = {}) => call<AuditPage>('GET', `/companies/${enc(companyId)}/activity${query(f)}`),
+  projectActivity: (projectId: string, f: Omit<AuditFilters, 'project_id'> = {}) => call<AuditPage>('GET', `/projects/${enc(projectId)}/activity${query(f)}`),
+  itemHistory: (companyId: string, kind: string, id: string) => call<AuditEntry[]>('GET', `/activity/item${query({ kind, id, company_id: companyId })}`),
+  cleanUpActivity: (companyId: string, b: AuditCleanup) => call<{ removed: number }>('POST', `/companies/${enc(companyId)}/activity/cleanup`, b),
+  openedCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/opened`),
 };
 
 export const API_BASE = BASE;
