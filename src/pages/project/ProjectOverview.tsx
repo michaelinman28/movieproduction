@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Section } from '../../components/Section';
 import { TaskTree } from '../../components/TaskTree';
 import { ProjectLocations } from '../../components/ProjectLocations';
-import { api, type Task } from '../../lib/api';
-import { PROJECT_STATUSES, dueWhen, errorText, isOverdue } from '../../lib/format';
+import { api, type Scene, type ShootDay, type Task } from '../../lib/api';
+import { PROJECT_STATUSES, clockLabel, dueWhen, errorText, isOverdue, minutesLabel, pagesLabel } from '../../lib/format';
 import type { ProjectStatus } from '../../lib/database.types';
 import { useUnsaved } from '../../lib/unsaved';
 import { useProject } from './ProjectLayout';
@@ -20,7 +20,13 @@ export function ProjectOverview() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[] | null>(null);
-  useEffect(() => { api.tasks(projectId).then(setTasks, () => setTasks([])); }, [projectId]);
+  const [scenes, setScenes] = useState<Scene[] | null>(null);
+  const [days, setDays] = useState<ShootDay[] | null>(null);
+  useEffect(() => {
+    api.tasks(projectId).then(setTasks, () => setTasks([]));
+    api.scenes(projectId).then(setScenes, () => setScenes([]));
+    api.shootDays(projectId).then(setDays, () => setDays([]));
+  }, [projectId]);
 
   // ---- Details form (held until Save) ---------------------------------------
   const initial = useMemo(() => ({
@@ -67,6 +73,12 @@ export function ProjectOverview() {
     .sort((a, b) => (a.due_date! + (a.due_time ?? '')).localeCompare(b.due_date! + (b.due_time ?? ''))).slice(0, 5);
   const inUse = locations.filter((l) => l.status !== 'not_using');
   const confirmed = locations.filter((l) => l.status === 'confirmed').length;
+  const shotCount = scenes?.reduce((n, sc) => n + sc.shots, 0) ?? 0;
+  const shotsDone = scenes?.reduce((n, sc) => n + sc.shots_done, 0) ?? 0;
+  const scenesShot = scenes?.filter((sc) => sc.status === 'shot').length ?? 0;
+  const today = localToday();
+  const daysAhead = days?.filter((d) => d.shoot_date >= today).sort((a, b) => a.shoot_date.localeCompare(b.shoot_date)) ?? [];
+  const nextDay = daysAhead[0];
 
   return (
     <>
@@ -108,13 +120,31 @@ export function ProjectOverview() {
       </Section>
 
       <Section id="project.glance" title="At a glance">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link to={`${base}/tasks`} className="card gap-1 text-fg no-underline hover:border-accent">
             <span className="text-sm font-semibold text-muted">Tasks</span>
             {tasks === null ? <span className="text-muted">Loading…</span> : (
               <>
                 <span className="text-2xl font-bold">{open.length} open</span>
                 <span className={late.length ? 'task-overdue' : 'hint'}>{late.length ? `${late.length} overdue` : 'Nothing overdue'}</span>
+              </>
+            )}
+          </Link>
+          <Link to={`${base}/scenes`} className="card gap-1 text-fg no-underline hover:border-accent">
+            <span className="text-sm font-semibold text-muted">Scenes</span>
+            {scenes === null ? <span className="text-muted">Loading…</span> : (
+              <>
+                <span className="text-2xl font-bold">{scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'}</span>
+                <span className="hint">{scenes.length ? `${scenesShot} shot, ${shotsDone} of ${shotCount} shots done` : 'No scenes yet'}</span>
+              </>
+            )}
+          </Link>
+          <Link to={nextDay ? `${base}/shoot-days/${nextDay.id}` : `${base}/shoot-days`} className="card gap-1 text-fg no-underline hover:border-accent">
+            <span className="text-sm font-semibold text-muted">Shoot days</span>
+            {days === null ? <span className="text-muted">Loading…</span> : (
+              <>
+                <span className="text-2xl font-bold">{days.length} {days.length === 1 ? 'day' : 'days'}</span>
+                <span className="hint">{nextDay ? `Next: ${shortDate(nextDay.shoot_date)}${nextDay.shoot_date === today ? ' (today)' : ''}` : days.length ? 'No shoot days ahead' : 'None planned yet'}</span>
               </>
             )}
           </Link>
@@ -131,6 +161,39 @@ export function ProjectOverview() {
         </div>
       </Section>
 
+      <Section id="project.scenes" title="Scenes and shots" summary={scenes?.length ? `${shotsDone} of ${shotCount} shots done` : undefined}>
+        {scenes === null ? <p className="hint">Loading…</p> : scenes.length ? <ScenesSummary scenes={scenes} /> : <p className="hint">No scenes yet. Add them on the Scenes page to build shot lists.</p>}
+        <Link to={`${base}/scenes`} className="btn-link self-start">All scenes</Link>
+      </Section>
+
+      <Section id="project.shootdays" title="Shoot days" summary={days?.length ? `${daysAhead.length} ahead of ${days.length}` : undefined}>
+        {days === null ? <p className="hint">Loading…</p> : !days.length ? <p className="hint">No shoot days yet. Plan them on the Shoot days page.</p> : (
+          <>
+            {nextDay ? <NextShootDay day={nextDay} today={today} base={base} scenes={scenes ?? []} locationName={locations.find((l) => l.id === nextDay.location_id)?.name} />
+              : <p className="hint">All {days.length} shoot days are behind you.</p>}
+            {daysAhead.length > 1 && (
+              <ul className="flex flex-col">
+                {daysAhead.slice(1, 6).map((d) => (
+                  <li key={d.id} className="border-b border-line last:border-b-0">
+                    <Link to={`${base}/shoot-days/${d.id}`} className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 py-2 text-fg no-underline hover:text-accent">
+                      <span className="flex min-w-0 basis-full items-baseline gap-3 sm:flex-1 sm:basis-auto">
+                        <span className="w-24 shrink-0 text-sm text-muted sm:w-28">{shortDate(d.shoot_date)}</span>
+                        <span className="min-w-0 flex-1 truncate">Day {d.day_number}{d.title ? `: ${d.title}` : ''}</span>
+                      </span>
+                      <span className="flex flex-wrap items-center gap-2 pl-27 sm:pl-0">
+                        <span className="text-sm text-muted">{d.scene_ids.length} {d.scene_ids.length === 1 ? 'scene' : 'scenes'}</span>
+                        <SheetPill day={d} />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+        <Link to={`${base}/shoot-days`} className="btn-link self-start">All shoot days</Link>
+      </Section>
+
       <Section id="project.upcoming" title="Coming up" summary={upcoming.length ? `next ${upcoming.length}` : undefined}>
         {upcoming.length ? (
           <ul className="flex flex-col">
@@ -145,6 +208,91 @@ export function ProjectOverview() {
         <Link to={`${base}/tasks`} className="btn-link self-start">All tasks</Link>
       </Section>
     </>
+  );
+}
+
+/** Today as 'YYYY-MM-DD' in the person's own time zone. */
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function Bar({ label, done, total, detail }: { label: string; done: number; total: number; detail?: string }) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="font-medium">{label}</span>
+        <span className="text-sm text-muted">{detail ?? `${done} of ${total}`} ({pct}%)</span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-line" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+        <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** Progress through the scenes and their shot lists. */
+function ScenesSummary({ scenes }: { scenes: Scene[] }) {
+  const count = (s: Scene['status']) => scenes.filter((sc) => sc.status === s).length;
+  const shots = scenes.reduce((n, sc) => n + sc.shots, 0);
+  const shotsDone = scenes.reduce((n, sc) => n + sc.shots_done, 0);
+  const pages = scenes.reduce((n, sc) => n + (sc.pages_eighths ?? 0), 0);
+  const pagesShot = scenes.filter((sc) => sc.status === 'shot').reduce((n, sc) => n + (sc.pages_eighths ?? 0), 0);
+  const minutes = scenes.reduce((n, sc) => n + sc.est_minutes, 0);
+  const noShots = scenes.filter((sc) => !sc.shots).length;
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-3 gap-2 text-center">
+        {([['not_scheduled', 'Not scheduled'], ['scheduled', 'Scheduled'], ['shot', 'Shot']] as const).map(([s, label]) => (
+          <div key={s} className="rounded-lg border border-line px-2 py-3">
+            <div className="text-xl font-bold">{count(s)}</div>
+            <div className="text-xs text-muted sm:text-sm">{label}</div>
+          </div>
+        ))}
+      </div>
+      <Bar label="Scenes shot" done={count('shot')} total={scenes.length} />
+      {pages > 0 && <Bar label="Pages shot" done={pagesShot} total={pages} detail={`${pagesLabel(pagesShot) || '0'} of ${pagesLabel(pages)}`} />}
+      <Bar label="Shots done" done={shotsDone} total={shots} />
+      <p className="hint m-0">
+        {minutes ? `About ${minutesLabel(minutes)} of shooting planned. ` : ''}
+        {noShots ? `${noShots} ${noShots === 1 ? 'scene has' : 'scenes have'} no shot list yet.` : 'Every scene has a shot list.'}
+      </p>
+    </div>
+  );
+}
+
+/** Call sheet state for a day: not sent, or which version and how many confirmed. */
+function SheetPill({ day }: { day: ShootDay }) {
+  if (!day.version) return <span className="task-pill">Call sheet not sent</span>;
+  const all = day.called > 0 && day.confirmed === day.called;
+  return <span className={`task-pill ${all ? 'task-pill-done' : ''}`}>Sent v{day.version}, {day.confirmed} of {day.called} confirmed</span>;
+}
+
+/** The next shoot day, in more detail. */
+function NextShootDay({ day, today, base, scenes, locationName }: { day: ShootDay; today: string; base: string; scenes: Scene[]; locationName?: string }) {
+  const byId = new Map(scenes.map((sc) => [sc.id, sc]));
+  const dayScenes = day.scene_ids.map((id) => byId.get(id)).filter((sc): sc is Scene => !!sc);
+  const times = ([['Crew call', day.crew_call], ['Shooting call', day.shooting_call], ['Lunch', day.lunch], ['Wrap', day.wrap]] as const).filter(([, t]) => t);
+  return (
+    <Link to={`${base}/shoot-days/${day.id}`} className="card gap-2 text-fg no-underline hover:border-accent">
+      <span className="text-sm font-semibold text-muted">{day.shoot_date === today ? 'Shooting today' : 'Next shoot day'}</span>
+      <span className="text-xl font-bold">{shortDate(day.shoot_date)}: Day {day.day_number} of {day.total_days}</span>
+      {(day.title || locationName) && <span>{[day.title, locationName].filter(Boolean).join(' at ')}</span>}
+      {times.length > 0 && (
+        <span className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          {times.map(([label, t]) => <span key={label}><span className="text-muted">{label}</span> {clockLabel(t)}</span>)}
+        </span>
+      )}
+      <span className="text-sm">
+        {dayScenes.length ? `${dayScenes.length === 1 ? 'Scene' : 'Scenes'} ${dayScenes.map((sc) => sc.number).join(', ')}` : 'No scenes scheduled yet'}
+        {day.pages_eighths ? ` (${pagesLabel(day.pages_eighths)} ${day.pages_eighths <= 8 ? 'page' : 'pages'})` : ''}
+      </span>
+      <span className="flex flex-wrap items-center gap-2">
+        <SheetPill day={day} />
+        <span className="text-sm text-muted">{day.called} called</span>
+      </span>
+    </Link>
   );
 }
 
