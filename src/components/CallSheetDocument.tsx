@@ -161,10 +161,20 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
           {(day.sunrise || day.sunset) && <p className="cs-small cs-muted">Sunrise {clockLabel(day.sunrise) || '—'} · Sunset {clockLabel(day.sunset) || '—'}</p>}
         </Card>
         <Card title="Nearest hospital" tone="alert">
-          {loc?.nearest_hospital
-            ? <p><a {...mapsLinkProps(loc.nearest_hospital)}>{loc.nearest_hospital}</a></p>
-            : <p className="cs-muted">Not set</p>}
-          <p className="cs-small cs-muted">In an emergency call 911.</p>
+          <ul className="cs-keys">
+            {loc?.nearest_hospital ? (() => {
+              // "WakeMed Cary Hospital, 1900 Kildaire Farm Rd, Cary, NC" -> name, then the address.
+              const [name, ...rest] = loc.nearest_hospital.split(',');
+              return (
+                <li>
+                  <span className="cs-muted">Hospital</span>
+                  <span>{rest.length ? name.trim() : ''}</span>
+                  <a className="cs-addr" {...mapsLinkProps(loc.nearest_hospital)}>{rest.length ? rest.join(',').trim() : name}</a>
+                </li>
+              );
+            })() : <li><span className="cs-muted">Hospital</span><span>Not set</span></li>}
+            <li><span className="cs-muted">Emergency</span><span>Police, fire, ambulance</span><a className="cs-phone" href="tel:911">911</a></li>
+          </ul>
         </Card>
         <Card title="Key contacts">
           {keys.length ? (

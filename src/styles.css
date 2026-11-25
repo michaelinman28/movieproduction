@@ -199,7 +199,8 @@
 
 .cs-info { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
 .cs-card { display: flex; flex-direction: column; gap: 0.25rem; border-radius: 0.75rem; padding: 0.875rem 1rem; background: var(--color-surface); border: 1px solid var(--color-line); border-top: 4px solid var(--color-accent); }
-.cs-card-alert { border-top-color: var(--cs-alert); background: linear-gradient(var(--cs-alert-soft), var(--color-surface) 70%); }
+.cs-card-alert { border-top-color: var(--cs-alert); }
+.cs-keys .cs-addr { flex-basis: 100%; }
 .cs-card-alert .cs-card-h { color: var(--cs-alert); }
 .cs-card-h { margin: 0 0 0.25rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent-strong); }
 .cs-keys { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.375rem; font-size: 0.875rem; }
@@ -304,6 +305,8 @@
   .cs-time dd { font-size: 12pt; }
   .cs-info { grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
   .cs-card { padding: 0.5rem 0.7rem; border-radius: 0.5rem; font-size: 9pt; }
+  .cs-card p, .cs-card .cs-small, .cs-keys { font-size: 8.5pt; }
+  .cs-keys li > .cs-muted { font-size: 7pt; }
   .cs-body { border: 0; padding: 0; border-radius: 0; gap: 0.4rem; }
   .cs-body > section + section { border-top: 0; }
   .cs .section-toggle { pointer-events: none; min-height: 0; padding: 0.35rem 0; border-bottom: 2px solid #15803d; border-radius: 0; }
