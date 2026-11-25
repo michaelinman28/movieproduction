@@ -213,7 +213,19 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
   const keys = Object.keys(initial) as (keyof Draft)[];
   const changed = keys.some((k) => draft[k].trim() !== initial[k]);
   useUnsaved(changed);
-  useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
+  // When the day reloads (after Save, a weather lookup, or a change elsewhere), take in
+  // the new saved values for every field the person hasn't changed, and keep their edits.
+  const shown = useRef(initial);
+  useEffect(() => {
+    const before = shown.current;
+    shown.current = initial;
+    if (before === initial) return;
+    setDraft((d) => {
+      const next = { ...d };
+      for (const k of Object.keys(initial) as (keyof Draft)[]) if (d[k].trim() === before[k]) next[k] = initial[k];
+      return next;
+    });
+  }, [initial]);
   const set = (k: keyof Draft) => (e: { target: { value: string } }) => setDraft({ ...draft, [k]: e.target.value });
 
   async function save(e: FormEvent) {
@@ -231,10 +243,12 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
   async function lookUp() {
     setLooking(true);
     setWeatherNote(null);
+    if (!draft.location_id) { setWeatherNote('Pick a location first.'); setLooking(false); return; }
     try {
-      const w = await api.lookUpWeather(day.id);
-      setWeatherNote(`Forecast for ${w.place} saved.`);
-      await run(async () => undefined);
+      // Looks up the date and location shown in the form; the result waits for Save day.
+      const w = await api.lookUpWeather(day.id, { shoot_date: draft.shoot_date || undefined, location_id: draft.location_id });
+      setDraft((d) => ({ ...d, weather: w.weather, sunrise: clockValue(w.sunrise), sunset: clockValue(w.sunset) }));
+      setWeatherNote(`Forecast for ${w.place} filled in. Press Save day to keep it.`);
     } catch (e) { setWeatherNote(errorText(e)); }
     setLooking(false);
   }
@@ -271,10 +285,10 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
         {timeInput('sunrise', 'Sunrise')}
         {timeInput('sunset', 'Sunset')}
         <div className="flex flex-col gap-1 md:col-span-2">
-          <button type="button" className="btn btn-secondary sm:w-auto sm:self-start" disabled={looking || changed} onClick={lookUp}>
+          <button type="button" className="btn btn-secondary sm:w-auto sm:self-start" disabled={looking} onClick={lookUp}>
             {looking ? 'Looking up…' : 'Look up weather, sunrise and sunset'}
           </button>
-          <span className="hint">{changed ? 'Save first, then look it up.' : 'From the location\'s address, up to about 16 days ahead.'}</span>
+          <span className="hint">Fills in the weather, sunrise and sunset for this date and location, from the location's address, up to about 16 days ahead.</span>
           {weatherNote && <span className="hint">{weatherNote}</span>}
         </div>
         <label className="label md:col-span-2">Notes for the call sheet
@@ -590,7 +604,19 @@ function CallForm({ day, call, run, onRemoved }: { day: ShootDay; call: ShootDay
   const keys = Object.keys(initial) as (keyof Draft)[];
   const changed = keys.some((k) => draft[k].trim() !== initial[k]);
   useUnsaved(changed);
-  useEffect(() => { if (!changed) setDraft(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
+  // When the day reloads (after Save, a weather lookup, or a change elsewhere), take in
+  // the new saved values for every field the person hasn't changed, and keep their edits.
+  const shown = useRef(initial);
+  useEffect(() => {
+    const before = shown.current;
+    shown.current = initial;
+    if (before === initial) return;
+    setDraft((d) => {
+      const next = { ...d };
+      for (const k of Object.keys(initial) as (keyof Draft)[]) if (d[k].trim() === before[k]) next[k] = initial[k];
+      return next;
+    });
+  }, [initial]);
   const set = (k: keyof Draft) => (e: { target: { value: string } }) => setDraft({ ...draft, [k]: e.target.value });
   const name = displayName(call.profile);
 

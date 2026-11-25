@@ -3,7 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { anonClient, authed, fail, found, must } from '../context.ts';
 import {
   CallSheet, IdParam, LinkedCallSheet, TokenParam, OrderInput, ShootDay, ShootDayCall, ShootDayCallInput, ShootDayInput, ShootDayItem,
-  ShootDayItemInput, ShootDayItemUpdate, ShootDayUpdate, UserParams, WeatherResult,
+  ShootDayItemInput, ShootDayItemUpdate, ShootDayUpdate, UserParams, WeatherLookup, WeatherResult,
 } from '../schemas.ts';
 import { body, errors, ok, profileFields, rolesByUser, router, secured, send } from './common.ts';
 
@@ -349,15 +349,19 @@ async function getJson(url: string) {
 
 shootDays.openapi(createRoute({
   method: 'post', path: '/shoot-days/{id}/weather', tags, security: secured,
-  summary: 'Look up the forecast, sunrise and sunset for the day\'s location and date, and save them on the day',
-  description: 'Uses Open-Meteo. Forecasts reach about 16 days ahead; for later dates, type the weather in.',
-  request: { params: IdParam },
+  summary: 'Look up the forecast, sunrise and sunset for the day\'s location and date',
+  description: 'Uses Open-Meteo. Nothing is saved: the app puts the result in the day\'s form, and Save day stores it. '
+    + 'Pass shoot_date and location_id to look up what the form shows before it is saved. Forecasts reach about 16 days ahead; for later dates, type the weather in.',
+  request: { params: IdParam, body: { required: false, content: { 'application/json': { schema: WeatherLookup } } } },
   responses: { 200: ok(WeatherResult), 400: errors[400], 401: errors[401], 404: errors[404] },
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  const day = found(must<Row[]>(await db.from('shoot_days').select('id, shoot_date, location_id').eq('id', id)));
-  const loc = day.location_id ? must<Row[]>(await db.from('project_locations').select('address').eq('id', day.location_id))[0] : null;
+  const ask = c.req.valid('json') ?? {};
+  const saved = found(must<Row[]>(await db.from('shoot_days').select('id, project_id, shoot_date, location_id').eq('id', id)));
+  const day = { shoot_date: ask.shoot_date ?? saved.shoot_date, location_id: ask.location_id ?? saved.location_id };
+  const loc = day.location_id
+    ? must<Row[]>(await db.from('project_locations').select('address').eq('id', day.location_id).eq('project_id', saved.project_id))[0] : null;
   if (!loc?.address) return c.json({ error: 'Give the day a location with an address first.' }, 400);
   const daysAhead = Math.round((Date.parse(day.shoot_date) - Date.now()) / 864e5);
   if (daysAhead > 15) return c.json({ error: 'Forecasts only reach about 16 days ahead. Look it up closer to the day, or type it in.' }, 400);
@@ -377,6 +381,5 @@ shootDays.openapi(createRoute({
   const rain = d.precipitation_probability_max?.[0];
   const weather = `${words}, ${Math.round(d.temperature_2m_min[0])}°F to ${Math.round(d.temperature_2m_max[0])}°F${rain != null ? `, ${rain}% chance of rain` : ''}`;
   const sunrise = String(d.sunrise[0]).slice(11, 16), sunset = String(d.sunset[0]).slice(11, 16);
-  must(await db.from('shoot_days').update({ weather, sunrise, sunset }).eq('id', id).select('id'));
   return send(c, { weather, sunrise, sunset, place: [place.name, place.admin1].filter(Boolean).join(', ') }, 200);
 });

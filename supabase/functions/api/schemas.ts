@@ -529,6 +529,10 @@ export const UserParams = z.object({
   id: Uuid.openapi({ param: { name: 'id', in: 'path' } }),
   userId: Uuid.openapi({ param: { name: 'userId', in: 'path' } }),
 });
+export const WeatherLookup = z.object({
+  shoot_date: date.optional().openapi({ description: 'The date to look up; defaults to the day\'s saved date' }),
+  location_id: Uuid.optional().openapi({ description: 'The location to look up; defaults to the day\'s saved location' }),
+}).openapi('WeatherLookup');
 export const WeatherResult = z.object({
   weather: z.string().openapi({ example: 'Light rain, 48°F to 55°F, 60% chance of rain' }),
   sunrise: clock, sunset: clock,
