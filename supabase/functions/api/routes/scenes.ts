@@ -35,9 +35,20 @@ async function shotTotals(db: Db, sceneIds: string[]) {
   return totals;
 }
 
+/** Each scene's character ids, by cast number then name (the order of its names). */
+async function characterIds(db: Db, sceneIds: string[]) {
+  const map = new Map<string, string[]>();
+  if (!sceneIds.length) return map;
+  const rows = must<Row[]>(await db.from('scene_characters').select('scene_id, character:characters(id, name, cast_number)').in('scene_id', sceneIds));
+  rows.sort((a, b) => (a.character.cast_number ?? 1e9) - (b.character.cast_number ?? 1e9) || a.character.name.localeCompare(b.character.name));
+  for (const r of rows) map.set(r.scene_id, [...(map.get(r.scene_id) ?? []), r.character.id]);
+  return map;
+}
+
 async function withTotals(db: Db, rows: Row[]) {
-  const totals = await shotTotals(db, rows.map((r) => r.id));
-  return rows.map((r) => ({ ...r, ...(totals.get(r.id) ?? { shots: 0, shots_done: 0, est_minutes: 0 }) }));
+  const ids = rows.map((r) => r.id);
+  const [totals, chars] = await Promise.all([shotTotals(db, ids), characterIds(db, ids)]);
+  return rows.map((r) => ({ ...r, ...(totals.get(r.id) ?? { shots: 0, shots_done: 0, est_minutes: 0 }), character_ids: chars.get(r.id) ?? [] }));
 }
 
 /** Set sort_order 1, 2, 3… in the order given. Every id must be in the list being ordered. */
@@ -74,7 +85,9 @@ scenes.openapi(createRoute({
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
   const row = must<Row>(await db.from('scenes').insert({ ...clean(c.req.valid('json')), project_id: id }).select('*').single());
-  return send(c, { ...row, shots: 0, shots_done: 0, est_minutes: 0 }, 201);
+  // Names given in `characters` were turned into links (and new characters) on the way in.
+  const fresh = must<Row>(await db.from('scenes').select('*').eq('id', row.id).single());
+  return send(c, (await withTotals(db, [fresh]))[0], 201);
 });
 
 scenes.openapi(createRoute({
@@ -98,7 +111,9 @@ scenes.openapi(createRoute({
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  const row = found(must<Row[]>(await db.from('scenes').update(clean(c.req.valid('json'))).eq('id', id).select('*')));
+  found(must<Row[]>(await db.from('scenes').update(clean(c.req.valid('json'))).eq('id', id).select('id')));
+  // Read it back: writing names to `characters` tidies them after the update.
+  const row = must<Row>(await db.from('scenes').select('*').eq('id', id).single());
   return send(c, (await withTotals(db, [row]))[0], 200);
 });
 

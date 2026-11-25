@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { authed, fail, found, must } from '../context.ts';
 import {
-  AddPersonResult, IdParam, MemberParams, Project, ProjectCreate, ProjectDetail, ProjectMember, ProjectMemberAdd, ProjectPersonAdd, ProjectUpdate, RoleIds,
+  AddPersonResult, DietaryInput, IdParam, MemberParams, Project, ProjectCreate, ProjectDetail, ProjectMember, ProjectMemberAdd, ProjectPersonAdd, ProjectUpdate, RoleIds,
 } from '../schemas.ts';
 import { body, errors, ok, send, profileFields, rolesByUser, router, secured, setRoles } from './common.ts';
 
@@ -92,10 +92,10 @@ projects.openapi(createRoute({
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
   const [m, r] = await Promise.all([
-    db.from('project_members').select('user_id, joined_at').eq('project_id', id),
+    db.from('project_members').select('user_id, joined_at, dietary, dietary_allergy').eq('project_id', id),
     db.from('project_member_roles').select('user_id, role_id').eq('project_id', id),
   ]);
-  const members = must<{ user_id: string; joined_at: string }[]>(m);
+  const members = must<{ user_id: string; joined_at: string; dietary: string | null; dietary_allergy: boolean }[]>(m);
   const roles = rolesByUser(must(r));
   const ids = members.map((x) => x.user_id);
   const profiles = ids.length ? must<{ id: string }[]>(await db.from('profiles').select(profileFields).in('id', ids)) : [];
@@ -161,4 +161,19 @@ projects.openapi(createRoute({
   const error = await setRoles(db, 'project_member_roles', { project_id: id, user_id: userId }, role_ids);
   if (error) fail(error);
   return send(c, { role_ids }, 200);
+});
+
+projects.openapi(createRoute({
+  method: 'put', path: '/projects/{id}/members/{userId}/dietary', tags: team, security: secured,
+  summary: 'Set someone\'s dietary needs on a project (company admins, or the person themselves)',
+  description: 'Shown on the call sheet for catering, and on that person\'s own call sheet link. Never on the shared link.',
+  request: { params: MemberParams, ...body(DietaryInput) },
+  responses: { 204: { description: 'Saved' }, 400: errors[400], 401: errors[401], 403: errors[403] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const { id, userId } = c.req.valid('param');
+  const b = c.req.valid('json');
+  const { error } = await db.rpc('set_dietary', { project: id, person: userId, needs: b.needs ?? null, allergy: b.allergy ?? false });
+  if (error) fail(error);
+  return c.body(null, 204);
 });

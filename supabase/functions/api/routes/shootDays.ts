@@ -58,12 +58,21 @@ async function oneDay(db: Db, id: string) {
 
 /** A day's calls with each person's profile and project roles, cast (with a character) first. */
 async function callsFor(db: Db, day: Row) {
-  const [calls, roles] = await Promise.all([
+  const [calls, roles, chars, members] = await Promise.all([
     db.from('shoot_day_calls').select(`*, profile:profiles!shoot_day_calls_user_id_fkey(${profileFields})`).eq('shoot_day_id', day.id),
     db.from('project_member_roles').select('user_id, role_id').eq('project_id', day.project_id),
+    db.from('characters').select('name, cast_number, actor_id').eq('project_id', day.project_id).not('actor_id', 'is', null)
+      .order('cast_number', { ascending: true, nullsFirst: false }).order('name'),
+    db.from('project_members').select('user_id, dietary, dietary_allergy').eq('project_id', day.project_id).not('dietary', 'is', null),
   ]);
   const byUser = rolesByUser(must(roles));
-  return must<Row[]>(calls).map((c) => ({ ...c, role_ids: byUser.get(c.user_id) ?? [] }));
+  // The characters each person plays, and their dietary needs (for catering).
+  const plays = new Map<string, { name: string; cast_number: number | null }[]>();
+  for (const ch of must<Row[]>(chars)) plays.set(ch.actor_id, [...(plays.get(ch.actor_id) ?? []), { name: ch.name, cast_number: ch.cast_number }]);
+  const food = new Map(must<Row[]>(members).map((m) => [m.user_id, { needs: m.dietary, allergy: m.dietary_allergy }]));
+  return must<Row[]>(calls).map((c) => ({
+    ...c, role_ids: byUser.get(c.user_id) ?? [], characters: plays.get(c.user_id) ?? [], dietary: food.get(c.user_id) ?? null,
+  }));
 }
 
 // ---- Days -------------------------------------------------------------------

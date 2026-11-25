@@ -9,6 +9,7 @@ const open = (id: string) => `?open=${encodeURIComponent(id)}`;
 export const itemPath = {
   task: (projectId: string, id: string) => `/projects/${projectId}/tasks${open(id)}`,
   scene: (projectId: string, id: string) => `/projects/${projectId}/scenes${open(id)}`,
+  character: (projectId: string, id: string) => `/projects/${projectId}/characters${open(id)}`,
   shootDay: (projectId: string, id: string) => `/projects/${projectId}/shoot-days${open(id)}`,
   callSheet: (projectId: string, dayId: string) => `/projects/${projectId}/shoot-days/${dayId}`,
   location: (projectId: string, id: string) => `/projects/${projectId}/locations${open(id)}`,

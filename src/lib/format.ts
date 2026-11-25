@@ -124,6 +124,33 @@ export const SCENE_STATUSES: { value: SceneStatus; label: string }[] = [
   { value: 'shot', label: 'Shot' },
 ];
 
+// ---- Characters ---------------------------------------------------------------
+
+export type CharacterKind = 'lead' | 'supporting' | 'day_player' | 'background';
+export type CastingStatus = 'open' | 'auditioning' | 'offered' | 'cast';
+
+export const CHARACTER_KINDS: { value: CharacterKind; label: string }[] = [
+  { value: 'lead', label: 'Lead' },
+  { value: 'supporting', label: 'Supporting' },
+  { value: 'day_player', label: 'Day player' },
+  { value: 'background', label: 'Background' },
+];
+export const CASTING_STATUSES: { value: CastingStatus; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'auditioning', label: 'Auditioning' },
+  { value: 'offered', label: 'Offered' },
+  { value: 'cast', label: 'Cast' },
+];
+
+/**
+ * Who someone plays on a call sheet: the character typed on their call, or else the
+ * characters they're cast as on the Characters page, e.g. "Ellie (#1)".
+ */
+export function castLabel(c: { character_name: string | null; characters?: { name: string; cast_number: number | null }[] }) {
+  if (c.character_name) return c.character_name;
+  return (c.characters ?? []).map((ch) => (ch.cast_number != null ? `${ch.name} (#${ch.cast_number})` : ch.name)).join(', ');
+}
+
 /** Shown in a pick-list for "nothing picked". */
 export const NONE = '—';
 

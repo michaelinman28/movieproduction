@@ -11,6 +11,8 @@ import { labels } from './routes/labels.ts';
 import { locations } from './routes/locations.ts';
 import { people } from './routes/people.ts';
 import { scenes } from './routes/scenes.ts';
+import { characters } from './routes/characters.ts';
+import { teamNotes } from './routes/teamNotes.ts';
 import { shootDays } from './routes/shootDays.ts';
 import { notes } from './routes/notes.ts';
 import { audit } from './routes/audit.ts';
@@ -47,6 +49,8 @@ export function createApp(config: ApiConfig) {
   api.route('/', locations);
   api.route('/', people);
   api.route('/', scenes);
+  api.route('/', characters);
+  api.route('/', teamNotes);
   api.route('/', shootDays);
   api.route('/', notes);
   api.route('/', audit);
@@ -81,6 +85,10 @@ export function createApp(config: ApiConfig) {
       { name: 'People', description: 'People\'s names, phones and extra contacts. Admins look after the people in their company; only the person changes their sign-in email' },
       { name: 'Locations', description: 'A project\'s locations, with address and on-site contact; tasks can be assigned to one' },
       { name: 'Scenes', description: 'A project\'s scenes in order: set, interior or exterior, time of day, pages, characters, needs and location' },
+      { name: 'Characters', description: 'A project\'s characters: cast number, type, casting (actor, stand-in, stunt double), look and continuity, and the scenes they\'re in' },
+      { name: 'Character notes', description: 'Any number of notes on a character' },
+      { name: 'Team member notes', description: 'Notes about a person on a project, each with a type. Only company admins and the person see them' },
+      { name: 'Team note types', description: 'Each company\'s list of team note types, set up by its admins' },
       { name: 'Shots', description: 'Each scene\'s shot list, in shooting order, ticked off on set' },
       { name: 'Shoot days', description: 'Each day of filming: location, times, weather, the day\'s schedule of scenes and breaks, and who is called when' },
       { name: 'Activity', description: 'The audit trail: every add, change and delete, sign-ins and call sheet views. Company admins only' },

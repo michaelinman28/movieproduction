@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { LinkedCallSheet } from '../lib/api';
-import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, clockLabel, labelOf, longDate, pagesLabel, shortDate } from '../lib/format';
+import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, clockLabel, labelOf, longDate, pagesLabel, shortDate } from '../lib/format';
 import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
 
@@ -87,9 +87,9 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
   const callOf = (c: SheetCall) => clockLabel(c.call_time) || crewCall;
   const byName = (a: SheetCall, b: SheetCall) => nameOf(a).localeCompare(nameOf(b));
 
-  const cast = sheet.calls.filter((c) => c.character_name).sort((a, b) => (a.call_time ?? '').localeCompare(b.call_time ?? '') || byName(a, b));
+  const cast = sheet.calls.filter((c) => castLabel(c)).sort((a, b) => (a.call_time ?? '').localeCompare(b.call_time ?? '') || byName(a, b));
   const depts = new Map<string, SheetCall[]>();
-  for (const c of sheet.calls.filter((x) => !x.character_name)) depts.set(department(c), [...(depts.get(department(c)) ?? []), c]);
+  for (const c of sheet.calls.filter((x) => !castLabel(x))) depts.set(department(c), [...(depts.get(department(c)) ?? []), c]);
   const rank = (d: string) => (DEPARTMENTS.includes(d) ? DEPARTMENTS.indexOf(d) : DEPARTMENTS.length);
   const crew = [...depts.entries()].sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0])).map(([d, list]) => [d, list.sort(byName)] as const);
   const keys: { role: string; c: SheetCall }[] = [];
@@ -97,6 +97,9 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
     for (const c of sheet.calls) if (rolesOf(c).some((r) => r.name === role) && !keys.some((k) => k.c.user_id === c.user_id)) keys.push({ role, c });
   }
   const mine = me ? sheet.calls.find((c) => c.user_id === me) ?? null : null;
+  // Dietary needs for catering: everyone's on the project's sheet, only the reader's own on a personal link, none on the shared link.
+  const food = sheet.calls.filter((c) => c.dietary?.needs).sort((a, b) => Number(Boolean(b.dietary?.allergy)) - Number(Boolean(a.dietary?.allergy)) || byName(a, b));
+  const allergies = food.filter((c) => c.dietary?.allergy).length;
   const totalPages = sheet.scenes.reduce((n, s) => n + (s.pages_eighths ?? 0), 0);
   const sceneLine = (s: { int_ext: SheetData['scenes'][number]['int_ext']; time_of_day: SheetData['scenes'][number]['time_of_day'] }) =>
     [s.int_ext && labelOf(SCENE_INT_EXT, s.int_ext), s.time_of_day && labelOf(SCENE_TIMES, s.time_of_day)].filter(Boolean) as string[];
@@ -149,7 +152,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
             <p className="cs-you-time">{callOf(mine) || 'Not set yet'}</p>
           </div>
           <div className="cs-you-details">
-            <p className="cs-you-name">{nameOf(mine)}{mine.character_name ? <> as <strong>{mine.character_name}</strong></> : roleNames(mine) ? <span className="cs-muted"> · {roleNames(mine)}</span> : null}</p>
+            <p className="cs-you-name">{nameOf(mine)}{castLabel(mine) ? <> as <strong>{castLabel(mine)}</strong></> : roleNames(mine) ? <span className="cs-muted"> · {roleNames(mine)}</span> : null}</p>
             <div className="cs-chips">
               <TimeChip label="Pickup" time={mine.pickup_time} />
               <TimeChip label="Makeup" time={mine.makeup_time} />
@@ -254,7 +257,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
           {cast.length ? (
             <ul className="cs-people">
               {cast.map((c) => person(c,
-                <p className="cs-person-sub">as <strong>{c.character_name}</strong></p>,
+                <p className="cs-person-sub">as <strong>{castLabel(c)}</strong></p>,
                 <><TimeChip label="Pickup" time={c.pickup_time} /><TimeChip label="Makeup" time={c.makeup_time} /><span className="cs-chip cs-chip-strong"><span>On set</span> {callOf(c) || '—'}</span></>))}
             </ul>
           ) : <p className="cs-muted">No cast called</p>}
@@ -276,6 +279,20 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
             </div>
           ) : <p className="cs-muted">No crew called yet</p>}
         </Section>
+
+        {food.length > 0 && (
+          <Section id={`${sectionPrefix}.dietary`} title="Dietary needs"
+            summary={`${food.length} ${food.length === 1 ? 'person' : 'people'}${allergies ? `, ${allergies} ${allergies === 1 ? 'allergy' : 'allergies'}` : ''}`}>
+            <ul className="cs-food">
+              {food.map((c) => (
+                <li key={c.user_id} className={c.dietary?.allergy ? 'cs-food-allergy' : ''}>
+                  <span className="cs-food-who">{nameOf(c)}</span>
+                  <span>{c.dietary?.allergy && <strong>Allergy: </strong>}{c.dietary?.needs}</span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
 
         {day.notes && (
           <Section id={`${sectionPrefix}.notes`} title="Notes">

@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import type { TaskTag } from '../lib/api';
+/** Anything with a name that can be picked: a tag, a character, a scene. */
+export interface Pickable { id: string; name: string }
 
 /**
  * Pick tags from the company's list, or type a new one and press Enter to create it.
@@ -10,12 +11,17 @@ import type { TaskTag } from '../lib/api';
  * so a side panel that scrolls can't clip it, and it opens upwards when there's more
  * room above the field than below.
  */
-export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
-  tags: TaskTag[];
+export function TagPicker<T extends Pickable>({ tags, selected, onChange, onCreate, disabled, noun = 'tag', listLabel = 'Tags on this task', maxLength = 40 }: {
+  tags: T[];
   selected: string[];
   onChange: (ids: string[]) => void;
-  onCreate: (name: string) => Promise<TaskTag | null>;
+  /** Leave out to only pick from the list. */
+  onCreate?: (name: string) => Promise<T | null>;
   disabled?: boolean;
+  /** What's being picked, for the field's placeholder and label ("Add a tag…"). */
+  noun?: string;
+  listLabel?: string;
+  maxLength?: number;
 }) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -24,7 +30,7 @@ export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
   const inputRef = useRef<HTMLInputElement>(null);
   const [place, setPlace] = useState<CSSProperties | null>(null);
 
-  const chosen = selected.map((id) => tags.find((t) => t.id === id)).filter(Boolean) as TaskTag[];
+  const chosen = selected.map((id) => tags.find((t) => t.id === id)).filter(Boolean) as T[];
   const q = text.trim().toLowerCase();
   const exact = tags.find((t) => t.name.toLowerCase() === q);
   const suggestions = useMemo(
@@ -32,9 +38,9 @@ export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
     [tags, selected, q],
   );
   // The choices under the field: matching tags, then "Create" when nothing matches exactly.
-  const options: { label: string; tag?: TaskTag }[] = [
+  const options: { label: string; tag?: T }[] = [
     ...suggestions.map((t) => ({ label: t.name, tag: t })),
-    ...(q && !exact ? [{ label: `Create "${text.trim()}"` }] : []),
+    ...(q && !exact && onCreate ? [{ label: `Create "${text.trim()}"` }] : []),
   ];
 
   const showing = open && options.length > 0;
@@ -66,6 +72,7 @@ export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
     setText('');
     setActive(0);
     if (o.tag) { onChange([...selected, o.tag.id]); return; }
+    if (!onCreate) return;
     const made = await onCreate(text.trim());
     if (made && !selected.includes(made.id)) onChange([...selected, made.id]);
   }
@@ -87,7 +94,7 @@ export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
   return (
     <div className="flex flex-col gap-2">
       {chosen.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5" aria-label="Tags on this task">
+        <ul className="flex flex-wrap gap-1.5" aria-label={listLabel}>
           {chosen.map((t) => (
             <li key={t.id} className="tag-chip">
               {t.name}
@@ -102,8 +109,8 @@ export function TagPicker({ tags, selected, onChange, onCreate, disabled }: {
         <div className="relative">
           <input
             ref={inputRef}
-            className="field" placeholder="Add a tag…" value={text} maxLength={40}
-            role="combobox" aria-expanded={open && options.length > 0} aria-controls={listId} aria-label="Add a tag"
+            className="field" placeholder={`Add a ${noun}…`} value={text} maxLength={maxLength}
+            role="combobox" aria-expanded={open && options.length > 0} aria-controls={listId} aria-label={`Add a ${noun}`}
             onChange={(e) => { setText(e.target.value); setOpen(true); setActive(0); }}
             onFocus={() => setOpen(true)}
             onBlur={() => setTimeout(() => setOpen(false), 150)}

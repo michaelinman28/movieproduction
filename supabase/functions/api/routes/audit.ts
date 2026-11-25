@@ -27,8 +27,9 @@ const REFS: Record<string, string> = {
   assignee_id: 'profiles', user_id: 'profiles', author_id: 'profiles', created_by: 'profiles', sent_by: 'profiles',
   location_id: 'project_locations', category_id: 'task_categories', scene_id: 'scenes', parent_id: 'tasks',
   role_id: 'roles', tag_id: 'task_tags',
+  actor_id: 'profiles', stand_in_id: 'profiles', double_id: 'profiles', character_id: 'characters', type_id: 'team_note_types',
 };
-const ENUMS = new Set(['status', 'priority', 'due_part', 'start_part', 'int_ext', 'time_of_day', 'kind', 'visibility']);
+const ENUMS = new Set(['status', 'priority', 'due_part', 'start_part', 'int_ext', 'time_of_day', 'kind', 'visibility', 'casting_status']);
 const TIMES = new Set(['crew_call', 'shooting_call', 'lunch', 'wrap', 'sunrise', 'sunset']);
 
 const typeOf = (field: string): 'text' | 'date' | 'time' | 'datetime' =>
@@ -51,6 +52,8 @@ const NAMERS: Record<string, { cols: string; name: (r: Row) => string | null }> 
   tasks: { cols: 'id, title', name: (r) => r.title },
   scenes: { cols: 'id, number, set_name', name: (r) => `Scene ${r.number}${r.set_name ? `: ${r.set_name}` : ''}` },
   shoot_days: { cols: 'id, shoot_date, title', name: dayLabel },
+  characters: { cols: 'id, name', name: (r) => r.name },
+  team_note_types: { cols: 'id, name', name: (r) => r.name },
   projects: { cols: 'id, name', name: (r) => r.name },
   companies: { cols: 'id, name', name: (r) => r.name },
 };
@@ -79,8 +82,8 @@ async function namesFor(db: Db, table: string, ids: string[]) {
 
 /** Where an entry links to: the item itself, or what it belongs to (a note's task, a shot's scene). */
 function target(r: Row): [string, string] | null {
-  if (r.parent_table && ['tasks', 'scenes', 'shoot_days'].includes(r.parent_table)) return [r.parent_table, r.parent_key];
-  if (['company_members', 'project_members', 'company_member_roles', 'project_member_roles', 'person_contacts', 'shoot_day_calls'].includes(r.table_name) || r.table_name === 'profiles') {
+  if (r.parent_table && ['tasks', 'scenes', 'shoot_days', 'characters'].includes(r.parent_table)) return [r.parent_table, r.parent_key];
+  if (['company_members', 'project_members', 'company_member_roles', 'project_member_roles', 'person_contacts', 'shoot_day_calls', 'team_notes'].includes(r.table_name) || r.table_name === 'profiles') {
     return r.subject_user_id ? ['profiles', r.subject_user_id] : null;
   }
   if (NAMERS[r.table_name]) return [r.table_name, r.row_key];

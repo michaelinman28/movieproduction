@@ -38,6 +38,17 @@ export function SceneNotes({ sceneId, canManage }: { sceneId: string; canManage:
   return <Notes sectionId="project.scenes.notes" store={store} canManage={canManage} />;
 }
 
+/** The notes on one character. */
+export function CharacterNotes({ characterId, canManage }: { characterId: string; canManage: boolean }) {
+  const store = useMemo<NoteStore>(() => ({
+    list: () => api.characterNotes(characterId),
+    add: (body) => api.addCharacterNote(characterId, body),
+    update: api.updateCharacterNote,
+    remove: api.deleteCharacterNote,
+  }), [characterId]);
+  return <Notes sectionId="project.characters.notes" store={store} canManage={canManage} />;
+}
+
 /**
  * An item's notes, oldest first: anyone who can see the item adds them, authors edit
  * their own, and the author or an admin (canManage) deletes one. Adding happens at once.

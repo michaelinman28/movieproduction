@@ -178,7 +178,14 @@ export const ProjectMember = z.object({
   joined_at: z.string(),
   profile: Profile,
   role_ids: z.array(Uuid),
+  dietary: nullableText.openapi({ description: 'Dietary needs on this project, for catering and the call sheet', example: 'Vegetarian' }),
+  dietary_allergy: z.boolean().openapi({ description: 'Whether the dietary needs are an allergy (shown in red)' }),
 }).openapi('ProjectMember');
+
+export const DietaryInput = z.object({
+  needs: z.string().trim().max(500).nullable().openapi({ description: 'Blank clears it', example: 'Peanut allergy' }),
+  allergy: z.boolean().optional().openapi({ description: 'Show it as an allergy' }),
+}).openapi('DietaryInput');
 
 export const ProjectMemberAdd = z.object({ user_id: Uuid }).openapi('ProjectMemberAdd');
 
@@ -275,16 +282,16 @@ export const SceneNote = z.object({
 /** A note from anywhere on a project, for the Project Notes page. */
 export const ProjectNote = z.object({
   key: z.string().openapi({ description: 'Unique across every kind of note, e.g. task_note:<id>', example: 'task_note:6f1c…' }),
-  source: z.enum(['task', 'scene', 'shot', 'shoot_day', 'schedule', 'call']).openapi({
-    description: 'Where the note was taken: a task\'s or scene\'s notes, a shot\'s Notes field, a shoot day\'s Notes, a note in a day\'s schedule, or the note on someone\'s call.',
+  source: z.enum(['task', 'scene', 'shot', 'shoot_day', 'schedule', 'call', 'character', 'team']).openapi({
+    description: 'Where the note was taken: a task\'s, scene\'s or character\'s notes, a shot\'s Notes field, a shoot day\'s Notes, a note in a day\'s schedule, or the note on someone\'s call.',
   }),
-  note_id: Uuid.nullable().openapi({ description: 'The task or scene note\'s id; null for notes kept in a field of another item.' }),
+  note_id: Uuid.nullable().openapi({ description: 'The task, scene or character note\'s id; null for notes kept in a field of another item.' }),
   body: z.string(),
   author: Profile.nullable().openapi({ description: 'Who wrote it. For a note kept in a field (shot, shoot day, schedule, call), who last set or changed it; null for ones written before that was recorded.' }),
   at: z.string().openapi({ description: 'When the note was written (for a note kept in a field, when it was last set or changed).' }),
   edited: z.boolean(),
   item: z.object({
-    kind: z.enum(['task', 'scene', 'shoot_day']).openapi({ description: 'The page that holds the note' }),
+    kind: z.enum(['task', 'scene', 'shoot_day', 'character', 'team_member']).openapi({ description: 'The page that holds the note' }),
     id: Uuid,
     label: z.string().openapi({ example: 'Scene 12A: INT. DINER' }),
     detail: z.string().nullable().openapi({ description: 'Where on the item, e.g. "Shot 3" or "Call for Ava"', example: 'Shot 3' }),
@@ -373,7 +380,7 @@ export const Scene = z.object({
   time_of_day: SceneTime.nullable(),
   pages_eighths: z.number().int().nullable().openapi({ description: 'Length in eighths of a page (11 = 1 3/8 pages)', example: 11 }),
   synopsis: nullableText.openapi({ example: 'Maya confronts Leo about the money' }),
-  characters: nullableText.openapi({ example: 'Maya, Leo, Waitress' }),
+  characters: nullableText.openapi({ example: 'Maya, Leo, Waitress', description: 'The names of the scene\'s characters, by cast number. Kept in step with character_ids.' }),
   needs: nullableText.openapi({ example: 'Practical neon sign, rain on windows' }),
   location_id: Uuid.nullable().openapi({ description: 'One of the project\'s locations' }),
   status: SceneStatus,
@@ -384,6 +391,7 @@ export const Scene = z.object({
   shots: z.number().int().openapi({ description: 'How many shots the scene has' }),
   shots_done: z.number().int().openapi({ description: 'How many of them are done' }),
   est_minutes: z.number().int().openapi({ description: 'The shots\' estimated minutes added up' }),
+  character_ids: z.array(Uuid).openapi({ description: 'The characters in the scene (see Characters). `characters` holds their names.' }),
 }).openapi('Scene');
 
 export const SceneInput = z.object({
@@ -393,7 +401,7 @@ export const SceneInput = z.object({
   time_of_day: SceneTime.nullable().optional(),
   pages_eighths: z.number().int().min(0).max(8000).nullable().optional(),
   synopsis: optText(1000),
-  characters: optText(1000),
+  characters: optText(1000).openapi({ description: 'Character names, comma-separated. They become the scene\'s characters; names the project doesn\'t have yet are added as new characters.' }),
   needs: optText(2000),
   location_id: Uuid.nullable().optional(),
   status: SceneStatus.optional().openapi({ description: 'Defaults to not_scheduled' }),
@@ -523,6 +531,8 @@ export const ShootDayCall = z.object({
   created_at: z.string(),
   profile: Profile,
   role_ids: z.array(Uuid).openapi({ description: 'Their project roles' }),
+  characters: z.array(z.object({ name: z.string(), cast_number: z.number().int().nullable() })).openapi({ description: 'The characters they play (from Characters)' }),
+  dietary: z.object({ needs: z.string(), allergy: z.boolean() }).nullable().openapi({ description: 'Their dietary needs on the project, if any' }),
 }).openapi('ShootDayCall');
 export const ShootDayCallInput = z.object({
   call_time: optTime,
@@ -551,7 +561,7 @@ export const LinkedCallSheet = z.object({
   location: z.any().nullable().openapi({ description: 'Name, description, address, parking, nearest hospital and on-site contact' }),
   items: z.array(z.any()).openapi({ description: 'The schedule in order: id, kind, scene_id, label, at_time' }),
   scenes: z.array(z.any()).openapi({ description: 'The scenes on the day, in order' }),
-  calls: z.array(z.any()).openapi({ description: 'Everyone called: their call, character, pickup, makeup, note, name, nickname, phone and role ids (no emails)' }),
+  calls: z.array(z.any()).openapi({ description: 'Everyone called: their call, character, the characters they play, pickup, makeup, note, name, nickname, phone and role ids (no emails). On a personal link, the reader\'s own call also has their dietary needs.' }),
   roles: z.array(z.object({ id: Uuid, name: z.string(), department: z.string().nullable(), sort_order: z.number().int().nullable() })),
   next_day: z.any().nullable(),
 }).openapi('LinkedCallSheet');
@@ -640,3 +650,112 @@ export const AuditCleanupInput = z.object({
   to: z.string().nullable().optional(),
 }).openapi('AuditCleanupInput');
 export const AuditCleanupResult = z.object({ removed: z.number().int() }).openapi('AuditCleanupResult');
+
+// ---- Characters ---------------------------------------------------------------
+
+export const CharacterKind = z.enum(['lead', 'supporting', 'day_player', 'background']).openapi('CharacterKind');
+export const CastingStatus = z.enum(['open', 'auditioning', 'offered', 'cast']).openapi('CastingStatus');
+
+export const CharacterScene = z.object({
+  scene_id: Uuid,
+  look_note: nullableText.openapi({ description: 'How they look in this scene', example: 'Jacket torn, mud on face' }),
+}).openapi('CharacterScene');
+
+export const Character = z.object({
+  id: Uuid,
+  project_id: Uuid,
+  name: z.string().openapi({ example: 'Ellie' }),
+  cast_number: z.number().int().nullable().openapi({ description: 'The cast number on call sheets; 1 is usually the lead', example: 1 }),
+  kind: CharacterKind.nullable(),
+  description: nullableText.openapi({ example: 'A drone photographer who loses everything in one afternoon' }),
+  age_range: nullableText.openapi({ example: '30s' }),
+  gender: nullableText.openapi({ example: 'Female' }),
+  traits: nullableText.openapi({ description: 'Traits and arc', example: 'Stubborn, funny; learns to ask for help' }),
+  casting_status: CastingStatus,
+  actor_id: Uuid.nullable().openapi({ description: 'Someone on the project\'s team. Picking an actor marks the character cast.' }),
+  stand_in_id: Uuid.nullable(),
+  double_id: Uuid.nullable().openapi({ description: 'Stunt double' }),
+  wardrobe: nullableText,
+  hair_makeup: nullableText,
+  props: nullableText,
+  continuity: nullableText,
+  created_by: Uuid.nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  scenes: z.array(CharacterScene).openapi({ description: 'The scenes they\'re in' }),
+}).openapi('Character');
+
+const characterFields = {
+  name: z.string().trim().min(1).max(100).regex(/^[^,]*$/, 'A character name can\'t have a comma in it').openapi({ example: 'Ellie' }),
+  cast_number: z.number().int().min(1).max(9999).nullable().optional(),
+  kind: CharacterKind.nullable().optional(),
+  description: optText(2000),
+  age_range: optText(40),
+  gender: optText(40),
+  traits: optText(4000),
+  casting_status: CastingStatus.optional().openapi({ description: 'Defaults to open' }),
+  actor_id: Uuid.nullable().optional(),
+  stand_in_id: Uuid.nullable().optional(),
+  double_id: Uuid.nullable().optional(),
+  wardrobe: optText(4000),
+  hair_makeup: optText(4000),
+  props: optText(4000),
+  continuity: optText(4000),
+};
+export const CharacterInput = z.object(characterFields).openapi('CharacterInput');
+export const CharacterUpdate = z.object(characterFields).partial().openapi('CharacterUpdate');
+
+export const IdsInput = z.object({
+  ids: z.array(Uuid).max(1000).openapi({ description: 'The full list; anything not listed is removed' }),
+}).openapi('IdsInput');
+
+export const LookNoteInput = z.object({
+  look_note: optText(1000),
+}).openapi('LookNoteInput');
+
+export const SceneCharacterParams = z.object({
+  id: Uuid.openapi({ param: { name: 'id', in: 'path' }, description: 'The scene' }),
+  characterId: Uuid.openapi({ param: { name: 'characterId', in: 'path' } }),
+});
+
+export const CharacterNote = z.object({
+  id: Uuid,
+  character_id: Uuid,
+  author_id: Uuid,
+  author: Profile,
+  body: z.string().openapi({ example: 'Has a scar on her left hand; keep it visible in close-ups.' }),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('CharacterNote');
+
+// ---- Team member notes ----------------------------------------------------------
+
+export const TeamNoteType = z.object({
+  id: Uuid,
+  company_id: Uuid,
+  name: z.string().openapi({ example: 'Travel' }),
+  sort_order: z.number().int(),
+  notes: z.number().int().openapi({ description: 'How many notes use it (admins only; 0 for others)' }),
+}).openapi('TeamNoteType');
+
+export const TeamNoteTypeInput = z.object({
+  name: z.string().trim().min(1).max(40).openapi({ example: 'Travel' }),
+}).openapi('TeamNoteTypeInput');
+
+export const TeamNote = z.object({
+  id: Uuid,
+  project_id: Uuid,
+  user_id: Uuid.openapi({ description: 'Who the note is about' }),
+  type_id: Uuid.nullable(),
+  author_id: Uuid,
+  author: Profile,
+  body: z.string().openapi({ example: 'Flies in Dec 6, needs a pickup from the airport.' }),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('TeamNote');
+
+export const TeamNoteInput = z.object({
+  body: z.string().trim().min(1).max(5000),
+  type_id: Uuid.nullable().optional(),
+}).openapi('TeamNoteInput');
+export const TeamNoteUpdate = TeamNoteInput.partial().openapi('TeamNoteUpdate');

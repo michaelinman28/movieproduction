@@ -26,6 +26,7 @@ const AREAS: { to: string; label: string; end?: boolean; admin?: boolean }[] = [
   { to: '', label: 'Overview', end: true },
   { to: 'tasks', label: 'Tasks' },
   { to: 'scenes', label: 'Scenes' },
+  { to: 'characters', label: 'Characters' },
   { to: 'shoot-days', label: 'Shoot days' },
   { to: 'locations', label: 'Locations' },
   { to: 'team', label: 'Team' },

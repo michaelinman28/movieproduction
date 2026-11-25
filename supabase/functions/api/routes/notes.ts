@@ -70,7 +70,7 @@ const personName = (p: Row) => p?.nickname || p?.full_name || p?.email || 'Someo
 notes.openapi(createRoute({
   method: 'get', path: '/projects/{id}/notes', tags: ['Project notes'], security: secured,
   summary: 'Every note on the project, newest first',
-  description: 'Task notes, scene notes, shot notes, shoot day notes, notes in a day\'s schedule and notes on people\'s calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.',
+  description: 'Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, shoot day notes, notes in a day\'s schedule and notes on people\'s calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.',
   request: { params: IdParam },
   responses: { 200: ok(z.array(ProjectNote)), 401: errors[401] },
 }), async (c) => {
@@ -88,11 +88,20 @@ notes.openapi(createRoute({
   const sceneById = new Map(scenes.map((s: Row) => [s.id, s]));
   const dayById = new Map(days.map((d: Row) => [d.id, d]));
 
-  const [taskNotes, sceneNotes] = await Promise.all([
+  const chars = must<Row[]>(await db.from('characters').select('id, name').eq('project_id', id));
+  // Only company admins and the person a note is about can read team notes (the database decides).
+  const teamRows = await withAuthors(db, must<Row[]>(await db.from('team_notes').select('*').eq('project_id', id)));
+  const subjects = await withAuthors(db, [...new Set(teamRows.map((n: Row) => n.user_id))].map((author_id) => ({ author_id })));
+  const subjectName = new Map(subjects.map((s) => [s.author_id, personName(s.author)]));
+  const typeIds = [...new Set(teamRows.map((n: Row) => n.type_id).filter(Boolean))];
+  const typeName = new Map(typeIds.length ? must<Row[]>(await db.from('team_note_types').select('id, name').in('id', typeIds)).map((t) => [t.id, t.name]) : []);
+  const charById = new Map(chars.map((ch: Row) => [ch.id, ch]));
+  const [taskNotes, sceneNotes, charNotes] = await Promise.all([
     tasks.length ? db.from('task_notes').select('*').in('task_id', tasks.map((t: Row) => t.id)) : { data: [], error: null },
     scenes.length ? db.from('scene_notes').select('*').in('scene_id', scenes.map((s: Row) => s.id)) : { data: [], error: null },
+    chars.length ? db.from('character_notes').select('*').in('character_id', chars.map((ch: Row) => ch.id)) : { data: [], error: null },
   ]).then((rs) => rs.map((r) => must<Row[]>(r)));
-  const [taskAuthored, sceneAuthored] = await Promise.all([withAuthors(db, taskNotes), withAuthors(db, sceneNotes)]);
+  const [taskAuthored, sceneAuthored, charAuthored] = await Promise.all([withAuthors(db, taskNotes), withAuthors(db, sceneNotes), withAuthors(db, charNotes)]);
   // Notes kept in a field record who last wrote them (note_by) and when (note_at).
   const writerIds = [...new Set([...shots, ...days, ...items, ...calls].map((r: Row) => r.note_by).filter(Boolean))];
   const writers = new Map((await withAuthors(db, writerIds.map((author_id) => ({ author_id })))).map((w) => [w.author_id, w.author]));
@@ -108,6 +117,15 @@ notes.openapi(createRoute({
     const s = sceneById.get(n.scene_id);
     out.push({ key: `scene_note:${n.id}`, source: 'scene', note_id: n.id, body: n.body, author: n.author, at: n.created_at, edited: n.updated_at > n.created_at,
       item: { kind: 'scene', id: n.scene_id, label: s ? sceneLabel(s) : 'Scene', detail: null } });
+  }
+  for (const n of charAuthored) {
+    const ch = charById.get(n.character_id);
+    out.push({ key: `character_note:${n.id}`, source: 'character', note_id: n.id, body: n.body, author: n.author, at: n.created_at, edited: n.updated_at > n.created_at,
+      item: { kind: 'character', id: n.character_id, label: ch?.name ?? 'Character', detail: null } });
+  }
+  for (const n of teamRows) {
+    out.push({ key: `team_note:${n.id}`, source: 'team', note_id: n.id, body: n.body, author: n.author, at: n.created_at, edited: n.updated_at > n.created_at,
+      item: { kind: 'team_member', id: n.user_id, label: subjectName.get(n.user_id) ?? 'Someone', detail: n.type_id ? typeName.get(n.type_id) ?? null : null } });
   }
   // Shots are numbered by their place in their scene's list.
   const shotNumber = new Map<string, number>();
