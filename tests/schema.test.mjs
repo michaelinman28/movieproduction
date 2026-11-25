@@ -362,6 +362,21 @@ await expect('person confirms', async () => { await as(U.b, `select mark_call_sh
 await expect('admin not called cannot confirm', () => as(U.a, `select mark_call_sheet($1,true)`, [day.id]), isErr);
 await expect('new version needs a new confirm', async () => { await as(U.b, `select publish_call_sheet($1)`, [day.id]); return as(U.b, `select d.version, c.confirmed_version from shoot_days d join shoot_day_calls c on c.shoot_day_id=d.id where d.id=$1`, [day.id]); }, r => r[0]?.version === 2 && r[0]?.confirmed_version === 1);
 await expect('editing a day keeps its version', () => as(U.b, `update shoot_days set notes='Rain' where id=$1 returning version`, [day.id]), r => r[0]?.version === 2);
+// personal call sheet links
+await db.exec(`grant usage on schema public to anon;`);
+async function asAnon(sql, params=[]) {
+  await db.exec(`reset role; select set_config('request.jwt.sub', '', false); set role anon;`);
+  try { const r = await db.query(sql, params); return r.rows; } finally { await db.exec('reset role'); }
+}
+const [bCall] = await as(U.b, `select link_token from shoot_day_calls where shoot_day_id=$1 and user_id=$2`, [day.id, U.b]);
+await expect('each call gets a link token', () => Promise.resolve(bCall), r => /^[0-9a-f-]{36}$/.test(r?.link_token));
+await expect('link token cannot be changed', () => as(U.b, `update shoot_day_calls set link_token=gen_random_uuid() where shoot_day_id=$1 returning link_token`, [day.id]), r => r[0]?.link_token === bCall.link_token);
+await expect('anon cannot read calls directly', () => asAnon(`select * from shoot_day_calls`), isErr);
+const [sheetRow] = await asAnon(`select call_sheet_for_link($1) s`, [bCall.link_token]);
+await expect('link opens the sheet without signing in', () => Promise.resolve(sheetRow.s), s => s?.me === U.b && s.day.version === 2 && s.calls.length === 1 && s.project.name && Array.isArray(s.items) && s.scenes.length === 1);
+await expect('link sheet has no emails', () => Promise.resolve(JSON.stringify(sheetRow.s)), s => !s.includes('@x.com'));
+await expect('opening the link counts as viewed', () => as(U.b, `select viewed_version from shoot_day_calls where shoot_day_id=$1`, [day.id]), r => r[0]?.viewed_version === 2);
+await expect('unknown link shows nothing', () => asAnon(`select call_sheet_for_link(gen_random_uuid()) s`), r => r[0]?.s === null);
 const [day2] = await as(U.a, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-03-13') returning id`, [lp.id]);
 await expect('only the creator or an admin deletes a day', () => as(U.b, `delete from shoot_days where id=$1 returning id`, [day2.id]), len(0));
 await expect('leaving the project removes their calls', async () => { await as(U.a, `delete from project_members where project_id=$1 and user_id=$2`, [lp.id, U.b]); return as(U.a, `select * from shoot_day_calls where shoot_day_id=$1`, [day.id]); }, len(0));

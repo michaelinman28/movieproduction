@@ -488,6 +488,7 @@ export const ShootDayCall = z.object({
   viewed_at: z.string().nullable(),
   confirmed_version: z.number().int(),
   confirmed_at: z.string().nullable(),
+  link_token: Uuid.openapi({ description: 'Their personal call sheet link: /call-sheet-links/{token}, and the app page /sheet/{token}' }),
   created_at: z.string(),
   profile: Profile,
   role_ids: z.array(Uuid).openapi({ description: 'Their project roles' }),
@@ -508,6 +509,20 @@ export const CallSheet = z.object({
   calls: z.array(ShootDayCall),
   next_day: z.object({ day: ShootDay, scenes: z.array(z.any()) }).nullable().openapi({ description: 'A look ahead at the following shoot day' }),
 }).openapi('CallSheet');
+
+export const TokenParam = z.object({ token: Uuid.openapi({ param: { name: 'token', in: 'path' } }) });
+
+export const LinkedCallSheet = z.object({
+  me: Uuid.openapi({ description: 'The person the link belongs to' }),
+  project: z.object({ name: z.string(), company_name: z.string() }),
+  day: z.any().openapi({ description: 'The day: date, title, times, weather, notes, version, sent_at, day_number, total_days' }),
+  location: z.any().nullable().openapi({ description: 'Name, description, address, parking, nearest hospital and on-site contact' }),
+  items: z.array(z.any()).openapi({ description: 'The schedule in order: id, kind, scene_id, label, at_time' }),
+  scenes: z.array(z.any()).openapi({ description: 'The scenes on the day, in order' }),
+  calls: z.array(z.any()).openapi({ description: 'Everyone called: their call, character, pickup, makeup, note, name, nickname, phone and role ids (no emails)' }),
+  roles: z.array(z.object({ id: Uuid, name: z.string(), department: z.string().nullable(), sort_order: z.number().int().nullable() })),
+  next_day: z.any().nullable(),
+}).openapi('LinkedCallSheet');
 
 export const UserParams = z.object({
   id: Uuid.openapi({ param: { name: 'id', in: 'path' } }),

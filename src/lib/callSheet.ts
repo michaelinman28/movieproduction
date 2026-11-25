@@ -3,7 +3,7 @@
  * or copy into a text or chat, with a link to the full sheet where people confirm.
  * There's no email server, the same way invites and task summaries work.
  */
-import type { CallSheet } from './api';
+import type { CallSheet, ShootDayCall } from './api';
 import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, clockLabel, labelOf, longDate, pagesLabel } from './format';
 
 export interface SheetText { projectName: string; url: string }
@@ -59,4 +59,34 @@ export function callSheetMailto(sheet: CallSheet, t: SheetText) {
 
 export async function copyCallSheet(sheet: CallSheet, t: SheetText) {
   try { await navigator.clipboard.writeText(`${callSheetSubject(sheet, t)}\n\n${callSheetBody(sheet, t)}`); return true; } catch { return false; }
+}
+
+// ---- Personal links -----------------------------------------------------------
+
+/** The address of a person's own view-only call sheet page. No sign-in needed. */
+export function personalLink(token: string) {
+  return `${window.location.origin}${import.meta.env.BASE_URL}sheet/${token}`;
+}
+
+function personalText(sheet: CallSheet, c: ShootDayCall, t: SheetText) {
+  const d = sheet.day;
+  const first = (c.profile.nickname || c.profile.full_name || '').trim().split(/\s+/)[0];
+  const call = clockLabel(c.call_time) || clockLabel(d.crew_call);
+  return [
+    `${first ? `Hi ${first}, here` : 'Here'}'s your call sheet for ${t.projectName}, day ${d.day_number} of ${d.total_days} (${longDate(d.shoot_date)}).`,
+    call ? `Your call: ${call}${sheet.location ? ` at ${sheet.location.name}` : ''}.` : '',
+    '',
+    'Everything for the day is on your personal call sheet:',
+    personalLink(c.link_token),
+  ].filter((l, i) => l || i === 2).join('\n');
+}
+
+/** An email to one person with their own link, from the sender's email app. */
+export function personalMailto(sheet: CallSheet, c: ShootDayCall, t: SheetText) {
+  return `mailto:${encodeURIComponent(c.profile.email ?? '')}?subject=${encodeURIComponent(callSheetSubject(sheet, t))}&body=${encodeURIComponent(personalText(sheet, c, t))}`;
+}
+
+/** A text message to one person with their own link. */
+export function personalSms(sheet: CallSheet, c: ShootDayCall, t: SheetText) {
+  return `sms:${(c.profile.phone ?? '').replace(/[^\d+]/g, '')}?body=${encodeURIComponent(personalText(sheet, c, t))}`;
 }

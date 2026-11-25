@@ -1,8 +1,8 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { HTTPException } from 'hono/http-exception';
-import { authed, fail, found, must } from '../context.ts';
+import { anonClient, authed, fail, found, must } from '../context.ts';
 import {
-  CallSheet, IdParam, OrderInput, ShootDay, ShootDayCall, ShootDayCallInput, ShootDayInput, ShootDayItem,
+  CallSheet, IdParam, LinkedCallSheet, TokenParam, OrderInput, ShootDay, ShootDayCall, ShootDayCallInput, ShootDayInput, ShootDayItem,
   ShootDayItemInput, ShootDayItemUpdate, ShootDayUpdate, UserParams, WeatherResult,
 } from '../schemas.ts';
 import { body, errors, ok, profileFields, rolesByUser, router, secured, send } from './common.ts';
@@ -291,6 +291,22 @@ shootDays.openapi(createRoute({
   const r = await db.rpc('mark_call_sheet', { day: c.req.valid('param').id, confirm: true });
   if (r.error) fail(r.error);
   return c.body(null, 204);
+});
+
+shootDays.openapi(createRoute({
+  method: 'get', path: '/call-sheet-links/{token}', tags: sheetTags,
+  summary: 'A personal call sheet link: the sent call sheet, view only, with no sign-in',
+  description: 'Each person called on a day has their own link token (ShootDayCall.link_token). Whoever has the link can read that day\'s '
+    + 'sent call sheet and see which call is theirs (`me`); nothing can be changed through it. Opening it counts as that person viewing '
+    + 'the sent version. Unknown links, and sheets not sent yet, give 404.',
+  request: { params: TokenParam },
+  responses: { 200: ok(LinkedCallSheet), 404: errors[404] },
+}), async (c) => {
+  const r = await anonClient(c).rpc('call_sheet_for_link', { token: c.req.valid('param').token });
+  if (r.error) fail(r.error);
+  if (!r.data) throw new HTTPException(404, { message: 'This call sheet link isn\'t working. It may not be sent yet, or you\'re no longer called on this day.' });
+  c.header('Cache-Control', 'no-store');
+  return send(c, r.data, 200);
 });
 
 // ---- Weather ----------------------------------------------------------------

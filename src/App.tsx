@@ -13,12 +13,20 @@ import { CallSheetPage } from './pages/project/CallSheetPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
 import { TaskSettingsPage } from './pages/TaskSettingsPage';
+import { SheetLinkPage } from './pages/SheetLinkPage';
 import { ThemeSwitch } from './components/ThemeSwitch';
 import { PinnedAction } from './components/PinnedAction';
 import { UnsavedGuard } from './components/UnsavedGuard';
 
+/** A personal call sheet link (/sheet/:token) opens on its own page, with no sign-in. */
+function sheetToken() {
+  const path = window.location.pathname.slice(import.meta.env.BASE_URL.replace(/\/$/, '').length);
+  return path.match(/^\/sheet\/([0-9a-f-]{36})\/?$/i)?.[1] ?? null;
+}
+
 export function App() {
   const { session, loading } = useAuth();
+  const token = sheetToken();
 
   if (!supabaseConfigured)
     return (
@@ -29,6 +37,7 @@ export function App() {
         </div>
       </main>
     );
+  if (token) return <SheetLinkPage token={token} />;
   if (loading) return <main className="grid min-h-dvh place-items-center p-4"><p className="text-muted">Loading…</p></main>;
   if (!session) return <SignIn />;
 
