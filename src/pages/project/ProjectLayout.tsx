@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useOutletContext, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom';
 import { api, type CompanyMember, type Location, type ProjectDetail, type ProjectMember } from '../../lib/api';
 import { errorText, statusLabel } from '../../lib/format';
 import type { Role } from '../../lib/database.types';
@@ -33,7 +33,7 @@ const AREAS = [
 ];
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `flex min-h-11 shrink-0 items-center rounded-md px-3 no-underline ${isActive ? 'bg-accent-soft font-semibold text-accent-strong' : 'text-fg hover:bg-bg'}`;
+  `flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 no-underline ${isActive ? 'bg-accent-soft font-semibold text-accent-strong' : 'text-fg hover:bg-bg'}`;
 
 /**
  * A project's pages share this frame: the project's name, and a nav to each area
@@ -70,6 +70,22 @@ export function ProjectLayout() {
     try { setLocations(await api.locations(projectId)); } catch (e) { setError(errorText(e)); }
   }, [projectId]);
 
+  // Phones: keep the open tab in view, and fade the edges that have more tabs past them.
+  const tabs = useRef<HTMLUListElement>(null);
+  const { pathname } = useLocation();
+  const fade = useCallback(() => {
+    const el = tabs.current;
+    if (!el) return;
+    el.dataset.left = String(el.scrollLeft > 4);
+    el.dataset.right = String(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+  useEffect(() => {
+    const el = tabs.current;
+    const open = el?.querySelector<HTMLElement>('a[aria-current="page"]');
+    if (el && open && el.scrollWidth > el.clientWidth) el.scrollLeft = open.offsetLeft - (el.clientWidth - open.offsetWidth) / 2;
+    fade();
+  }, [pathname, loaded, fade]);
+
   if (!loaded) return <p className="text-muted">Loading…</p>;
   if (!project) return <p>{error ?? "That project doesn't exist or you aren't assigned to it."} <Link to="/">Back to companies</Link></p>;
 
@@ -91,9 +107,10 @@ export function ProjectLayout() {
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
         <nav aria-label="Project" className="-mx-4 md:sticky md:top-16 md:mx-0 md:w-44 md:shrink-0">
           {/* Phones: one row of tabs that scrolls sideways inside itself, never the page. */}
-          <ul className="flex gap-1 overflow-x-auto border-b border-line px-4 pb-2 md:flex-col md:overflow-visible md:border-b-0 md:px-0 md:pb-0">
+          {/* Each tab stays on one line; the open one scrolls into view, and the edges fade while there's more to scroll to. */}
+          <ul ref={tabs} onScroll={fade} className="project-tabs relative flex gap-1 overflow-x-auto border-b border-line px-4 pb-2 md:flex-col md:overflow-visible md:border-b-0 md:px-0 md:pb-0">
             {AREAS.map((a) => (
-              <li key={a.label}><NavLink to={a.to ? `${base}/${a.to}` : base} end={a.end} className={navClass}>{a.label}</NavLink></li>
+              <li key={a.label} className="shrink-0"><NavLink to={a.to ? `${base}/${a.to}` : base} end={a.end} className={navClass}>{a.label}</NavLink></li>
             ))}
           </ul>
           <div className="hidden md:mt-4 md:block md:border-t md:border-line md:pt-3">

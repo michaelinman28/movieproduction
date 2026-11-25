@@ -135,6 +135,15 @@
 /* A form opened after adding something scrolls into view below the header and pinned button. */
 [data-form-for] { scroll-margin-top: 7rem; }
 
+/* A project's tab row on phones (ProjectLayout): fade an edge while more tabs are past it. */
+@media (max-width: 767px) {
+  .project-tabs { scrollbar-width: none; }
+  .project-tabs::-webkit-scrollbar { display: none; }
+  .project-tabs[data-right='true'] { mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); }
+  .project-tabs[data-left='true'] { mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); }
+  .project-tabs[data-left='true'][data-right='true'] { mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); }
+}
+
 /* The call sheet (src/components/CallSheetDocument.tsx): the project's call sheet page,
    each person's private link (/sheet/:token), and its printed PDF all use this. Mobile first. */
 .cs { --cs-alert: #b42318; --cs-alert-soft: #fef3f2; display: flex; flex-direction: column; gap: 1rem; }
@@ -181,10 +190,12 @@
 .cs-chip > span { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); }
 .cs-chip-strong { background: var(--color-accent-soft); border-color: color-mix(in srgb, var(--color-accent) 40%, transparent); color: var(--color-accent-strong); }
 
-.cs-times { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: 0.5rem; margin: 0; }
-.cs-time { border-radius: 0.75rem; padding: 0.625rem 0.75rem; background: var(--color-surface); border: 1px solid var(--color-line); }
-.cs-time dt { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-muted); }
-.cs-time dd { margin: 0.125rem 0 0; font-size: 1.125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* The day's times: one even list on phones, a row of equal tiles from sm: up. */
+.cs-times { display: flex; flex-direction: column; margin: 0; border-radius: 0.75rem; background: var(--color-surface); border: 1px solid var(--color-line); }
+.cs-time { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0.625rem 1rem; }
+.cs-time + .cs-time { border-top: 1px solid var(--color-line); }
+.cs-time dt { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-muted); white-space: nowrap; }
+.cs-time dd { margin: 0; font-size: 1.125rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .cs-info { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
 .cs-card { display: flex; flex-direction: column; gap: 0.25rem; border-radius: 0.75rem; padding: 0.875rem 1rem; background: var(--color-surface); border: 1px solid var(--color-line); border-top: 4px solid var(--color-accent); }
@@ -250,6 +261,9 @@
   .cs-you-details { flex: 1; }
   .cs-you-action { align-items: flex-end; text-align: right; }
   .cs-info { grid-template-columns: repeat(2, 1fr); }
+  .cs-times { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+  .cs-time { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 0.125rem; padding: 0.625rem 0.875rem; }
+  .cs-time + .cs-time { border-top: 0; border-left: 1px solid var(--color-line); }
   .cs-body { padding: 0.75rem 1.5rem 1.25rem; }
   .cs-row { grid-template-columns: 5.5rem 1fr; }
   .cs-footer { flex-direction: row; justify-content: space-between; }
@@ -284,8 +298,9 @@
   .cs-hero-time { font-size: 24pt; }
   .cs-you { flex-direction: row; align-items: center; gap: 1rem; padding: 0.6rem 1rem; border-radius: 0.6rem; }
   .cs-you-time { font-size: 22pt; }
-  .cs-times { grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr)); gap: 0.4rem; }
-  .cs-time { padding: 0.35rem 0.6rem; border-radius: 0.5rem; }
+  .cs-times { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border-radius: 0.5rem; }
+  .cs-time { flex-direction: column; align-items: flex-start; gap: 0.1rem; padding: 0.35rem 0.6rem; }
+  .cs-time + .cs-time { border-top: 0; border-left: 1px solid var(--color-line); }
   .cs-time dd { font-size: 12pt; }
   .cs-info { grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
   .cs-card { padding: 0.5rem 0.7rem; border-radius: 0.5rem; font-size: 9pt; }
