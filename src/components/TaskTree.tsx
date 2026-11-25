@@ -7,7 +7,9 @@ import { TaskSummaryBar } from './TaskSummaryBar';
 import { TaskCalendar, isoDate } from './TaskCalendar';
 import { TaskGantt, type GanttRow } from './TaskGantt';
 import { confirmDiscard, useUnsaved } from '../lib/unsaved';
-import { scrollToForm } from '../lib/reveal';
+import { scrollToForm, useOpenFromLink } from '../lib/reveal';
+import { itemPath } from '../lib/links';
+import { OpenLink } from './OpenLink';
 import { useAuth } from '../lib/auth';
 import { mapsLinkProps } from '../lib/maps';
 import {
@@ -246,18 +248,28 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
       const t = byIdRef.current.get(data.id);
       return value ? (t && isOverdue(t) ? `<span class="task-overdue">${value}</span>` : value) : '';
     };
+    // A pick-list cell whose value is another item gets an open button to that item's page.
+    const openTo = (data: TaskRow, key: 'assignee_id' | 'category_id' | 'location_id' | 'parent_id', name: string) => {
+      const t = byIdRef.current.get(data.id);
+      const id = t?.[key];
+      if (!id) return null;
+      if (key === 'assignee_id') return nameOf.has(id) ? { to: itemPath.teamMember(projectId, id), title: `Open ${name} on the Team page` } : null;
+      if (key === 'category_id') return { to: itemPath.taskSetting(companyId, id), title: `Open the ${name} category` };
+      if (key === 'location_id') return { to: itemPath.location(projectId, id), title: `Open ${name} on the Locations page` };
+      return byIdRef.current.has(id) ? { to: itemPath.task(projectId, id), title: `Open ${name}` } : null;
+    };
     const columns = [
       // In the tree the task's name is the tree column; a flat list needs its own.
       ...(flat ? [{ field: 'title', header: 'Task', width: window.innerWidth < 640 ? 170 : 240, editable: true }] : []),
       {
         field: 'assignee', header: 'Assigned to', width: 170, editable: true, editor: 'select',
         editorOptions: [UNASSIGNED, ...people.map((p) => p.name)],
-        render: ({ value }: { value: string }) => dropdown(esc(value)),
+        render: ({ value, data }: { value: string; data: TaskRow }) => dropdown(esc(value), openTo(data, 'assignee_id', value)),
       },
       {
         field: 'category', header: 'Category', width: 150, editable: true, editor: 'select',
         editorOptions: [NO_CATEGORY, ...categories.map((c) => c.name)],
-        render: ({ value }: { value: string }) => dropdown(value ? esc(value) : '<span class="text-muted">None</span>'),
+        render: ({ value, data }: { value: string; data: TaskRow }) => dropdown(value ? esc(value) : '<span class="text-muted">None</span>', value ? openTo(data, 'category_id', value) : null),
       },
       {
         field: 'status', header: 'Status', width: 130, editable: true, editor: 'select',
@@ -275,7 +287,7 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
           const names = locationList.split('\n').filter(Boolean);
           return [NO_LOCATION, ...(d.location && !names.includes(d.location) ? [d.location] : []), ...names];
         },
-        render: ({ value }: { value: string }) => dropdown(value ? esc(value) : '<span class="text-muted">None</span>'),
+        render: ({ value, data }: { value: string; data: TaskRow }) => dropdown(value ? esc(value) : '<span class="text-muted">None</span>', value ? openTo(data, 'location_id', value) : null),
       },
       { field: 'start', header: 'Start', type: 'date', width: 120, editable: true },
       {
@@ -305,7 +317,7 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
           const below = subtree(d.id, kidsRef.current);
           return [TOP_LEVEL, ...[...labelsRef.current].filter(([id]) => !below.has(id)).map(([, label]) => label).sort()];
         },
-        render: ({ value }: { value: string }) => dropdown(esc(value)),
+        render: ({ value, data }: { value: string; data: TaskRow }) => dropdown(esc(value), openTo(data, 'parent_id', value)),
       },
       { field: 'subtasks', header: 'Sub-tasks', width: 120 },
     ];
@@ -341,7 +353,7 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
         groupColumnWidth: window.innerWidth < 640 ? 190 : 260,
         groupPanel: false,
       };
-  }, [people, categories, locationList, groupBy, flat, overdue, mine]);
+  }, [people, categories, locationList, groupBy, flat, overdue, mine, projectId, companyId, nameOf]);
 
   // The due-date renderer reads the latest tasks without rebuilding the grid.
   const byIdRef = useRef(byId);
@@ -459,6 +471,14 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
   // Group header rows take space too when the list is grouped.
   const groupCount = groupBy ? new Set(shown.map((r) => r[groupBy as keyof TaskRow] as string)).size : 0;
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
+  // A link from elsewhere (?open=<task>, e.g. from the Overview or a parent task's open
+  // button) opens that task: on the calendar when it shows, otherwise in the list,
+  // going back to the sub-task tree if the list on screen leaves the task out.
+  useOpenFromLink((id) => byId.has(id), (id) => {
+    if (calendar) { openOnCalendar(id); return; }
+    if (!shown.some((r) => r.id === id)) changeView('');
+    open(id);
+  });
   const done = tasks.filter((t) => t.status === 'done').length;
   // Ticked tasks in tree order (rows), skipping any deleted since.
   const chosen = useMemo(() => { const set = new Set(picked); return rows.filter((r) => set.has(r.id)).map((r) => byId.get(r.id)!).filter(Boolean); }, [picked, rows, byId]);
@@ -475,7 +495,7 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
           ? 'Each task has a row: a bar runs from its start date to its due date, and a diamond marks a task on one day. Click a task to open its form, and click a day to add new tasks on it. On a computer, drag a bar to move the task.'
           : calendar
           ? 'Tasks show on their due date; a task with a start date too shows as a bar across each day until it is due. Click a day to list its tasks and add new ones on it, and click a task to open its form. On a computer, drag a task to another day to move it.'
-          : 'Click a person, location, category, status, priority, time or parent task to pick from its list. Double-click a task name, due date, tags or description to type a change.'}
+          : 'Click a person, location, category, status, priority, time or parent task to pick from its list, or its arrow to open it on its own page. Double-click a task name, due date, tags or description to type a change.'}
         {' '}Select a task to edit its description, tags and notes, add sub-tasks, or move it.
       </p>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -708,6 +728,10 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
             {draft.assignee && !people.some((p) => p.id === draft.assignee) && <option value={draft.assignee}>Left the project</option>}
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          {(() => {
+            const who = people.find((p) => p.id === draft.assignee);
+            return who ? <OpenLink to={itemPath.teamMember(projectId, who.id)}>Open {who.name} on the Team page</OpenLink> : null;
+          })()}
           {people.length <= 1 && (
             <span className="hint">Only people on the project team can be assigned. Add more people on the Team page.</span>
           )}
@@ -721,7 +745,12 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
           </select>
           {(() => {
             const at = locations.find((l) => l.id === draft.location);
-            return at?.address ? <a className="text-sm" {...mapsLinkProps(at.address)}>Open {at.name} in maps</a> : null;
+            return at ? (
+              <span className="flex flex-wrap gap-x-4">
+                <OpenLink to={itemPath.location(projectId, at.id)}>Open {at.name} on the Locations page</OpenLink>
+                {at.address && <a className="inline-flex min-h-11 items-center text-sm font-normal sm:min-h-0" {...mapsLinkProps(at.address)}>Open in maps</a>}
+              </span>
+            ) : null;
           })()}
           {!locations.length && <span className="hint">Add the project's locations on the Locations page.</span>}
         </label>
@@ -730,6 +759,10 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
             <option value="">{NO_CATEGORY}</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          {(() => {
+            const cat = categories.find((c) => c.id === draft.category);
+            return cat ? <OpenLink to={itemPath.taskSetting(companyId, cat.id)}>Open the {cat.name} category</OpenLink> : null;
+          })()}
         </label>
         <div className="label">Tags
           <TagPicker tags={tags} selected={draft.tags} onChange={(ids) => set('tags', ids)} onCreate={createTag} />
@@ -739,6 +772,10 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
             <option value="">Nothing (top-level task)</option>
             {parents.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
+          {(() => {
+            const up = tasks.find((t) => t.id === draft.parent);
+            return up ? <OpenLink to={itemPath.task(projectId, up.id)}>Open {up.title}</OpenLink> : null;
+          })()}
         </label>
         <div className="flex gap-2">
           <button type="submit" className="btn flex-1" disabled={!changed} data-pin="2">Save</button>

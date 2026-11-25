@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import type { LinkedCallSheet } from '../lib/api';
 import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, clockLabel, labelOf, longDate, pagesLabel, shortDate } from '../lib/format';
 import { mapsLinkProps } from '../lib/maps';
@@ -17,6 +18,25 @@ const nameOf = (c: SheetCall) => c.profile.full_name?.trim() || 'Unknown';
 
 function Phone({ phone }: { phone: string | null | undefined }) {
   return phone ? <a className="cs-phone" href={tel(phone)}>{phone}</a> : null;
+}
+
+/**
+ * Where the call sheet's items link to on the project's call sheet page: each scene,
+ * person, the location and the next day open on their own pages. A personal link page
+ * (no sign-in, outside the app) passes none, so it shows plain text.
+ */
+export interface SheetLinks {
+  scene: (id: string) => string;
+  person: (userId: string) => string;
+  /** The day's location. */
+  location: string | null;
+  /** The next shoot day's call sheet. */
+  nextDay: string | null;
+}
+
+/** Text that links to an item's page when there's somewhere to go; plain text otherwise. */
+function To({ to, title, children }: { to?: string | null; title?: string; children: ReactNode }) {
+  return to ? <Link to={to} title={title} className="cs-link">{children}</Link> : <>{children}</>;
 }
 
 /** A labelled time, or nothing when it isn't set. */
@@ -42,7 +62,7 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
  * call sheet page and by each person's private link.
  */
-export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNote, youAction }: {
+export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNote, youAction, links }: {
   sheet: SheetData;
   /** The person reading it: their call is shown at the top and their rows are marked. */
   me?: string | null;
@@ -54,6 +74,8 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
   versionNote?: string;
   /** Shown in the reader's "Your call" box, e.g. a Confirm button. */
   youAction?: ReactNode;
+  /** Links from each item to its own page (the project's call sheet page only). */
+  links?: SheetLinks;
 }) {
   const { day, location: loc, project } = sheet;
   const roleById = new Map(sheet.roles.map((r) => [r.id, r]));
@@ -88,7 +110,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
     <li key={c.user_id} className={`cs-person ${isMe(c) ? 'cs-me' : ''}`}>
       <div className="cs-person-who">
         <p className="cs-person-name">
-          {nameOf(c)}{c.profile.nickname && <span className="cs-nick"> “{c.profile.nickname}”</span>}
+          <To to={links?.person(c.user_id)} title={`Open ${nameOf(c)} on the Team page`}>{nameOf(c)}</To>{c.profile.nickname && <span className="cs-nick"> “{c.profile.nickname}”</span>}
           {isMe(c) && <span className="cs-you-badge">You</span>}
         </p>
         {sub}
@@ -149,7 +171,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
         <Card title="Location">
           {loc ? (
             <>
-              <p className="cs-strong">{loc.name}</p>
+              <p className="cs-strong"><To to={links?.location} title={`Open ${loc.name} on the Locations page`}>{loc.name}</To></p>
               {loc.address && <p><a {...mapsLinkProps(loc.address)}>{loc.address}</a></p>}
               {loc.parking && <p className="cs-small"><span className="cs-muted">Parking:</span> {loc.parking}</p>}
               {loc.contact_name && <p className="cs-small"><span className="cs-muted">On site:</span> {loc.contact_name} <Phone phone={loc.contact_phone} /></p>}
@@ -180,7 +202,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
           {keys.length ? (
             <ul className="cs-keys">
               {keys.map(({ role, c }) => (
-                <li key={c.user_id}><span className="cs-muted">{role}</span><span>{nameOf(c)}</span><Phone phone={c.profile.phone} /></li>
+                <li key={c.user_id}><span className="cs-muted">{role}</span><span><To to={links?.person(c.user_id)} title={`Open ${nameOf(c)} on the Team page`}>{nameOf(c)}</To></span><Phone phone={c.profile.phone} /></li>
               ))}
             </ul>
           ) : <p className="cs-muted cs-small">None listed</p>}
@@ -208,8 +230,8 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
                     <span className="cs-row-time">{time}</span>
                     <div className="cs-row-body">
                       <div className="cs-row-head">
-                        <span className="cs-scene-no">Sc {s.number}</span>
-                        <span className="cs-row-set">{s.set_name || 'Scene'}</span>
+                        <To to={links?.scene(s.id)} title={`Open scene ${s.number} on the Scenes page`}><span className="cs-scene-no">Sc {s.number}</span></To>
+                        <span className="cs-row-set"><To to={links?.scene(s.id)} title={`Open scene ${s.number} on the Scenes page`}>{s.set_name || 'Scene'}</To></span>
                         {sceneLine(s).map((t) => <span key={t} className="cs-pill">{t}</span>)}
                         {s.pages_eighths != null && <span className="cs-pages">{pagesLabel(s.pages_eighths)} pg</span>}
                       </div>
@@ -265,14 +287,14 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
           {sheet.next_day ? (
             <div className="cs-next">
               <p className="cs-strong">
-                Day {sheet.next_day.day.day_number} · {longDate(sheet.next_day.day.shoot_date)}
+                <To to={links?.nextDay} title="Open the next day's call sheet">Day {sheet.next_day.day.day_number} · {longDate(sheet.next_day.day.shoot_date)}</To>
                 {sheet.next_day.day.crew_call && <span className="cs-muted"> · crew call {clockLabel(sheet.next_day.day.crew_call)}</span>}
               </p>
               {sheet.next_day.scenes.length ? (
                 <ul className="cs-next-list">
                   {sheet.next_day.scenes.map((s) => (
                     <li key={s.id}>
-                      <span className="cs-scene-no">Sc {s.number}</span> {s.set_name}
+                      <To to={links?.scene(s.id)} title={`Open scene ${s.number} on the Scenes page`}><span className="cs-scene-no">Sc {s.number}</span> {s.set_name}</To>
                       {sceneLine(s).length > 0 && <span className="cs-muted"> · {sceneLine(s).join(' ')}</span>}
                       {s.pages_eighths != null && <span className="cs-muted"> · {pagesLabel(s.pages_eighths)} pg</span>}
                     </li>

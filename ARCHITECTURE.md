@@ -345,6 +345,22 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   team member, role, category or tag selects it, highlights its row and opens its form
   (scrolled into view on a phone), since a name alone is rarely all it needs. A new
   company or project opens its page with the details form ready.
+- **Items link to their home page (standard).** Every item has one home: the page
+  where it's edited (a scene on Scenes, a location on Locations, a task on Tasks, a
+  person on the project's Team or the company's People, a category or tag on Task
+  categories and tags). Anywhere else it's shown (a scene on a shoot day or call
+  sheet, a location on a task, scene or shoot day, a person on a call sheet or task,
+  a task on the Overview), it links there, and the link opens the home page with the
+  item selected, its row highlighted and its form open, as after adding it.
+  Paths come from `itemPath` in `src/lib/links.ts` (`?open=<id>`); each home page
+  reads that with `useOpenFromLink` from `src/lib/reveal.ts`. In tables, read-only
+  cells link with `gridLinkHtml` / `gridLinkList`; a pick-list cell keeps opening its
+  list on a click and gets a small open arrow (`gridDropdown(html, { to, title })`).
+  In forms, an `OpenLink` (`src/components/OpenLink.tsx`) under a picker opens what's
+  picked. The project's call sheet page links its scenes, people, location and next
+  day (`CallSheetDocument`'s `links`); a personal call sheet link (`/sheet/<token>`)
+  is outside the signed-in app, so it stays plain text. Unsaved form changes are
+  asked about before leaving, as with any link.
 - **Dropdown filters for fixed values (standard).** In every table, a column whose
   values come from a fixed set (person assigned, status, priority, category, location,
   department, admin, roles, tags…) filters with a dropdown of tick boxes and counts.

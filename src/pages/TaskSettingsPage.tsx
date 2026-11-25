@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useParams } from 'react-router-dom';
 import { RenameForm } from '../components/RenameForm';
 import { confirmDiscard } from '../lib/unsaved';
-import { scrollToForm } from '../lib/reveal';
+import { scrollToForm, useOpenFromLink } from '../lib/reveal';
 import { LatticeGrid } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { api, type Company, type TaskCategory, type TaskTag } from '../lib/api';
@@ -106,6 +106,13 @@ export function TaskSettingsPage() {
       .filter(({ id, sort_order }) => categories.find((c) => c.id === id)?.sort_order !== sort_order);
     await run(() => Promise.all(changes.map((c) => api.updateTaskCategory(c.id, { sort_order: c.sort_order }))));
   }
+
+  // A link from elsewhere (?open=<id>, e.g. a task's category) opens that category or tag.
+  useOpenFromLink((id) => categories.some((c) => c.id === id) || tags.some((t) => t.id === id), (id) => {
+    if (categories.some((c) => c.id === id)) { setSelCat(id); setRevealCat({ id, n: Date.now() }); }
+    else { setSelTag(id); setRevealTag({ id, n: Date.now() }); }
+    scrollToForm(id);
+  });
 
   const selectedCat = categories.find((c) => c.id === selCat) ?? null;
   const selectedTag = tags.find((t) => t.id === selTag) ?? null;

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { LatticeGrid, gridDropdown, gridEsc } from '../../components/LatticeGrid';
+import { OpenLink } from '../../components/OpenLink';
+import { itemPath } from '../../lib/links';
 import { Section } from '../../components/Section';
 import { api, type Location, type Scene, type SceneInput, type Shot, type ShotInput } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -8,7 +10,7 @@ import {
   errorText, labelOf, minutesLabel, pagesLabel, parsePages, valueOf,
   type SceneIntExt, type SceneStatus, type SceneTime,
 } from '../../lib/format';
-import { scrollToForm } from '../../lib/reveal';
+import { scrollToForm, useOpenFromLink } from '../../lib/reveal';
 import { confirmDiscard, useUnsaved } from '../../lib/unsaved';
 import type { LatticeGridInstance } from '../../vendor/lattice-grid/lattice-grid';
 import { useProject } from './ProjectLayout';
@@ -31,13 +33,14 @@ const locationChoices = (locations: Location[], currentId?: string | null) =>
 interface SceneRow {
   id: string; number: string; set_name: string; int_ext: string; time_of_day: string; pages: string;
   synopsis: string; characters: string; location: string; status: string; needs: string; shots: string; est: string;
+  locationId: string | null;
 }
 
 const sceneRow = (s: Scene, locations: Location[]): SceneRow => ({
   id: s.id, number: s.number, set_name: s.set_name ?? '',
   int_ext: s.int_ext ? labelOf(SCENE_INT_EXT, s.int_ext) : '', time_of_day: s.time_of_day ? labelOf(SCENE_TIMES, s.time_of_day) : '',
   pages: pagesLabel(s.pages_eighths), synopsis: s.synopsis ?? '', characters: s.characters ?? '',
-  location: locations.find((l) => l.id === s.location_id)?.name ?? '', status: labelOf(SCENE_STATUSES, s.status), needs: s.needs ?? '',
+  location: locations.find((l) => l.id === s.location_id)?.name ?? '', locationId: s.location_id, status: labelOf(SCENE_STATUSES, s.status), needs: s.needs ?? '',
   shots: s.shots ? `${s.shots_done} of ${s.shots}` : '', est: minutesLabel(s.est_minutes),
 });
 
@@ -94,7 +97,11 @@ export function ProjectScenes() {
       { field: 'pages', header: 'Pages', width: 90, editable: true },
       { field: 'synopsis', header: 'Synopsis', width: 260, editable: true, editor: 'textarea' },
       { field: 'characters', header: 'Characters', width: 200, editable: true, filterSplit: ',' },
-      { field: 'location', header: 'Location', width: 170, editable: true, editor: 'select', editorOptions: withNone(locationNames), render: dd },
+      {
+        field: 'location', header: 'Location', width: 170, editable: true, editor: 'select', editorOptions: withNone(locationNames),
+        render: ({ value, data }: { value: string; data: SceneRow }) => gridDropdown(gridEsc(value || NONE),
+          data.locationId && value ? { to: itemPath.location(projectId, data.locationId), title: `Open ${value} on the Locations page` } : null),
+      },
       {
         field: 'status', header: 'Status', width: 150, editable: true, editor: 'select',
         editorOptions: SCENE_STATUSES.map((s) => s.label), render: ({ value }: { value: string }) => gridDropdown(statusPill(value)),
@@ -103,7 +110,7 @@ export function ProjectScenes() {
       { field: 'est', header: 'Shot time', width: 110, filter: false },
       { field: 'needs', header: 'Needs', width: 240, editable: true, editor: 'textarea' },
     ],
-  }), [locationNames]);
+  }), [locationNames, projectId]);
 
   async function saveCell(e: { data: SceneRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
@@ -136,11 +143,18 @@ export function ProjectScenes() {
     let id = '';
     if (await run(async () => { id = (await api.createScene(projectId, { number })).id; }, `Added scene ${number}. Fill in its details and shots in the form below the table.`)) {
       setNewNumber('');
-      setSelectedId(id);
-      setReveal({ id, n: Date.now() });
-      scrollToForm(id);
+      open(id);
     }
   }
+
+  /** Selects a scene, highlights it and opens its form. */
+  function open(id: string) {
+    setSelectedId(id);
+    setReveal({ id, n: Date.now() });
+    scrollToForm(id);
+  }
+  // A link from elsewhere (?open=<scene>, e.g. from a shoot day) opens that scene's form.
+  useOpenFromLink((id) => scenes.some((s) => s.id === id), open);
 
   const selected = scenes.find((s) => s.id === selectedId) ?? null;
   const pages = scenes.reduce((n, s) => n + (s.pages_eighths ?? 0), 0);
@@ -259,6 +273,10 @@ function ScenePanel({ scene, locations, run, canDelete, onDeleted, onShotsChange
               <option value="">{NONE}</option>
               {locationChoices(locations, scene.location_id).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
+            {(() => {
+              const at = locations.find((l) => l.id === draft.location_id);
+              return at ? <OpenLink to={itemPath.location(scene.project_id, at.id)}>Open {at.name} on the Locations page</OpenLink> : null;
+            })()}
           </label>
           <label className="label md:col-span-2">Synopsis
             <textarea className="field" rows={2} value={draft.synopsis} maxLength={1000} placeholder="Maya confronts Leo about the money" onChange={set('synopsis')} />

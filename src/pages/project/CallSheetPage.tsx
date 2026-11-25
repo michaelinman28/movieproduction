@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CallSheetDocument, type SheetData } from '../../components/CallSheetDocument';
+import { CallSheetDocument, type SheetData, type SheetLinks } from '../../components/CallSheetDocument';
+import { itemPath } from '../../lib/links';
 import { Section } from '../../components/Section';
 import { api, type CallSheet } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -73,6 +74,13 @@ export function CallSheetPage() {
     try { await navigator.clipboard.writeText(personalLink(token)); setCopiedLink(userId); } catch { setCopiedLink(null); setError('Your browser didn\'t allow copying. Open the link and copy it from the address bar.'); }
   }
 
+  const links: SheetLinks | undefined = sheet ? {
+    scene: (id) => itemPath.scene(projectId, id),
+    person: (userId) => itemPath.teamMember(projectId, userId),
+    location: sheet.day.location_id ? itemPath.location(projectId, sheet.day.location_id) : null,
+    nextDay: sheet.next_day ? itemPath.callSheet(projectId, sheet.next_day.day.id) : null,
+  } : undefined;
+
   if (error && !sheet) return <p className="error">{error} <Link to={`/projects/${projectId}/shoot-days`}>Back to shoot days</Link></p>;
   if (!sheet) return <p className="text-muted">Loading…</p>;
   const { day } = sheet;
@@ -80,7 +88,10 @@ export function CallSheetPage() {
 
   return (
     <div className="call-sheet cs-shared flex flex-col gap-4">
-      <p className="no-print m-0 text-sm"><Link to={`/projects/${projectId}/shoot-days`}>Shoot days</Link> / Call sheet</p>
+      <p className="no-print m-0 text-sm">
+        <Link to={`/projects/${projectId}/shoot-days`}>Shoot days</Link>
+        {' / '}<Link to={itemPath.shootDay(projectId, day.id)} title="Open this day's form on the Shoot days page">Day {day.day_number}</Link> / Call sheet
+      </p>
 
       {mine && day.version > 0 && (
         <div className="no-print flex flex-col gap-2 rounded-lg border border-line bg-surface p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -122,7 +133,7 @@ export function CallSheetPage() {
               {people.map((c) => (
                 <li key={c.user_id} className="flex flex-col gap-2 border-b border-line py-2 last:border-b-0 sm:flex-row sm:items-center">
                   <div className="min-w-0 sm:flex-1">
-                    <p className="m-0 font-medium">{displayName(c.profile)}</p>
+                    <p className="m-0 font-medium"><Link to={itemPath.teamMember(projectId, c.user_id)} title={`Open ${displayName(c.profile)} on the Team page`}>{displayName(c.profile)}</Link></p>
                     <p className="m-0 text-sm text-muted">{callStatus(day, c)}{copiedLink === c.user_id ? ' · Link copied' : ''}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -140,7 +151,7 @@ export function CallSheetPage() {
       </div>
 
       {data && <CallSheetDocument sheet={data} me={me} sectionPrefix="callSheet" status={(id) => { const c = sheet.calls.find((x) => x.user_id === id); return c ? callStatus(day, c) : ''; }}
-        versionNote={day.version ? `Version ${day.version}` : 'Draft, not sent'} />}
+        versionNote={day.version ? `Version ${day.version}` : 'Draft, not sent'} links={links} />}
     </div>
   );
 }
