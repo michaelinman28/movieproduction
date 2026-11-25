@@ -204,7 +204,9 @@ export const api = {
   linkedCallSheet: (token: string) => call<LinkedCallSheet>('GET', `/call-sheet-links/${enc(token)}`),
   confirmLinkedCallSheet: (token: string) => call<void>('POST', `/call-sheet-links/${enc(token)}/confirm`),
   confirmCallSheet: (dayId: string) => call<void>('POST', `/shoot-days/${enc(dayId)}/confirm`),
-  lookUpWeather: (dayId: string) => call<{ weather: string; sunrise: string; sunset: string; place: string }>('POST', `/shoot-days/${enc(dayId)}/weather`),
+  /** The forecast, sunrise and sunset for a day; nothing is saved. Pass the form's date and location to look those up. */
+  lookUpWeather: (dayId: string, ask: { shoot_date?: string; location_id?: string } = {}) =>
+    call<{ weather: string; sunrise: string; sunset: string; place: string }>('POST', `/shoot-days/${enc(dayId)}/weather`, ask),
 
   tasks: (projectId: string) => call<Task[]>('GET', `/projects/${enc(projectId)}/tasks`),
   createTask: (projectId: string, b: TaskInput & { title: string }) => call<Task>('POST', `/projects/${enc(projectId)}/tasks`, b),

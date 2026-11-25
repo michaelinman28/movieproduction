@@ -243,11 +243,12 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
   async function lookUp() {
     setLooking(true);
     setWeatherNote(null);
+    if (!draft.location_id) { setWeatherNote('Pick a location first.'); setLooking(false); return; }
     try {
-      const w = await api.lookUpWeather(day.id);
+      // Looks up the date and location shown in the form; the result waits for Save day.
+      const w = await api.lookUpWeather(day.id, { shoot_date: draft.shoot_date || undefined, location_id: draft.location_id });
       setDraft((d) => ({ ...d, weather: w.weather, sunrise: clockValue(w.sunrise), sunset: clockValue(w.sunset) }));
-      setWeatherNote(`Forecast for ${w.place} saved: ${w.weather}, sunrise ${clockLabel(w.sunrise)}, sunset ${clockLabel(w.sunset)}.`);
-      await run(async () => undefined);
+      setWeatherNote(`Forecast for ${w.place} filled in. Press Save day to keep it.`);
     } catch (e) { setWeatherNote(errorText(e)); }
     setLooking(false);
   }
@@ -287,7 +288,7 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
           <button type="button" className="btn btn-secondary sm:w-auto sm:self-start" disabled={looking} onClick={lookUp}>
             {looking ? 'Looking up…' : 'Look up weather, sunrise and sunset'}
           </button>
-          <span className="hint">From the saved location's address, up to about 16 days ahead. Saves the weather, sunrise and sunset straight away.</span>
+          <span className="hint">Fills in the weather, sunrise and sunset for this date and location, from the location's address, up to about 16 days ahead.</span>
           {weatherNote && <span className="hint">{weatherNote}</span>}
         </div>
         <label className="label md:col-span-2">Notes for the call sheet
