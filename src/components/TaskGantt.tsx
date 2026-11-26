@@ -141,7 +141,7 @@ export function TaskGantt({ rows, selectedId, day, onDay, onOpen, onMove, nameOf
         <button type="button" className="btn btn-secondary w-auto shrink-0" onClick={goToday}>Today</button>
         <p className="hint m-0">Scroll sideways to see other days. {rows.length > 0 && 'On a computer, drag a bar to move a task.'}</p>
       </div>
-      <div ref={scroller} className="overflow-x-auto rounded-md border border-line bg-surface" role="grid" aria-label="Tasks over time">
+      <div ref={scroller} className="overflow-x-auto overscroll-x-none rounded-md border border-line bg-surface" role="grid" aria-label="Tasks over time">
         <div className="min-w-max">
           {/* Months */}
           <div className="flex border-b border-line text-sm font-semibold">
