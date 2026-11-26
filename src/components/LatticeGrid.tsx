@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PickManyMenu, type PickManyOpen } from './PickManyMenu';
 import { useTheme } from '../lib/theme';
 import { confirmDiscard } from '../lib/unsaved';
+import { isItemLink, linkOut } from '../lib/backLink';
 import { mapsUrl, openMaps } from '../lib/maps';
 import { PAGE_SIZE, readGridView, saveGridView } from '../lib/gridView';
 import { ServerPager, type ServerPaging } from './ServerPager';
@@ -352,7 +353,10 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
     if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    if (confirmDiscard()) navigate(a.dataset.to!);
+    if (!confirmDiscard()) return;
+    const to = a.dataset.to!;
+    // Item links remember where they were followed from ("Back to …", src/lib/backLink.ts).
+    if (isItemLink(to)) linkOut(navigate, to, a); else navigate(to);
   }
   function onClick(e: MouseEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest('a[data-map]')) { e.preventDefault(); return; }

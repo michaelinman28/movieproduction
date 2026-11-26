@@ -106,7 +106,7 @@ export function CallSheetPage() {
   const people = [...sheet.calls].sort((a, b) => displayName(a.profile).localeCompare(displayName(b.profile)));
 
   return (
-    <div className="call-sheet cs-shared flex flex-col gap-4">
+    <div className="call-sheet cs-shared flex flex-col gap-4" data-page-label={`Day ${day.day_number} call sheet`}>
       <p className="no-print m-0 text-sm">
         <Link to={`/projects/${projectId}/shoot-days`}>Shoot days</Link>
         {' / '}<Link to={itemPath.shootDay(projectId, day.id)} title="Open this day's form on the Shoot days page">Day {day.day_number}</Link> / Call sheet

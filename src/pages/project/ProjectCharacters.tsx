@@ -319,7 +319,7 @@ function CharacterPanel({ character: c, scenes, people, run, isAdmin, canDelete,
   );
 
   return (
-    <aside data-pin-scope data-form-for={c.id} className="card gap-2">
+    <aside data-pin-scope data-form-for={c.id} data-form-label={c.name} className="card gap-2">
       <h3>{c.cast_number != null ? `${c.cast_number}. ` : ''}{c.name}</h3>
       {/* One form across the sections, so Save keeps everything together. */}
       <form className="flex flex-col gap-2" onSubmit={save}>

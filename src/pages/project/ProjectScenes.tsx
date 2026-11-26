@@ -265,7 +265,7 @@ function ScenePanel({ scene, locations, characters, run, reloadCharacters, isAdm
 
   const heading = [scene.number, scene.set_name].filter(Boolean).join('  ');
   return (
-    <aside data-pin-scope data-form-for={scene.id} className="card gap-2">
+    <aside data-pin-scope data-form-for={scene.id} data-form-label={`Scene ${scene.number || heading}`} className="card gap-2">
       <h3>Scene {heading}</h3>
       <Section id="project.scenes.details" title="Details" level="h4">
         <form className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-x-4" onSubmit={save}>

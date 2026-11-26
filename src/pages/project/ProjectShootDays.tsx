@@ -206,7 +206,7 @@ function DayPanel({ day, scenes, run, onChanged, canDelete, onDeleted }: {
       && await run(() => api.deleteShootDay(day.id), `Deleted day ${day.day_number}.`)) onDeleted();
   }
   return (
-    <aside data-pin-scope data-form-for={day.id} className="card gap-2">
+    <aside data-pin-scope data-form-for={day.id} data-form-label={`Day ${day.day_number}, ${shortDate(day.shoot_date)}`} className="card gap-2">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3>Day {day.day_number} of {day.total_days}: {shortDate(day.shoot_date)}{day.title ? `, ${day.title}` : ''}</h3>
         <Link className="btn btn-secondary no-underline" to={`/projects/${projectId}/shoot-days/${day.id}`}>Open call sheet</Link>

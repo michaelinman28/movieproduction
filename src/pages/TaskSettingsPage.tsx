@@ -166,7 +166,7 @@ export function TaskSettingsPage() {
               selectionChanged: (rows: LabelRow[]) => setSelCat(rows[0]?.id ?? null),
             }} />
           {isAdmin && selectedCat && (
-            <div className="card gap-2" data-form-for={selectedCat.id}>
+            <div className="card gap-2" data-form-for={selectedCat.id} data-form-label={selectedCat.name}>
               <span className="hint">{selectedCat.name}: used by {plural(selectedCat.tasks)}.</span>
               <RenameForm key={selectedCat.id} label="Category name" value={selectedCat.name} maxLength={60}
                 onSave={(name) => run(() => api.updateTaskCategory(selectedCat.id, { name }), `Renamed to ${name}.`)} />
@@ -192,7 +192,7 @@ export function TaskSettingsPage() {
               selectionChanged: (rows: LabelRow[]) => setSelTag(rows[0]?.id ?? null),
             }} />
           {isAdmin && selectedTag && (
-            <div className="card gap-2" data-form-for={selectedTag.id}>
+            <div className="card gap-2" data-form-for={selectedTag.id} data-form-label={selectedTag.name}>
               <span className="hint">{selectedTag.name}: used by {plural(selectedTag.tasks)}.</span>
               <RenameForm key={selectedTag.id} label="Tag name" value={selectedTag.name} maxLength={40}
                 onSave={(name) => run(() => api.updateTaskTag(selectedTag.id, name), `Renamed to ${name}.`)} />

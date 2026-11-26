@@ -388,7 +388,7 @@ function MemberPanel({ companyId, companyName, member, roles, isAdmin, isMe, run
   }
 
   return (
-    <aside data-pin-scope data-form-for={member.user_id} className="card gap-2">
+    <aside data-pin-scope data-form-for={member.user_id} data-form-label={name} className="card gap-2">
       <h3>{name}{member.profile.nickname ? <span className="font-normal text-muted"> ({member.profile.nickname})</span> : null}</h3>
       <p className="hint mt-2">
         {member.profile.email && <a href={`mailto:${member.profile.email}`}>{member.profile.email}</a>}
