@@ -45,10 +45,22 @@ async function characterIds(db: Db, sceneIds: string[]) {
   return map;
 }
 
+/** Each scene's element ids, by name. */
+async function elementIds(db: Db, sceneIds: string[]) {
+  const map = new Map<string, string[]>();
+  if (!sceneIds.length) return map;
+  const rows = must<Row[]>(await db.from('scene_elements').select('scene_id, element:elements(id, name)').in('scene_id', sceneIds));
+  rows.sort((a, b) => a.element.name.localeCompare(b.element.name));
+  for (const r of rows) map.set(r.scene_id, [...(map.get(r.scene_id) ?? []), r.element.id]);
+  return map;
+}
+
 async function withTotals(db: Db, rows: Row[]) {
   const ids = rows.map((r) => r.id);
-  const [totals, chars] = await Promise.all([shotTotals(db, ids), characterIds(db, ids)]);
-  return rows.map((r) => ({ ...r, ...(totals.get(r.id) ?? { shots: 0, shots_done: 0, est_minutes: 0 }), character_ids: chars.get(r.id) ?? [] }));
+  const [totals, chars, elems] = await Promise.all([shotTotals(db, ids), characterIds(db, ids), elementIds(db, ids)]);
+  return rows.map((r) => ({
+    ...r, ...(totals.get(r.id) ?? { shots: 0, shots_done: 0, est_minutes: 0 }), character_ids: chars.get(r.id) ?? [], element_ids: elems.get(r.id) ?? [],
+  }));
 }
 
 /** Set sort_order 1, 2, 3… in the order given. Every id must be in the list being ordered. */

@@ -590,5 +590,59 @@ await expect('clean-up also removes the private content', () => db.query(`select
 await as(U.a, `select audit_cleanup($1)`, [ac.id]);
 await expect('clean-up entries are never removed', () => as(U.a, `select action from audit_log where company_id=$1`, [ac.id]), r => r.length === 2 && r.every((x) => x.action === 'cleanup'));
 await expect('clean-up of everything includes the company\'s people', () => as(U.a, `select * from audit_log where action='sign_in' and subject_user_id=$1`, [U.c]), len(0));
+// ---- elements ----
+const [ec] = await as(U.a, `insert into companies (name) values ('Element Co') returning id`);
+await as(U.a, `insert into company_members (company_id,user_id) values ($1,$2),($1,$3)`, [ec.id, U.b, U.c]);
+await expect('a new company gets element categories', () => as(U.b, `select name from element_categories where company_id=$1 order by sort_order`, [ec.id]), r => r.length === 12 && r[0].name === 'Props');
+await expect('only admins add element categories', () => as(U.b, `insert into element_categories (company_id,name) values ($1,'Drones')`, [ec.id]), isErr);
+const [eDrones] = await as(U.a, `insert into element_categories (company_id,name,sort_order) values ($1,' Drones ',13) returning *`, [ec.id]);
+await expect('category name tidied', () => Promise.resolve([eDrones]), r => r[0].name === 'Drones');
+const [eOther] = await as(U.a, `select id from element_categories where company_id=$1 and name='Props'`, [cc.id]);
+const [ep] = await as(U.a, `insert into projects (company_id,name) values ($1,'Element Film') returning id`, [ec.id]);
+await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2)`, [ep.id, U.b]);
+const [eChar] = await as(U.b, `insert into characters (project_id,name,actor_id) values ($1,'Ellie',$2) returning id`, [ep.id, U.b]);
+const [eLoc] = await as(U.b, `insert into project_locations (project_id,name) values ($1,'Ranger station') returning id`, [ep.id]);
+const [eSc1] = await as(U.b, `insert into scenes (project_id,number) values ($1,'1') returning id`, [ep.id]);
+const [eSc2] = await as(U.b, `insert into scenes (project_id,number) values ($1,'2') returning id`, [ep.id]);
+const [el1] = await as(U.b, `insert into elements (project_id,name,category_id,description,character_id,quantity,owner_id) values ($1,'  Hero drone ',$2,'  ',$3,2,$4) returning *`, [ep.id, eDrones.id, eChar.id, U.b]);
+await expect('member adds an element, tidied, needed', () => Promise.resolve([el1]), r => r[0].name === 'Hero drone' && r[0].description === null && r[0].status === 'needed' && r[0].created_by === U.b);
+await expect('outsider cannot add an element', () => as(U.c, `insert into elements (project_id,name) values ($1,'Nope')`, [ep.id]), isErr);
+await expect('outsider cannot see elements', () => as(U.c, `select * from elements where project_id=$1`, [ep.id]), len(0));
+await expect('category from another company refused', () => as(U.b, `update elements set category_id=$1 where id=$2`, [eOther.id, el1.id]), isErr);
+await expect('character from another project refused', () => as(U.b, `update elements set character_id=$1 where id=$2`, [otherCh.id, el1.id]), isErr);
+await expect('location from another project refused', () => as(U.b, `update elements set location_id=$1 where id=$2`, [sdLoc.id, el1.id]), isErr);
+await expect('owner must be on the team', () => as(U.b, `update elements set owner_id=$1 where id=$2`, [U.c, el1.id]), isErr);
+await expect('a location of its own project', () => as(U.b, `update elements set location_id=$1, status='sourced' where id=$2 returning status`, [eLoc.id, el1.id]), r => r[0]?.status === 'sourced');
+await expect('element links to scenes', () => as(U.b, `insert into scene_elements (scene_id,element_id,note) values ($1,$3,' Crashes into the lake '),($2,$3,null) returning project_id, note`, [eSc1.id, eSc2.id, el1.id]), r => r.length === 2 && r[0].project_id === ep.id && r[0].note === 'Crashes into the lake');
+
+await expect('element from another project cannot go in a scene', () => as(U.a, `insert into scene_elements (scene_id,element_id) values ($1,(select id from elements where project_id<>$2 limit 1))`, [eSc1.id, ep.id]), isErr);
+await expect('category usage counts elements', () => as(U.a, `select elements::int n from element_category_usage($1) where id=$2`, [ec.id, eDrones.id]), r => r[0]?.n === 1);
+// on the call sheet
+const [eDay] = await as(U.b, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-05-01') returning id`, [ep.id]);
+await as(U.b, `insert into shoot_day_items (shoot_day_id,kind,scene_id) values ($1,'scene',$2)`, [eDay.id, eSc2.id]);
+const [el2] = await as(U.b, `insert into elements (project_id,name) values ($1,'Rowboat') returning id`, [ep.id]);
+await as(U.b, `insert into scene_elements (scene_id,element_id) values ($1,$2)`, [eSc1.id, el2.id]);
+await as(U.b, `insert into shoot_day_calls (shoot_day_id,user_id) values ($1,$2)`, [eDay.id, U.b]);
+await as(U.b, `select publish_call_sheet($1)`, [eDay.id]);
+await expect('the project\'s sheet lists the day\'s elements only', () => as(U.b, `select call_sheet_elements($1) e`, [eDay.id]),
+  r => r[0]?.e?.length === 1 && r[0].e[0].name === 'Hero drone' && r[0].e[0].category === 'Drones' && r[0].e[0].character?.actor_id === U.b && r[0].e[0].scenes.length === 1 && r[0].e[0].scenes[0].number === '2');
+await expect('outsiders get no elements', () => as(U.c, `select call_sheet_elements($1) e`, [eDay.id]), r => r[0]?.e?.length === 0);
+await expect('nobody calls the inner function', () => as(U.b, `select shoot_day_elements_json($1)`, [eDay.id]), isErr);
+const [eTok] = await as(U.b, `select link_token from shoot_day_calls where shoot_day_id=$1`, [eDay.id]);
+await expect('a personal link lists them', () => asAnon(`select call_sheet_for_link($1) s`, [eTok.link_token]), r => r[0]?.s?.elements?.[0]?.name === 'Hero drone');
+const [eShare] = await as(U.b, `select share_call_sheet($1, true) t`, [eDay.id]);
+await expect('the shared link lists them', () => asAnon(`select call_sheet_for_share($1) s`, [eShare.t]), r => r[0]?.s?.elements?.length === 1);
+await expect('element changes are logged', () => as(U.a, `select table_name from audit_log where table_name in ('element_categories','elements','scene_elements') and (project_id=$1 or company_id=$2)`, [ep.id, ec.id]),
+  r => ['element_categories', 'elements', 'scene_elements'].every((t) => r.some((x) => x.table_name === t)));
+await expect('member cannot delete someone else\'s element', () => as(U.a, `insert into project_members (project_id,user_id) values ($1,$2)`, [ep.id, U.c]).then(() => as(U.c, `delete from elements where id=$1 returning id`, [el1.id])), len(0));
+await as(U.a, `delete from element_categories where id=$1`, [eDrones.id]);
+await expect('deleting a category keeps its elements', () => as(U.b, `select category_id from elements where id=$1`, [el1.id]), r => r[0]?.category_id === null);
+await as(U.b, `delete from characters where id=$1`, [eChar.id]);
+await expect('deleting a character keeps its elements', () => as(U.b, `select character_id from elements where id=$1`, [el1.id]), r => r.length === 1 && r[0].character_id === null);
+await as(U.b, `delete from scenes where id=$1`, [eSc1.id]);
+await expect('deleting a scene removes its links', () => as(U.b, `select count(*)::int n from scene_elements where element_id=$1`, [el1.id]), r => r[0].n === 1);
+await as(U.b, `delete from elements where id=$1`, [el1.id]);
+await expect('the creator deletes an element, with its links', () => as(U.b, `select count(*)::int n from scene_elements where scene_id=$1`, [eSc2.id]), r => r[0].n === 0);
+await expect('characters no longer hold wardrobe, hair or props', () => db.query(`select column_name from information_schema.columns where table_name='characters' and column_name in ('wardrobe','hair_makeup','props')`).then((r) => r.rows), len(0));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

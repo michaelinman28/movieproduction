@@ -11,6 +11,7 @@ export const KIND_LABELS: Record<string, string> = {
   tasks: 'Task', task_notes: 'Task note', task_categories: 'Task category', task_tags: 'Task tag', task_tag_links: 'Tag on a task',
   project_locations: 'Location', scenes: 'Scene', scene_notes: 'Scene note', shots: 'Shot',
   characters: 'Character', scene_characters: 'Character in a scene', character_notes: 'Character note',
+  elements: 'Element', scene_elements: 'Element in a scene', element_categories: 'Element category',
   team_notes: 'Team member note', team_note_types: 'Team note type',
   shoot_days: 'Shoot day', shoot_day_items: 'Day schedule', shoot_day_calls: 'Call',
   journal_entries: 'Journal entry', journal_entry_shares: 'Journal share', audit_log: 'Activity log',
@@ -25,7 +26,7 @@ const FIELD_LABELS: Record<string, string> = {
   assignee_id: 'Assigned to', parent_id: 'Sub-task of', user_id: 'Person', author_id: 'Written by', created_by: 'Added by',
   sent_by: 'Sent by', is_admin: 'Admin', int_ext: 'Int/Ext', pages_eighths: 'Pages (eighths)', est_minutes: 'Minutes',
   due_part: 'Due part of day', start_part: 'Start part of day', at_time: 'Time', sort_order: 'Order', full_name: 'Name',
-  dietary: 'Dietary needs', dietary_allergy: 'Allergy', type_id: 'Note type', actor_id: 'Actor', stand_in_id: 'Stand-in', double_id: 'Stunt double', hair_makeup: 'Hair and makeup', traits: 'Traits and arc', look_note: 'Look in this scene', character_id: 'Character',
+  dietary: 'Dietary needs', dietary_allergy: 'Allergy', type_id: 'Note type', actor_id: 'Actor', stand_in_id: 'Stand-in', double_id: 'Stunt double', hair_makeup: 'Hair and makeup', traits: 'Traits and arc', look_note: 'Look in this scene', character_id: 'Character', owner_id: 'Owner',
   confirmed_version: 'Confirmed version', confirmed_at: 'Confirmed', sent_at: 'Sent', version: 'Version', body: 'Text',
 };
 export function fieldLabel(f: string) {
@@ -96,7 +97,7 @@ export function sentence(e: AuditEntry, own: boolean) {
 export function entryLink(e: AuditEntry, companyId: string): { to: string; title: string } | null {
   if (!e.item_exists || e.private) return null;
   const pid = e.project_id ?? '';
-  const pk = e.parent_kind && ['tasks', 'scenes', 'shoot_days', 'characters'].includes(e.parent_kind) ? e.parent_kind : null;
+  const pk = e.parent_kind && ['tasks', 'scenes', 'shoot_days', 'characters', 'elements'].includes(e.parent_kind) ? e.parent_kind : null;
   const kind = pk ?? e.kind;
   const id = pk ? e.parent_id ?? '' : e.item_id;
   const person = e.subject_id && ['company_members', 'project_members', 'company_member_roles', 'project_member_roles', 'person_contacts', 'shoot_day_calls', 'profiles'].includes(e.kind);
@@ -106,6 +107,7 @@ export function entryLink(e: AuditEntry, companyId: string): { to: string; title
     case 'tasks': return { to: itemPath.task(pid, id), title: 'Open the task' };
     case 'scenes': return { to: itemPath.scene(pid, id), title: 'Open the scene' };
     case 'characters': return { to: itemPath.character(pid, id), title: 'Open the character' };
+    case 'elements': return { to: itemPath.element(pid, id), title: 'Open the element' };
     case 'shoot_days': return e.action === 'view' ? { to: itemPath.callSheet(pid, id), title: 'Open the call sheet' } : { to: itemPath.shootDay(pid, id), title: 'Open the shoot day' };
     case 'project_locations': return { to: itemPath.location(pid, id), title: 'Open the location' };
     case 'task_categories': case 'task_tags': return { to: itemPath.taskSetting(companyId, id), title: 'Open in task settings' };

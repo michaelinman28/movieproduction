@@ -246,11 +246,12 @@ shootDays.openapi(createRoute({
   const all = await describeDays(db, day.project_id);
   const next = all[day.day_number] ?? null; // day_number is 1-based, so this is the following day
   const sceneIds = [...new Set([...day.scene_ids, ...(next?.scene_ids ?? [])])];
-  const [loc, items, scenes, calls] = await Promise.all([
+  const [loc, items, scenes, calls, elems] = await Promise.all([
     day.location_id ? db.from('project_locations').select('*').eq('id', day.location_id) : { data: [], error: null },
     db.from('shoot_day_items').select('*').eq('shoot_day_id', day.id).order('sort_order'),
     sceneIds.length ? db.from('scenes').select('*').in('id', sceneIds) : { data: [], error: null },
     callsFor(db, day),
+    db.rpc('call_sheet_elements', { day: day.id }),
   ]);
   const sceneRows = must<Row[]>(scenes);
   const pick = (ids: string[]) => ids.map((id) => sceneRows.find((s) => s.id === id)).filter(Boolean);
@@ -261,6 +262,7 @@ shootDays.openapi(createRoute({
     scenes: pick(day.scene_ids),
     calls,
     next_day: next ? { day: next, scenes: pick(next.scene_ids) } : null,
+    elements: must<Row[]>(elems) ?? [],
   }, 200);
 });
 

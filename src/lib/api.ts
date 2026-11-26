@@ -2,7 +2,7 @@
 // writes all data through the API; Supabase is used here only to keep the user
 // signed in and supply their access token.
 import { supabase } from './supabase';
-import type { CastingStatus, CharacterKind, SceneIntExt, SceneStatus, SceneTime } from './format';
+import type { CastingStatus, CharacterKind, ElementStatus, SceneIntExt, SceneStatus, SceneTime } from './format';
 import type { DayPart, ProjectStatus, Role, Task as TaskRow, TaskPriority, TaskStatus } from './database.types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://localhost:8787';
@@ -82,6 +82,8 @@ export interface Scene {
   shots: number; shots_done: number; est_minutes: number;
   /** The scene's characters, by cast number then name; `characters` holds their names. */
   character_ids: string[];
+  /** The scene's elements (props, wardrobe…), by name. `needs` is a free note for anything else. */
+  element_ids: string[];
 }
 export type SceneInput = Partial<Pick<Scene, 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths' | 'synopsis' | 'characters' | 'needs' | 'location_id' | 'status'>>;
 export interface Shot {
@@ -97,12 +99,33 @@ export interface Character {
   id: string; project_id: string; name: string; cast_number: number | null; kind: CharacterKind | null;
   description: string | null; age_range: string | null; gender: string | null; traits: string | null;
   casting_status: CastingStatus; actor_id: string | null; stand_in_id: string | null; double_id: string | null;
-  wardrobe: string | null; hair_makeup: string | null; props: string | null; continuity: string | null;
+  continuity: string | null;
   created_by: string | null; created_at: string; updated_at: string;
   /** The scenes they're in, in scene order, with how they look in each. */
   scenes: { scene_id: string; look_note: string | null }[];
 }
 export type CharacterInput = Partial<Omit<Character, 'id' | 'project_id' | 'created_by' | 'created_at' | 'updated_at' | 'scenes'>>;
+
+export type { ElementStatus } from './format';
+/** Something a shoot needs (a prop, wardrobe, a vehicle…), stored once and linked to the scenes that use it. */
+export interface Element {
+  id: string; project_id: string; name: string; category_id: string | null; description: string | null;
+  status: ElementStatus; owner_id: string | null; quantity: number | null;
+  /** The one character it belongs to, and the one location it stays at, if any. */
+  character_id: string | null; location_id: string | null; notes: string | null;
+  created_by: string | null; created_at: string; updated_at: string;
+  /** The scenes it's in, in scene order, with a note for each. */
+  scenes: { scene_id: string; note: string | null }[];
+}
+export type ElementInput = Partial<Omit<Element, 'id' | 'project_id' | 'created_by' | 'created_at' | 'updated_at' | 'scenes'>>;
+export interface ElementCategory { id: string; company_id: string; name: string; sort_order: number; elements: number }
+/** An element as a call sheet lists it: one of the day's scenes uses it. */
+export interface SheetElement {
+  id: string; name: string; category: string | null; quantity: number | null; description: string | null; status: ElementStatus;
+  character: { id: string; name: string; cast_number: number | null; actor_id: string | null } | null;
+  /** The day's scenes it's in. */
+  scenes: { scene_id: string; number: string; note: string | null }[];
+}
 
 /** A day of filming. Times are 'HH:MM' or 'HH:MM:SS'. */
 export interface ShootDay {
@@ -140,6 +163,7 @@ export type ShootDayCallInput = Partial<Pick<ShootDayCall, 'call_time' | 'charac
 export interface CallSheet {
   day: ShootDay; location: Location | null; items: ShootDayItem[]; scenes: Scene[]; calls: ShootDayCall[];
   next_day: { day: ShootDay; scenes: Scene[] } | null;
+  elements: SheetElement[];
 }
 /** What a personal call sheet link shows: the sent sheet, view only, no emails. */
 export interface LinkedCallSheet {
@@ -158,6 +182,8 @@ export interface LinkedCallSheet {
     dietary?: Dietary | null;
   })[];
   roles: { id: string; name: string; department: string | null; sort_order: number | null }[];
+  /** The elements of the day's scenes. */
+  elements: SheetElement[];
   next_day: { day: Pick<ShootDay, 'shoot_date' | 'crew_call' | 'title' | 'day_number'>; scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths'>[] } | null;
 }
 
@@ -285,6 +311,18 @@ export const api = {
   addCharacterNote: (id: string, body: string) => call<CharacterNote>('POST', `/characters/${enc(id)}/notes`, { body }),
   updateCharacterNote: (id: string, body: string) => call<CharacterNote>('PATCH', `/character-notes/${enc(id)}`, { body }),
   deleteCharacterNote: (id: string) => call<void>('DELETE', `/character-notes/${enc(id)}`),
+  elements: (projectId: string) => call<Element[]>('GET', `/projects/${enc(projectId)}/elements`),
+  createElement: (projectId: string, b: ElementInput & { name: string }) => call<Element>('POST', `/projects/${enc(projectId)}/elements`, b),
+  updateElement: (id: string, b: ElementInput) => call<Element>('PATCH', `/elements/${enc(id)}`, b),
+  deleteElement: (id: string) => call<void>('DELETE', `/elements/${enc(id)}`),
+  setElementScenes: (id: string, ids: string[]) => call<Element>('PUT', `/elements/${enc(id)}/scenes`, { ids }),
+  setSceneElements: (sceneId: string, ids: string[]) => call<void>('PUT', `/scenes/${enc(sceneId)}/elements`, { ids }),
+  setSceneElementNote: (sceneId: string, elementId: string, note: string | null) =>
+    call<void>('PATCH', `/scenes/${enc(sceneId)}/elements/${enc(elementId)}`, { note }),
+  elementCategories: (companyId: string) => call<ElementCategory[]>('GET', `/companies/${enc(companyId)}/element-categories`),
+  createElementCategory: (companyId: string, name: string) => call<ElementCategory>('POST', `/companies/${enc(companyId)}/element-categories`, { name }),
+  renameElementCategory: (id: string, name: string) => call<void>('PATCH', `/element-categories/${enc(id)}`, { name }),
+  deleteElementCategory: (id: string) => call<void>('DELETE', `/element-categories/${enc(id)}`),
   shots: (sceneId: string) => call<Shot[]>('GET', `/scenes/${enc(sceneId)}/shots`),
   createShot: (sceneId: string, b: ShotInput & { description: string }) => call<Shot>('POST', `/scenes/${enc(sceneId)}/shots`, b),
   updateShot: (id: string, b: ShotInput) => call<Shot>('PATCH', `/shots/${enc(id)}`, b),

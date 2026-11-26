@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { LatticeGrid, gridDropdown, gridEsc } from '../../components/LatticeGrid';
+import { LatticeGrid, gridDropdown, gridEsc, gridLinkList } from '../../components/LatticeGrid';
 import { OpenLink } from '../../components/OpenLink';
 import { CharacterNotes } from '../../components/Notes';
 import { Section } from '../../components/Section';
 import { ItemHistory } from '../../components/ItemHistory';
 import { TagPicker } from '../../components/TagPicker';
-import { api, type Character, type CharacterInput, type Scene } from '../../lib/api';
+import { api, type Character, type CharacterInput, type Element, type Scene } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import {
   CASTING_STATUSES, CHARACTER_KINDS, NONE, displayName, errorText, labelOf, valueOf,
@@ -45,7 +45,7 @@ function sceneIdsFor(text: string, scenes: Scene[]) {
 interface CharRow {
   id: string; cast: string; name: string; kind: string; casting: string; actor: string; stand_in: string; double: string;
   age_range: string; gender: string; scenes: string; description: string; traits: string;
-  wardrobe: string; hair_makeup: string; props: string; continuity: string;
+  elements: string; continuity: string;
   actorId: string | null; standInId: string | null; doubleId: string | null;
 }
 
@@ -67,6 +67,7 @@ export function ProjectCharacters() {
   const me = session?.user.id;
   const [chars, setChars] = useState<Character[]>([]);
   const [scenes, setScenes] = useState<Scene[]>([]);
+  const [elements, setElements] = useState<Element[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -76,9 +77,10 @@ export function ProjectCharacters() {
 
   const load = useCallback(async () => {
     try {
-      const [c, s] = await Promise.all([api.characters(projectId), api.scenes(projectId)]);
+      const [c, s, el] = await Promise.all([api.characters(projectId), api.scenes(projectId), api.elements(projectId)]);
       setChars(c);
       setScenes(s);
+      setElements(el);
     } catch (e) { setError(errorText(e)); }
     setLoaded(true);
   }, [projectId]);
@@ -106,9 +108,9 @@ export function ProjectCharacters() {
     age_range: c.age_range ?? '', gender: c.gender ?? '',
     scenes: c.scenes.map((l) => sceneById.get(l.scene_id)?.number).filter(Boolean).join(', '),
     description: c.description ?? '', traits: c.traits ?? '',
-    wardrobe: c.wardrobe ?? '', hair_makeup: c.hair_makeup ?? '', props: c.props ?? '', continuity: c.continuity ?? '',
+    elements: elements.filter((e) => e.character_id === c.id).map((e) => e.name).join(', '), continuity: c.continuity ?? '',
     actorId: c.actor_id, standInId: c.stand_in_id, doubleId: c.double_id,
-  })), [chars, who, sceneById]);
+  })), [chars, who, sceneById, elements]);
 
   const options = useMemo(() => {
     const names = withNone(people.map((p) => p.name));
@@ -140,13 +142,18 @@ export function ProjectCharacters() {
         { field: 'traits', header: 'Traits and arc', width: 220, editable: true, editor: 'textarea' },
         personCol('stand_in', 'Stand-in', 'standInId'),
         personCol('double', 'Stunt double', 'doubleId'),
-        { field: 'wardrobe', header: 'Wardrobe', width: 200, editable: true, editor: 'textarea' },
-        { field: 'hair_makeup', header: 'Hair and makeup', width: 200, editable: true, editor: 'textarea' },
-        { field: 'props', header: 'Props', width: 180, editable: true, editor: 'textarea' },
+        {
+          // Each element's own Character; it's picked on the Elements page.
+          field: 'elements', header: 'Elements', width: 220, filterSplit: ',',
+          tooltip: () => 'Their wardrobe, props and other elements. Pick an element\'s character on the Elements page.',
+          render: ({ data }: { data: CharRow }) => gridLinkList(elements.filter((e) => e.character_id === data.id).map((e) => ({
+            text: e.name, to: itemPath.element(projectId, e.id), title: `Open ${e.name} on the Elements page`,
+          }))),
+        },
         { field: 'continuity', header: 'Continuity', width: 220, editable: true, editor: 'textarea' },
       ],
     };
-  }, [people, nameOf, projectId]);
+  }, [people, nameOf, projectId, elements]);
 
   async function saveCell(e: { data: CharRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
@@ -159,7 +166,7 @@ export function ProjectCharacters() {
       case 'actor': patch.actor_id = personId(v); break;
       case 'stand_in': patch.stand_in_id = personId(v); break;
       case 'double': patch.double_id = personId(v); break;
-      case 'age_range': case 'gender': case 'description': case 'traits': case 'wardrobe': case 'hair_makeup': case 'props': case 'continuity':
+      case 'age_range': case 'gender': case 'description': case 'traits': case 'continuity':
         patch[e.column] = v || null; break;
       case 'cast': case 'scenes': break;
       default: await load(); return;
@@ -211,7 +218,7 @@ export function ProjectCharacters() {
             selectionChanged: (r: CharRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
           }} />
         {selected && (
-          <CharacterPanel key={selected.id} character={selected} scenes={scenes} people={people} run={run}
+          <CharacterPanel key={selected.id} character={selected} scenes={scenes} elements={elements.filter((e) => e.character_id === selected.id)} people={people} run={run}
             isAdmin={isAdmin} canDelete={isAdmin || selected.created_by === me} companyId={project.company_id}
             onDeleted={() => setSelectedId(null)} />
         )}
@@ -227,15 +234,15 @@ export function ProjectCharacters() {
   );
 }
 
-function CharacterPanel({ character: c, scenes, people, run, isAdmin, canDelete, companyId, onDeleted }: {
-  character: Character; scenes: Scene[]; people: Person[]; run: Run; isAdmin: boolean; canDelete: boolean; companyId: string; onDeleted: () => void;
+function CharacterPanel({ character: c, scenes, elements, people, run, isAdmin, canDelete, companyId, onDeleted }: {
+  character: Character; scenes: Scene[]; elements: Element[]; people: Person[]; run: Run; isAdmin: boolean; canDelete: boolean; companyId: string; onDeleted: () => void;
 }) {
   // Every field, the scene picks and the look notes are held until Save.
   const initial = useMemo(() => ({
     name: c.name, cast: c.cast_number == null ? '' : String(c.cast_number), kind: c.kind ?? '', age_range: c.age_range ?? '', gender: c.gender ?? '',
     description: c.description ?? '', traits: c.traits ?? '', casting_status: c.casting_status as string,
     actor_id: c.actor_id ?? '', stand_in_id: c.stand_in_id ?? '', double_id: c.double_id ?? '',
-    wardrobe: c.wardrobe ?? '', hair_makeup: c.hair_makeup ?? '', props: c.props ?? '', continuity: c.continuity ?? '',
+    continuity: c.continuity ?? '',
   }), [c]);
   const initialScenes = useMemo(() => c.scenes.map((l) => l.scene_id), [c]);
   const initialLooks = useMemo(() => Object.fromEntries(c.scenes.map((l) => [l.scene_id, l.look_note ?? ''])), [c]);
@@ -273,7 +280,7 @@ function CharacterPanel({ character: c, scenes, people, run, isAdmin, canDelete,
       if (d.kind !== initial.kind) patch.kind = (d.kind || null) as CharacterKind | null;
       if (d.casting_status !== initial.casting_status) patch.casting_status = d.casting_status as CastingStatus;
       for (const k of ['actor_id', 'stand_in_id', 'double_id'] as const) if (d[k] !== initial[k]) patch[k] = d[k] || null;
-      for (const k of ['age_range', 'gender', 'description', 'traits', 'wardrobe', 'hair_makeup', 'props', 'continuity'] as const) {
+      for (const k of ['age_range', 'gender', 'description', 'traits', 'continuity'] as const) {
         if (d[k] !== initial[k]) patch[k] = d[k] || null;
       }
       if (Object.keys(patch).length) await api.updateCharacter(c.id, patch);
@@ -379,11 +386,16 @@ function CharacterPanel({ character: c, scenes, people, run, isAdmin, canDelete,
             </ul>
           </div>
         </Section>
-        <Section id="project.characters.look" title="Look and continuity" level="h4">
+        <Section id="project.characters.look" title="Look and continuity" level="h4" summary={elements.length ? `${elements.length} ${elements.length === 1 ? 'element' : 'elements'}` : undefined}>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-x-4">
-            {text('wardrobe', 'Wardrobe', 4000, 'Costumes and changes')}
-            {text('hair_makeup', 'Hair and makeup', 4000)}
-            {text('props', 'Props', 4000, 'What they carry or use')}
+            <div className="label md:col-span-2">Elements
+              {elements.length ? (
+                <ul className="flex flex-col gap-1">
+                  {elements.map((e) => <li key={e.id}><OpenLink to={itemPath.element(c.project_id, e.id)}>{e.name}</OpenLink></li>)}
+                </ul>
+              ) : <span className="text-muted">None yet</span>}
+              <span className="hint">Their wardrobe, hair and makeup, props and anything else they need are elements. Add them on the Elements page and pick {c.name} as the character.</span>
+            </div>
             {text('continuity', 'Continuity', 4000, 'Things that must match from shot to shot')}
           </div>
         </Section>

@@ -28,7 +28,10 @@ const REFS: Record<string, string> = {
   location_id: 'project_locations', category_id: 'task_categories', scene_id: 'scenes', parent_id: 'tasks',
   role_id: 'roles', tag_id: 'task_tags',
   actor_id: 'profiles', stand_in_id: 'profiles', double_id: 'profiles', character_id: 'characters', type_id: 'team_note_types',
+  owner_id: 'profiles', element_id: 'elements',
 };
+/** Where a field's id points, when it differs by table (an element's category is an element category). */
+const refOf = (table: string, field: string) => (table === 'elements' && field === 'category_id' ? 'element_categories' : REFS[field]);
 const ENUMS = new Set(['status', 'priority', 'due_part', 'start_part', 'int_ext', 'time_of_day', 'kind', 'visibility', 'casting_status']);
 const TIMES = new Set(['crew_call', 'shooting_call', 'lunch', 'wrap', 'sunrise', 'sunset']);
 
@@ -53,6 +56,8 @@ const NAMERS: Record<string, { cols: string; name: (r: Row) => string | null }> 
   scenes: { cols: 'id, number, set_name', name: (r) => `Scene ${r.number}${r.set_name ? `: ${r.set_name}` : ''}` },
   shoot_days: { cols: 'id, shoot_date, title', name: dayLabel },
   characters: { cols: 'id, name', name: (r) => r.name },
+  elements: { cols: 'id, name', name: (r) => r.name },
+  element_categories: { cols: 'id, name', name: (r) => r.name },
   team_note_types: { cols: 'id, name', name: (r) => r.name },
   projects: { cols: 'id, name', name: (r) => r.name },
   companies: { cols: 'id, name', name: (r) => r.name },
@@ -82,7 +87,7 @@ async function namesFor(db: Db, table: string, ids: string[]) {
 
 /** Where an entry links to: the item itself, or what it belongs to (a note's task, a shot's scene). */
 function target(r: Row): [string, string] | null {
-  if (r.parent_table && ['tasks', 'scenes', 'shoot_days', 'characters'].includes(r.parent_table)) return [r.parent_table, r.parent_key];
+  if (r.parent_table && ['tasks', 'scenes', 'shoot_days', 'characters', 'elements'].includes(r.parent_table)) return [r.parent_table, r.parent_key];
   if (['company_members', 'project_members', 'company_member_roles', 'project_member_roles', 'person_contacts', 'shoot_day_calls', 'team_notes'].includes(r.table_name) || r.table_name === 'profiles') {
     return r.subject_user_id ? ['profiles', r.subject_user_id] : null;
   }
@@ -98,7 +103,7 @@ export async function present(db: Db, rows: Row[]): Promise<Entry[]> {
     if (r.private) continue;
     for (const side of [r.before, r.after]) {
       if (!side) continue;
-      for (const [f, v] of Object.entries(side)) if (REFS[f]) add(REFS[f], v);
+      for (const [f, v] of Object.entries(side)) if (refOf(r.table_name, f)) add(refOf(r.table_name, f), v);
     }
   }
   for (const r of rows) {
@@ -110,9 +115,10 @@ export async function present(db: Db, rows: Row[]): Promise<Entry[]> {
   const looked = new Map(await Promise.all([...need].map(async ([t, ids]) => [t, await namesFor(db, t, ids)] as const)));
   const nameOf = (t: string, id: string) => looked.get(t)?.names.get(id) ?? null;
 
-  const show = (field: string, v: unknown): string | null => {
+  const show = (table: string, field: string, v: unknown): string | null => {
     if (v === null || v === undefined || v === '') return null;
-    if (REFS[field] && isUuid(v)) return nameOf(REFS[field], v) ?? '(removed)';
+    const ref = refOf(table, field);
+    if (ref && isUuid(v)) return nameOf(ref, v) ?? '(removed)';
     if (typeof v === 'boolean') return v ? 'Yes' : 'No';
     if (Array.isArray(v)) return v.join(', ');
     if (typeof v === 'object') return JSON.stringify(v);
@@ -129,8 +135,8 @@ export async function present(db: Db, rows: Row[]): Promise<Entry[]> {
         // On an add or delete, skip the link to what the entry is already about (a shot's scene, a member's person).
         const v = (r.after ?? r.before)?.[f];
         if (r.action !== 'update' && REFS[f] && (v === r.parent_key || v === r.subject_user_id)) continue;
-        const before = r.action === 'insert' ? null : show(f, r.before?.[f]);
-        const after = r.action === 'delete' ? null : show(f, r.after?.[f]);
+        const before = r.action === 'insert' ? null : show(r.table_name, f, r.before?.[f]);
+        const after = r.action === 'delete' ? null : show(r.table_name, f, r.after?.[f]);
         if (r.action !== 'update' && before === null && after === null) continue;
         changes.push({ field: f, before, after, type: REFS[f] ? 'text' : typeOf(f) });
       }

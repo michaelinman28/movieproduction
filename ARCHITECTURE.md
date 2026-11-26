@@ -19,7 +19,8 @@ day to day.
 | Tasks | A tree of tasks and sub-tasks (any depth) on each project's Tasks page. See [Tasks](#tasks) below | Done |
 | Task categories and tags | Each company has its own task categories (12 starter ones) that admins add, rename, reorder and delete, and its own tags, which anyone in the company can add and admins can rename or delete | Done |
 | Locations | Each project's locations, with a status (Considering, Confirmed, Not using; Not using ones are hidden unless you ask, and aren't offered for tasks), a description, an address (the Map column, the panel and the task panel open it in the device's own maps app: Apple Maps on iPhone, iPad and Mac, the default maps app on Android, Google Maps in the browser elsewhere; `src/lib/maps.ts`) an on-site contact name, email and phone, and parking and the nearest hospital for call sheets. Anyone on the project adds and edits them; whoever added one or an admin deletes it. A task can be assigned to a location | Done |
-| Scenes and shot lists | Each project's scenes on its Scenes page, in script order (drag to reorder): number, set, INT/EXT, day or night, pages in eighths, synopsis, characters, needs, location and status (Not scheduled, Scheduled, Shot). Each scene has a shot list in its form: shots in shooting order with size, angle, movement, lens, equipment, estimated minutes and notes, ticked Done on set with one tap. Anyone on the project adds, edits and reorders them; whoever added a scene, or an admin, deletes it (with its shots). See [Scenes](#scenes-and-shot-lists) below | Done |
+| Scenes and shot lists | Each project's scenes on its Scenes page, in script order (drag to reorder): number, set, INT/EXT, day or night, pages in eighths, synopsis, characters, elements, other needs, location and status (Not scheduled, Scheduled, Shot). Each scene has a shot list in its form: shots in shooting order with size, angle, movement, lens, equipment, estimated minutes and notes, ticked Done on set with one tap. Anyone on the project adds, edits and reorders them; whoever added a scene, or an admin, deletes it (with its shots). See [Scenes](#scenes-and-shot-lists) below | Done |
+| Elements | Each project's breakdown elements on its Elements page: props, wardrobe, vehicles, animals, effects and the rest, each stored once and linked to the scenes that use it (edited from the scene too), with a category (12 starter ones per company, admins manage them), status (Needed, Sourced, Ready), owner, quantity, description, notes, and optionally the one character it belongs to and the one location it stays at. Call sheets list the day's elements. See [Elements](#elements) below | Done |
 | Shoot days and call sheets | Each project's shoot days on its Shoot days page: date, location, crew call, shooting call, lunch, wrap, weather (looked up from the location's address), sunrise and sunset, notes, an ordered schedule of scenes, meal breaks, company moves and notes, and who is called (each person's call time; cast with character, pickup and makeup). Each day's call sheet is built from all that, sent as a new version (by email from your own app, or copied), and confirmed by each person; it prints cleanly. See [Shoot days](#shoot-days-and-call-sheets) below | Done |
 | Scene notes | Any number of notes on a scene, in their own Notes section of the scene form (apart from Details and the Shot list, so those can be folded away). Like task notes: anyone on the project adds them, the author edits their own, and the author or an admin deletes one | Done |
 | Project notes | The Project notes page lists every note on a project, newest first: task notes, scene notes, shot notes, shoot day notes, notes in a day's schedule and notes on people's calls. Each links back to where it was taken (opening that item's form), where it's edited, and shows who wrote it: notes kept in a field (shot, shoot day, schedule, call) record who last set or changed them and when (`note_by`, `note_at`, stamped by a database trigger). Separate from the journal | Done |
@@ -98,7 +99,8 @@ day to day.
 - **Fields:** basics (name, cast number, type: lead / supporting / day player /
   background, age range, gender, description, traits and arc), casting (status: open /
   auditioning / offered / cast; actor, stand-in and stunt double picked from the
-  project's team), look and continuity (wardrobe, hair and makeup, props, continuity).
+  project's team), look and continuity (continuity; their wardrobe, hair and makeup and
+  props are elements that belong to them, listed here and in the table's Elements column).
   No photos. Every field is editable in the table and in the form (**Save character**).
 - **Scenes:** one link (`scene_characters`) that both pages edit: the character form's
   Scenes section and the scene form's Characters picker. Each link has a look note
@@ -121,6 +123,33 @@ day to day.
   are unique per project. The actor, stand-in and double must be on the team; taking
   someone off the team clears them. Picking an actor marks the character cast.
   Migration `20261126020000_characters.sql`.
+
+### Elements
+
+- **Where:** a project's Elements page (`/projects/:id/elements`,
+  `src/pages/project/ProjectElements.tsx`); admins also manage the company's element
+  categories there (12 starter ones: Props, Wardrobe, Hair & makeup, Set dressing,
+  Vehicles, Animals, SFX, VFX, Stunts, Extras, Sound/music, Special equipment).
+- **Fields:** name, category, status (needed / sourced / ready), quantity, owner (from the
+  team), character (one, optional), location (one, optional), description, notes. Every
+  field is editable in the table and in the form (**Save element**).
+- **Scenes:** one link (`scene_elements`) that both pages edit: the element's Scenes
+  (table `pickMany` column and form section, with a note per scene) and the scene's
+  Elements (table `pickMany` column, and the scene form's picker, which can add a new
+  element by name). A scene's `needs` is now **Other needs**, a free note for anything
+  that isn't an element.
+- **Characters:** an element's character is stored on the element only; the Characters
+  page lists each character's elements (read-only, linked). The old Wardrobe, Hair and
+  makeup and Props text on characters became elements of that character (in all their
+  scenes) and those columns were dropped (migration `20261126050000_elements.sql`).
+- **Call sheets:** the project's sheet, personal links and the shared link list the
+  elements of the day's scenes by category (`shoot_day_elements_json`; the project page
+  calls `call_sheet_elements`), with each scene row naming its elements. On a personal
+  link the reader's own character's elements come first, marked Yours.
+- **Rules:** the category must be the company's, and the owner, character and location
+  the project's; taking the owner off the team clears it; deleting a category, character
+  or location keeps the element. Whoever added an element, or an admin, deletes it.
+  Built to be filled in later by the AI script import.
 
 ### Dietary needs and team member notes
 
@@ -368,13 +397,16 @@ There are three layers, and each one can be run and tested by itself.
 | `task_notes` | Notes on a task, with author and time |
 | `scene_notes` | Notes on a scene, with author and time (same rules as task notes) |
 | `task_categories`, `task_tags`, `task_tag_links` | Each company's task categories and tags, and which tags each task has |
-| `scenes` | A project's scenes in order: number, set, INT/EXT, time of day, pages in eighths, synopsis, characters, needs, location, status |
+| `scenes` | A project's scenes in order: number, set, INT/EXT, time of day, pages in eighths, synopsis, characters, other needs, location, status |
 | `shots` | Each scene's shots in order: size, angle, movement, lens, equipment, estimated minutes, done, notes |
 | `shoot_days` | A project's shoot days: date, title, location, crew call, shooting call, lunch, wrap, weather, sunrise, sunset, notes, call sheet version and when and by whom it was sent |
 | `shoot_day_items` | Each day's schedule in order: a scene, meal break, company move or note, with an optional time |
 | `shoot_day_calls` | Who is called on each day: call, pickup and makeup times, character, note, which version they viewed and confirmed, and their personal link token |
 | `characters` | A project's characters: cast number, type, description, age range, gender, traits, casting status, actor / stand-in / stunt double, wardrobe, hair and makeup, props, continuity |
 | `scene_characters` | Which characters are in which scenes, with a look note per scene |
+| `element_categories` | Each company's element categories, in order |
+| `elements` | A project's breakdown elements: category, status, owner, quantity, character, location, description, notes |
+| `scene_elements` | Which elements are in which scenes, with a note per scene |
 | `character_notes` | Notes on a character (same rules as scene notes) |
 | `team_note_types`, `team_notes` | Each company's team note types, and notes about people on a project (admins and the person only) |
 | `journal_entries`, `journal_entry_shares` | The project journal and who private entries are shared with |

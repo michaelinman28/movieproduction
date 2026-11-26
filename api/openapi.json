@@ -61,11 +61,19 @@
     },
     {
       "name": "Scenes",
-      "description": "A project's scenes in order: set, interior or exterior, time of day, pages, characters, needs and location"
+      "description": "A project's scenes in order: set, interior or exterior, time of day, pages, characters, elements, other needs and location"
     },
     {
       "name": "Characters",
-      "description": "A project's characters: cast number, type, casting (actor, stand-in, stunt double), look and continuity, and the scenes they're in"
+      "description": "A project's characters: cast number, type, casting (actor, stand-in, stunt double), continuity, and the scenes they're in"
+    },
+    {
+      "name": "Elements",
+      "description": "A project's breakdown elements (props, wardrobe, vehicles, effects…): category, status, owner, quantity, an optional character and location, and the scenes that use them"
+    },
+    {
+      "name": "Element categories",
+      "description": "The company's list of element categories, which its admins manage"
     },
     {
       "name": "Character notes",
@@ -2014,7 +2022,8 @@
               "string",
               "null"
             ],
-            "example": "Practical neon sign, rain on windows"
+            "example": "Rain on windows after 3pm",
+            "description": "Other needs, as a free note; the things the scene needs are its elements"
           },
           "location_id": {
             "type": [
@@ -2065,6 +2074,15 @@
               "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
             },
             "description": "The characters in the scene (see Characters). `characters` holds their names."
+          },
+          "element_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "description": "The elements in the scene (see Elements)"
           }
         },
         "required": [
@@ -2087,7 +2105,8 @@
           "shots",
           "shots_done",
           "est_minutes",
-          "character_ids"
+          "character_ids",
+          "element_ids"
         ]
       },
       "SceneIntExt": {
@@ -2617,24 +2636,6 @@
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
             "description": "Stunt double"
           },
-          "wardrobe": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "hair_makeup": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "props": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "continuity": {
             "type": [
               "string",
@@ -2677,9 +2678,6 @@
           "actor_id",
           "stand_in_id",
           "double_id",
-          "wardrobe",
-          "hair_makeup",
-          "props",
           "continuity",
           "created_by",
           "created_at",
@@ -2814,27 +2812,6 @@
             "format": "uuid",
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
           },
-          "wardrobe": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 4000
-          },
-          "hair_makeup": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 4000
-          },
-          "props": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 4000
-          },
           "continuity": {
             "type": [
               "string",
@@ -2930,27 +2907,6 @@
             "format": "uuid",
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
           },
-          "wardrobe": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 4000
-          },
-          "hair_makeup": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 4000
-          },
-          "props": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 4000
-          },
           "continuity": {
             "type": [
               "string",
@@ -3030,6 +2986,364 @@
           "body",
           "created_at",
           "updated_at"
+        ]
+      },
+      "Element": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "name": {
+            "type": "string",
+            "example": "Hero drone"
+          },
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "One of the company's element categories"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "White quadcopter with a red stripe"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ElementStatus"
+          },
+          "owner_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "Who looks after it: someone on the project's team"
+          },
+          "quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "example": 2
+          },
+          "character_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "The character it belongs to, if any"
+          },
+          "location_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+            "description": "The location it stays at, if any"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ElementScene"
+            },
+            "description": "The scenes it's in, in scene order"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "category_id",
+          "description",
+          "status",
+          "owner_id",
+          "quantity",
+          "character_id",
+          "location_id",
+          "notes",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "scenes"
+        ]
+      },
+      "ElementStatus": {
+        "type": "string",
+        "enum": [
+          "needed",
+          "sourced",
+          "ready"
+        ]
+      },
+      "ElementScene": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anything about it in this scene",
+            "example": "Crashes into the lake"
+          }
+        },
+        "required": [
+          "scene_id",
+          "note"
+        ]
+      },
+      "ElementInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "example": "Hero drone"
+          },
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ElementStatus"
+              },
+              {
+                "description": "Defaults to needed"
+              }
+            ]
+          },
+          "owner_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "character_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "location_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "ElementUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "example": "Hero drone"
+          },
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ElementStatus"
+              },
+              {
+                "description": "Defaults to needed"
+              }
+            ]
+          },
+          "owner_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "character_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "location_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 4000
+          }
+        }
+      },
+      "SceneElementNoteInput": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        }
+      },
+      "ElementCategory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "company_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          },
+          "name": {
+            "type": "string",
+            "example": "Props"
+          },
+          "sort_order": {
+            "type": "integer"
+          },
+          "elements": {
+            "type": "integer",
+            "description": "How many elements use it"
+          }
+        },
+        "required": [
+          "id",
+          "company_id",
+          "name",
+          "sort_order",
+          "elements"
+        ]
+      },
+      "ElementCategoryInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Drones"
+          }
+        },
+        "required": [
+          "name"
         ]
       },
       "TeamNoteType": {
@@ -3926,6 +4240,11 @@
               "scenes"
             ],
             "description": "A look ahead at the following shoot day"
+          },
+          "elements": {
+            "type": "array",
+            "items": {},
+            "description": "The elements of the day's scenes (see SheetElement)"
           }
         },
         "required": [
@@ -3933,7 +4252,8 @@
           "items",
           "scenes",
           "calls",
-          "next_day"
+          "next_day",
+          "elements"
         ]
       },
       "LinkedCallSheet": {
@@ -4019,6 +4339,11 @@
               ]
             }
           },
+          "elements": {
+            "type": "array",
+            "items": {},
+            "description": "The elements of the day's scenes (see SheetElement)"
+          },
           "next_day": {}
         },
         "required": [
@@ -4028,7 +4353,8 @@
           "items",
           "scenes",
           "calls",
-          "roles"
+          "roles",
+          "elements"
         ]
       },
       "ShareResult": {
@@ -4144,6 +4470,11 @@
               ]
             }
           },
+          "elements": {
+            "type": "array",
+            "items": {},
+            "description": "The elements of the day's scenes (see SheetElement)"
+          },
           "next_day": {},
           "phones": {
             "type": "boolean",
@@ -4156,6 +4487,7 @@
           "scenes",
           "calls",
           "roles",
+          "elements",
           "phones"
         ]
       },
@@ -9607,6 +9939,729 @@
           }
         ],
         "summary": "Delete a character note (its author, or a company admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/elements": {
+      "get": {
+        "tags": [
+          "Elements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The project's elements, by name, with their scenes",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Element"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Elements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add an element (anyone on the project)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElementInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Element"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/elements/{id}": {
+      "patch": {
+        "tags": [
+          "Elements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Change an element (anyone on the project)",
+        "description": "The category must be one of the company's, the owner someone on the project's team, and the character and location the project's.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElementUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Element"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Elements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete an element, taking it out of its scenes (whoever added it, or a company admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/elements/{id}/scenes": {
+      "put": {
+        "tags": [
+          "Elements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set the scenes an element is in",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Element"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scenes/{id}/elements": {
+      "put": {
+        "tags": [
+          "Elements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set the elements in a scene",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scenes/{id}/elements/{elementId}": {
+      "patch": {
+        "tags": [
+          "Elements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set the note on an element in one scene",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
+              "description": "The scene"
+            },
+            "required": true,
+            "description": "The scene",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "elementId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneElementNoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{id}/element-categories": {
+      "get": {
+        "tags": [
+          "Element categories"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The company's element categories, in order, with how many elements use each",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ElementCategory"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Element categories"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add an element category at the end of the list (company admins)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElementCategoryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ElementCategory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/element-categories/{id}": {
+      "patch": {
+        "tags": [
+          "Element categories"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Rename an element category (company admins)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElementCategoryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Renamed"
+          },
+          "400": {
+            "description": "Invalid request, or a rule in the database refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or you do not have access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Element categories"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete an element category (company admins); its elements stay, with no category",
         "parameters": [
           {
             "schema": {

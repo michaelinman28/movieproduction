@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { LatticeGrid, gridDropdown, gridEsc } from '../../components/LatticeGrid';
+import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLinkList } from '../../components/LatticeGrid';
 import { OpenLink } from '../../components/OpenLink';
 import { SceneNotes } from '../../components/Notes';
 import { itemPath } from '../../lib/links';
 import { Section } from '../../components/Section';
 import { ItemHistory } from '../../components/ItemHistory';
 import { TagPicker } from '../../components/TagPicker';
-import { api, type Character, type Location, type Scene, type SceneInput, type Shot, type ShotInput } from '../../lib/api';
+import { api, type Character, type Element, type Location, type Scene, type SceneInput, type Shot, type ShotInput } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import {
   NONE, SCENE_INT_EXT, SCENE_STATUSES, SCENE_TIMES, SHOT_ANGLES, SHOT_MOVEMENTS, SHOT_SIZES,
@@ -36,7 +36,7 @@ const locationChoices = (locations: Location[], currentId?: string | null) =>
 interface SceneRow {
   id: string; number: string; set_name: string; int_ext: string; time_of_day: string; pages: string;
   synopsis: string; characters: string; location: string; status: string; needs: string; shots: string; est: string;
-  locationId: string | null;
+  locationId: string | null; elementIds: string[];
 }
 
 const sceneRow = (s: Scene, locations: Location[]): SceneRow => ({
@@ -44,7 +44,7 @@ const sceneRow = (s: Scene, locations: Location[]): SceneRow => ({
   int_ext: s.int_ext ? labelOf(SCENE_INT_EXT, s.int_ext) : '', time_of_day: s.time_of_day ? labelOf(SCENE_TIMES, s.time_of_day) : '',
   pages: pagesLabel(s.pages_eighths), synopsis: s.synopsis ?? '', characters: s.characters ?? '',
   location: locations.find((l) => l.id === s.location_id)?.name ?? '', locationId: s.location_id, status: labelOf(SCENE_STATUSES, s.status), needs: s.needs ?? '',
-  shots: s.shots ? `${s.shots_done} of ${s.shots}` : '', est: minutesLabel(s.est_minutes),
+  shots: s.shots ? `${s.shots_done} of ${s.shots}` : '', est: minutesLabel(s.est_minutes), elementIds: s.element_ids,
 });
 
 /** A scene's status as a coloured pill. */
@@ -63,6 +63,7 @@ export function ProjectScenes() {
   const me = session?.user.id;
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [elements, setElements] = useState<Element[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newNumber, setNewNumber] = useState('');
@@ -73,9 +74,10 @@ export function ProjectScenes() {
 
   const load = useCallback(async () => {
     try {
-      const [s, c] = await Promise.all([api.scenes(projectId), api.characters(projectId)]);
+      const [s, c, el] = await Promise.all([api.scenes(projectId), api.characters(projectId), api.elements(projectId)]);
       setScenes(s);
       setCharacters(c);
+      setElements(el);
     } catch (e) { setError(errorText(e)); }
     setLoaded(true);
   }, [projectId]);
@@ -92,6 +94,7 @@ export function ProjectScenes() {
 
   const rows = useMemo(() => scenes.map((s) => sceneRow(s, locations)), [scenes, locations]);
   const locationNames = useMemo(() => locationChoices(locations).map((l) => l.name), [locations]);
+  const elementById = useMemo(() => new Map(elements.map((e) => [e.id, e])), [elements]);
   const options = useMemo(() => ({
     rowId: (r: SceneRow) => r.id,
     toolbar: false, groupPanel: false, statusBar: false,
@@ -120,12 +123,21 @@ export function ProjectScenes() {
       },
       { field: 'shots', header: 'Shots done', width: 110, filter: false },
       { field: 'est', header: 'Shot time', width: 110, filter: false },
-      { field: 'needs', header: 'Needs', width: 240, editable: true, editor: 'textarea' },
+      {
+        // The same links as each element's scenes on the Elements page.
+        field: 'elements', header: 'Elements', width: 240,
+        pickMany: { choices: () => elements.map((e) => ({ id: e.id, name: e.name })), selected: (r: SceneRow) => r.elementIds } satisfies PickMany<SceneRow>,
+        tooltip: () => 'Props, wardrobe, vehicles and other things the scene needs. Add new ones in the scene\'s form or on the Elements page.',
+        render: ({ data }: { data: SceneRow }) => gridDropdown(data.elementIds.length ? gridLinkList(data.elementIds.map((id) => elementById.get(id)).filter(Boolean).map((e) => ({
+          text: e!.name, to: itemPath.element(projectId, e!.id), title: `Open ${e!.name} on the Elements page`,
+        }))) : gridEsc(NONE)),
+      },
+      { field: 'needs', header: 'Other needs', width: 240, editable: true, editor: 'textarea' },
     ],
-  }), [locationNames, projectId]);
+  }), [locationNames, projectId, elements, elementById]);
 
   async function saveCell(e: { data: SceneRow; column: string; newValue: unknown }) {
-    const v = String(e.newValue ?? '').trim();
+    const v = typeof e.newValue === 'string' ? e.newValue.trim() : '';
     const patch: SceneInput = {};
     switch (e.column) {
       case 'number': if (!v) { await load(); return; } patch.number = v; break;
@@ -134,10 +146,11 @@ export function ProjectScenes() {
       case 'time_of_day': patch.time_of_day = (valueOf(SCENE_TIMES, v) ?? null) as SceneTime | null; break;
       case 'status': { const s = valueOf(SCENE_STATUSES, v); if (!s) { await load(); return; } patch.status = s; break; }
       case 'location': patch.location_id = locations.find((l) => l.name === v)?.id ?? null; break;
-      case 'pages': break;
+      case 'pages': case 'elements': break;
       default: await load(); return;
     }
     await run(async () => {
+      if (e.column === 'elements') return api.setSceneElements(e.data.id, e.newValue as string[]);
       if (e.column === 'pages') patch.pages_eighths = parsePages(v);
       return api.updateScene(e.data.id, patch);
     });
@@ -195,7 +208,7 @@ export function ProjectScenes() {
             selectionChanged: (r: SceneRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
           }} />
         {selected && (
-          <ScenePanel key={selected.id} scene={selected} locations={locations} characters={characters} run={run} reloadCharacters={load}
+          <ScenePanel key={selected.id} scene={selected} locations={locations} characters={characters} elements={elements} run={run} reloadCharacters={load}
             isAdmin={isAdmin} canDelete={isAdmin || selected.created_by === me} onDeleted={() => setSelectedId(null)} onShotsChanged={load} />
         )}
       </div>
@@ -209,8 +222,8 @@ export function ProjectScenes() {
   );
 }
 
-function ScenePanel({ scene, locations, characters, run, reloadCharacters, isAdmin, canDelete, onDeleted, onShotsChanged }: {
-  scene: Scene; locations: Location[]; characters: Character[]; run: Run; reloadCharacters: () => Promise<void>;
+function ScenePanel({ scene, locations, characters, elements, run, reloadCharacters, isAdmin, canDelete, onDeleted, onShotsChanged }: {
+  scene: Scene; locations: Location[]; characters: Character[]; elements: Element[]; run: Run; reloadCharacters: () => Promise<void>;
   isAdmin: boolean; canDelete: boolean; onDeleted: () => void; onShotsChanged: () => Promise<void>;
 }) {
   const { project } = useProject();
@@ -226,10 +239,13 @@ function ScenePanel({ scene, locations, characters, run, reloadCharacters, isAdm
   const initialCast = scene.character_ids;
   const [cast, setCast] = useState(initialCast);
   const castChanged = cast.length !== initialCast.length || cast.some((id) => !initialCast.includes(id));
-  const changed = keys.some((k) => draft[k].trim() !== initial[k]) || castChanged;
+  const initialElements = scene.element_ids;
+  const [elementIds, setElementIds] = useState(initialElements);
+  const elementsChanged = elementIds.length !== initialElements.length || elementIds.some((id) => !initialElements.includes(id));
+  const changed = keys.some((k) => draft[k].trim() !== initial[k]) || castChanged || elementsChanged;
   useUnsaved(changed);
   // Show changes made in the table unless something here is unsaved.
-  useEffect(() => { if (!changed) { setDraft(initial); setCast(initialCast); } }, [initial, initialCast]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!changed) { setDraft(initial); setCast(initialCast); setElementIds(initialElements); } }, [initial, initialCast, initialElements]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k: keyof Draft) => (e: { target: { value: string } }) => setDraft({ ...draft, [k]: e.target.value });
 
   // A new character is added to the project straight away; it goes in this scene when you save.
@@ -239,6 +255,21 @@ function ScenePanel({ scene, locations, characters, run, reloadCharacters, isAdm
       await reloadCharacters();
       return made;
     } catch (e) { window.alert(errorText(e)); return null; }
+  }
+
+  // A new element is added to the project straight away; it goes in this scene when you save.
+  async function createElement(name: string) {
+    try {
+      const made = await api.createElement(scene.project_id, { name });
+      await reloadCharacters();
+      return made;
+    } catch (e) { window.alert(errorText(e)); return null; }
+  }
+
+  function undo() {
+    setDraft(initial);
+    setCast(initialCast);
+    setElementIds(initialElements);
   }
 
   async function save(e: FormEvent) {
@@ -255,6 +286,7 @@ function ScenePanel({ scene, locations, characters, run, reloadCharacters, isAdm
       if (d.pages !== initial.pages) patch.pages_eighths = parsePages(d.pages);
       if (Object.keys(patch).length) await api.updateScene(scene.id, patch);
       if (castChanged) await api.setSceneCharacters(scene.id, cast);
+      if (elementsChanged) await api.setSceneElements(scene.id, elementIds);
     }, `Saved scene ${d.number}.`)) setDraft(d);
   }
 
@@ -319,12 +351,24 @@ function ScenePanel({ scene, locations, characters, run, reloadCharacters, isAdm
               </span>
             )}
           </div>
-          <label className="label md:col-span-2">Needs
-            <textarea className="field" rows={2} value={draft.needs} maxLength={2000} placeholder="Props, wardrobe, vehicles, effects" onChange={set('needs')} />
+          <div className="label md:col-span-2">Elements
+            <TagPicker tags={elements} selected={elementIds} onChange={setElementIds} onCreate={createElement} noun="element" listLabel="Elements in this scene" maxLength={100} />
+            {elementIds.length > 0 && (
+              <span className="flex flex-wrap gap-x-4">
+                {elementIds.map((id) => {
+                  const el = elements.find((x) => x.id === id);
+                  return el ? <OpenLink key={id} to={itemPath.element(scene.project_id, id)}>Open {el.name}</OpenLink> : null;
+                })}
+              </span>
+            )}
+            <span className="hint">Props, wardrobe, vehicles, effects. Type a new one and press Enter to add it to the Elements page.</span>
+          </div>
+          <label className="label md:col-span-2">Other needs
+            <textarea className="field" rows={2} value={draft.needs} maxLength={2000} placeholder="Anything else, e.g. train arrival timing" onChange={set('needs')} />
           </label>
           <div className="flex gap-2 md:col-span-2">
             <button type="submit" className="btn flex-1 whitespace-nowrap md:flex-none" disabled={!changed} data-pin="2">Save scene</button>
-            <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
+            <button type="button" className="btn btn-secondary" disabled={!changed} onClick={undo}>Undo changes</button>
           </div>
           {changed && <p className="hint md:col-span-2">Unsaved changes.</p>}
         </form>
