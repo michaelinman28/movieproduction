@@ -303,7 +303,7 @@ function ElementPanel({ element: el, categories, scenes, characters, locations, 
   );
 
   return (
-    <aside data-pin-scope data-form-for={el.id} className="card gap-2">
+    <aside data-pin-scope data-form-for={el.id} data-form-label={el.name} className="card gap-2">
       <h3>{el.name}</h3>
       {/* One form across the sections, so Save keeps everything together. */}
       <form className="flex flex-col gap-2" onSubmit={save}>
