@@ -33,18 +33,26 @@ export function ServerPager({ page, pageSize, total, loading, onPage, onPageSize
   const btn = (text: string, title: string, p: number, off: boolean) => (
     <button type="button" className="lg-btn lg-btn-sm" title={title} aria-label={title} disabled={off || loading} onClick={() => onPage(p)}>{text}</button>
   );
+  // Two rows on phones: rows per page and the count, then the page buttons and
+  // "Page x of y". From sm: up they share one row.
   return (
-    <div className={`lg-root lg-theme-${theme} lg-pager`} style={{ flexDirection: 'row', height: 'auto', minHeight: 0, marginTop: 4 }}>
-      <span>Rows per page</span>
-      <select aria-label="Rows per page" value={pageSize} onChange={(e) => onPageSize(+e.target.value)}>
-        {SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
-      </select>
-      <span>{fmt.format(from)}–{fmt.format(to)} of {fmt.format(total)}</span>
-      {btn('«', 'First page', 0, page === 0)}
-      {btn('‹', 'Previous page', page - 1, page === 0)}
-      <span>Page {page + 1} of {pages}</span>
-      {btn('›', 'Next page', page + 1, page >= pages - 1)}
-      {btn('»', 'Last page', pages - 1, page >= pages - 1)}
+    <div className={`lg-root lg-theme-${theme} lg-pager server-pager`} style={{ height: 'auto', minHeight: 0, marginTop: 4 }}>
+      <div className="server-pager-row">
+        <label className="flex items-center gap-2">
+          Rows per page
+          <select aria-label="Rows per page" value={pageSize} onChange={(e) => onPageSize(+e.target.value)}>
+            {SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <span>{fmt.format(from)}–{fmt.format(to)} of {fmt.format(total)}</span>
+      </div>
+      <div className="server-pager-row">
+        {btn('«', 'First page', 0, page === 0)}
+        {btn('‹', 'Previous page', page - 1, page === 0)}
+        <span className="whitespace-nowrap">Page {page + 1} of {pages}</span>
+        {btn('›', 'Next page', page + 1, page >= pages - 1)}
+        {btn('»', 'Last page', pages - 1, page >= pages - 1)}
+      </div>
     </div>
   );
 }

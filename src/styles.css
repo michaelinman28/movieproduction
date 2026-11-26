@@ -349,3 +349,11 @@
   .lg-pager .lg-btn { min-width: 32px; min-height: 28px; font-size: 14px; }
   .lg-pager select { height: 26px; }
 }
+
+/* ServerPager: two rows on phones (rows per page + count, then page buttons), one row from sm: up. */
+.server-pager { flex-direction: column; align-items: stretch; gap: 6px; padding: 6px 10px; }
+.server-pager-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+@media (min-width: 640px) {
+  .server-pager { flex-direction: row; align-items: center; justify-content: flex-end; gap: 16px; }
+  .server-pager-row { justify-content: flex-end; }
+}
