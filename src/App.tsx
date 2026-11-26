@@ -23,6 +23,7 @@ import { SharedSheetPage } from './pages/SharedSheetPage';
 import { ThemeSwitch } from './components/ThemeSwitch';
 import { HeaderAccount } from './components/HeaderAccount';
 import { PinnedAction } from './components/PinnedAction';
+import { FormScroller } from './components/FormScroller';
 import { UnsavedGuard } from './components/UnsavedGuard';
 import { PreviewBanner } from './components/PreviewBanner';
 import { BackLink, LinkOutTracker } from './components/BackLink';
@@ -61,6 +62,7 @@ export function App() {
         <button className="btn-link shrink-0 whitespace-nowrap text-sm" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </header>
       <PinnedAction />
+      <FormScroller />
       <UnsavedGuard />
       <LinkOutTracker />
       <main className="mx-auto w-full max-w-screen-2xl px-4 py-6 md:py-8">
