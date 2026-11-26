@@ -514,7 +514,7 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   the dropdown filters). The page uses `useServerPages` (`src/lib/serverPages.ts`) and
   passes its `paging` to `LatticeGrid`, which then turns off its own filtering, sends
   filter, sort and search changes to the hook, and shows `ServerPager` (25/50/100/250
-  rows, 50 to start, kept with the table's view; always shown, even for one page; on
+  rows, 50 to start, kept with the table's view; shown once 25 or more rows match (the filters included); on
   phones two rows: rows per page and the count, then the page buttons). Give each set filter its choices with
   the column's `setValues` (only one page is loaded) and turn off filters and sorts the
   API can't do (`filter: false`, `sortable: false`). Ask Michael before paging any

@@ -21,13 +21,16 @@ export interface ServerPaging {
 }
 
 const SIZES = [25, 50, 100, 250];
+/** The pager shows once this many rows match. */
+const SHOW_FROM = 25;
 const fmt = new Intl.NumberFormat();
 
-/** The pager under a server-paged table, always shown (Michael, 2026-11-26) so the count and rows per page are visible. */
+/** The pager under a server-paged table, shown once 25 or more rows match. */
 export function ServerPager({ page, pageSize, total, loading, onPage, onPageSize }: ServerPaging) {
   const { theme } = useTheme();
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  if (!total) return null;
+  // Shown once 25 or more rows match (Michael, 2026-11-26); fewer fit without paging.
+  if (total < SHOW_FROM) return null;
   const from = total ? page * pageSize + 1 : 0;
   const to = Math.min(total, (page + 1) * pageSize);
   const btn = (text: string, title: string, p: number, off: boolean) => (
