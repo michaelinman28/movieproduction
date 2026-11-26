@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { LatticeGrid, gridEsc, gridLinkHtml } from '../../components/LatticeGrid';
 import { Section } from '../../components/Section';
-import { api, type NoteSource, type ProjectNote } from '../../lib/api';
-import { displayName, errorText } from '../../lib/format';
+import { api, type NoteSource, type ProjectNote, type ProjectNotePage } from '../../lib/api';
+import { setValues, useServerPages, type PageRequest } from '../../lib/serverPages';
+import { displayName } from '../../lib/format';
 import { itemPath } from '../../lib/links';
 import { useProject } from './ProjectLayout';
 
@@ -49,13 +50,18 @@ function linkFor(projectId: string, n: ProjectNote) {
  */
 export function ProjectNotes() {
   const { projectId } = useProject();
-  const [notes, setNotes] = useState<ProjectNote[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.projectNotes(projectId).then(setNotes, (e) => setError(errorText(e))).finally(() => setLoaded(true));
+  // Notes keep growing, so the server pages them: the Where and By filters, sort by When
+  // and the quick search go to the API and cover every note.
+  const facets = useRef<ProjectNotePage['facets']>({ sources: [], authors: [] });
+  const fetchPage = useCallback(({ offset, limit, query: q }: PageRequest) => {
+    const pick = (col: string) => { const v = setValues(q, col); return v ? v.join(',') || 'nothing' : undefined; };
+    return api.projectNotesPage(projectId, {
+      offset, limit, q: q.quick || undefined, sources: pick('where'), author_ids: pick('by'),
+      order: q.sorts[0]?.id === 'at' && q.sorts[0].dir === 'asc' ? 'oldest' : 'newest',
+    }).then((p) => { facets.current = p.facets; setAll(p.facets.sources.reduce((n, x) => n + x.count, 0)); return { items: p.notes, total: p.total }; });
   }, [projectId]);
+  const [all, setAll] = useState(0);
+  const { items: notes, total, loaded, error, paging } = useServerPages<ProjectNote>('project.notes', fetchPage, { sorts: [{ id: 'at', dir: 'desc' }] });
 
   const rows = useMemo<NoteRow[]>(() => notes.map((n) => {
     const { to, page } = linkFor(projectId, n);
@@ -64,7 +70,9 @@ export function ProjectNotes() {
       note: n.body, by: n.author ? displayName(n.author) : '', to, title: `Open ${n.item.label} on the ${page} page`,
     };
   }), [notes, projectId]);
-  const byAt = useMemo(() => new Map(notes.map((n) => [n.key, n])), [notes]);
+  // A ref, so a new page doesn't rebuild the grid (which would drop its filters).
+  const byAt = useRef(new Map<string, ProjectNote>());
+  byAt.current = useMemo(() => new Map(notes.map((n) => [n.key, n])), [notes]);
 
   const options = useMemo(() => ({
     rowId: (r: NoteRow) => r.id,
@@ -73,26 +81,33 @@ export function ProjectNotes() {
     emptyMessage: 'No notes yet',
     columns: [
       // The note comes first so it's what a phone shows; the rest scrolls sideways.
-      { field: 'note', header: 'Note', width: 300, wrap: true },
+      { field: 'note', header: 'Note', width: 300, wrap: true, filter: false, sortable: false },
       {
-        field: 'item', header: 'Taken on', width: 210,
+        field: 'item', header: 'Taken on', width: 210, filter: false, sortable: false,
         render: ({ data }: { data: NoteRow }) => gridLinkHtml(data.item, data.to, data.title),
       },
-      { field: 'detail', header: 'Part', width: 150 },
-      { field: 'where', header: 'Where', width: 120, filter: 'set' },
-      { field: 'by', header: 'By', width: 140, filter: 'set' },
+      { field: 'detail', header: 'Part', width: 150, filter: false, sortable: false },
+      {
+        field: 'where', header: 'Where', width: 120, filter: 'set', sortable: false,
+        setValues: () => facets.current.sources.map((x) => ({ key: x.source, label: NOTE_SOURCES[x.source], count: x.count })),
+      },
+      {
+        field: 'by', header: 'By', width: 140, filter: 'set', sortable: false,
+        setValues: () => facets.current.authors.map((x) => ({ key: x.id, label: x.author ? displayName(x.author) : '(Not recorded)', count: x.count }))
+          .sort((a, b) => a.label.localeCompare(b.label)),
+      },
       {
         field: 'at', header: 'When', width: 170, sort: 'desc', filter: false,
         render: ({ data }: { data: NoteRow }) => {
-          const n = byAt.get(data.id);
+          const n = byAt.current.get(data.id);
           return n ? gridEsc(`${friendly(n.at)}${n.edited ? ' (edited)' : ''}`) : '';
         },
       },
     ],
-  }), [byAt]);
+  }), []);
 
-  const sources = new Set(notes.map((n) => n.source)).size;
-  const summary = notes.length ? `${notes.length} ${notes.length === 1 ? 'note' : 'notes'}${sources > 1 ? ` from ${sources} places` : ''}` : undefined;
+  const sources = facets.current.sources.length;
+  const summary = all ? `${all} ${all === 1 ? 'note' : 'notes'}${sources > 1 ? ` from ${sources} places` : ''}${total !== all ? `, ${total} shown by the filters` : ''}` : undefined;
 
   if (!loaded) return <p className="text-muted">Loading…</p>;
 
@@ -101,9 +116,9 @@ export function ProjectNotes() {
       {error && <p className="error">{error}</p>}
       <p className="hint mb-2">
         Every note on the project, newest first: notes on tasks and scenes, shot notes, shoot day notes, notes in a day's schedule and notes on
-        people's calls. Select where a note was taken to open it there, where you can edit it.
+        people's calls. Select where a note was taken to open it there, where you can edit it. Filters and search cover every note.
       </p>
-      <LatticeGrid stateId="project.notes" options={options} rows={rows} height={Math.min(140 + rows.length * 56, 640)} />
+      <LatticeGrid stateId="project.notes" options={options} rows={rows} paging={paging} height={Math.min(140 + Math.max(rows.length, 3) * 56, 640)} />
     </Section>
   );
 }

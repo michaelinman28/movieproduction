@@ -29,6 +29,7 @@ export interface LatticeGridInstance<Row = any> {
   getSelectedRows(): Row[];
   setTheme(theme: 'light' | 'dark'): void;
   setQuickFilter(text: string): void;
+  getFilterModel(): Record<string, any>;
   on(event: string, handler: (payload: any) => void): void;
   off(event: string, handler: (payload: any) => void): void;
   destroy(): void;

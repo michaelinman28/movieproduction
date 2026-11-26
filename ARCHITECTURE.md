@@ -319,7 +319,7 @@ There are three layers, and each one can be run and tested by itself.
 | Tasks | `GET/POST /projects/{id}/tasks`, `GET/PATCH/DELETE /tasks/{id}` (deleting a task deletes its sub-tasks) |
 | Task notes | `GET/POST /tasks/{id}/notes`, `PATCH/DELETE /task-notes/{id}` |
 | Scene notes | `GET/POST /scenes/{id}/notes`, `PATCH/DELETE /scene-notes/{id}` |
-| Project notes | `GET /projects/{id}/notes`: every note on the project, each with the item it was taken on |
+| Project notes | `GET /projects/{id}/notes`: every note on the project, each with the item it was taken on; `GET /projects/{id}/notes/page`: one page, filtered (`sources`, `author_ids`), searched (`q`) and sorted (`order`), with `total` and `facets` |
 | Task categories | `GET/POST /companies/{id}/task-categories`, `PATCH/DELETE /task-categories/{id}` |
 | Scenes | `GET/POST /projects/{id}/scenes` (with shot counts and time), `PUT /projects/{id}/scene-order`, `PATCH/DELETE /scenes/{id}` |
 | Shots | `GET /projects/{id}/shots`, `GET/POST /scenes/{id}/shots`, `PUT /scenes/{id}/shot-order`, `PATCH/DELETE /shots/{id}` |
@@ -506,6 +506,25 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   sessionStorage for the browser session (`src/lib/gridView.ts`), so it holds across
   pages and reloads. Changes through the grid's own menu (Hide column, Autosize, Reset
   columns) are kept too. Filters aren't kept. The tree / task-name column always shows.
+- **Paging (standard for every table).** Every table pages. Two ways, picked per table:
+  - *Load once, page on screen* (the default; nothing to do). The wrapper turns on
+    lattice-grid's pager (25 / 50 / 100 / 250 rows, 50 to start, kept with the table's
+    view). The table's rows are all loaded, so filters, dropdown filter choices, sort and
+    quick search cover every row on every page. The pager shows only when there's more
+    than one page. In tree mode a page holds that many top-level rows with all their
+    sub-rows, so a task and its sub-tasks stay together. Rows can be dragged within the
+    page shown (raise the rows per page to move one further). After adding, `reveal`
+    turns to the page the new row is on. (Local patches in `lattice-grid.js`.)
+  - *Server pages* for tables that keep growing without limit (the activity log, Project
+    notes, and later the journal). The API takes `offset`/`limit`, filters, a search
+    (`q`) and the order, and returns one page with `total` (and, where useful, `facets`
+    with counts for the dropdown filters). The page uses `useServerPages`
+    (`src/lib/serverPages.ts`) and passes its `paging` to `LatticeGrid`, which then turns
+    off its own filtering, sends filter, sort and search changes to the hook, and shows
+    `ServerPager`. Give each set filter its choices with the column's `setValues`
+    (only one page is loaded) and turn off filters and sorts the API can't do
+    (`filter: false`, `sortable: false`).
+  - A new table that can grow without limit uses server pages; everything else loads once.
 - **Phones and emails.** Phone numbers are stored as `###-###-####` (10 digits, or 11
   starting with 1), or `+` and digits for other countries; anything else is refused.
   Emails need a full address (`name@example.com`). The database enforces this

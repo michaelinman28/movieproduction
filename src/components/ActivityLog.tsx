@@ -1,49 +1,47 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LatticeGrid, gridEsc, gridLinkHtml } from './LatticeGrid';
 import { Section } from './Section';
-import { api, type AuditEntry, type AuditPage } from '../lib/api';
+import { api, type AuditEntry, type CompanyMember } from '../lib/api';
+import { setValues, useServerPages, type PageRequest } from '../lib/serverPages';
 import { ACTION_LABELS, KIND_LABELS, changesText, entryLink, friendlyTime, itemText, kindLabel, sortableTime } from '../lib/activity';
-import { errorText } from '../lib/format';
+import { displayName, errorText } from '../lib/format';
 
 interface Row { id: string; at: string; who: string; action: string; kind: string; item: string; to: string; title: string; changes: string; project: string }
 
 /**
  * The activity log (audit trail) for a company or one project, newest first, for
- * company admins. The grid's filters work on what's loaded; "Load older entries"
- * fetches the next page.
+ * company admins. The log keeps growing, so the server pages it: the grid's dropdown
+ * filters, sort by When and quick search go to the API and cover every entry.
  */
 export function ActivityLog({ companyId, projectId, projects }: {
   companyId: string;
   /** One project's log; leave out for the whole company. */
   projectId?: string;
-  /** The company's projects, for the clean-up tool's project choice (company log only). */
+  /** The company's projects, for the Project filter and the clean-up tool's project choice (company log only). */
   projects?: { id: string; name: string }[];
 }) {
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [next, setNext] = useState<number | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const stateId = projectId ? 'project.activity' : 'company.activity';
+  const [members, setMembers] = useState<CompanyMember[]>([]);
+  useEffect(() => { api.members(companyId).then(setMembers, () => setMembers([])); }, [companyId]);
 
-  const fetchPage = useCallback((before?: number): Promise<AuditPage> =>
-    projectId ? api.projectActivity(projectId, { before }) : api.companyActivity(companyId, { before }), [companyId, projectId]);
+  const fetchPage = useCallback(({ offset, limit, query: q }: PageRequest) => {
+    const f = {
+      offset, limit, q: q.quick || undefined,
+      order: q.sorts[0]?.id === 'at' && q.sorts[0].dir === 'asc' ? 'oldest' as const : 'newest' as const,
+      person_ids: setValues(q, 'who')?.join(',') ?? undefined,
+      actions: setValues(q, 'action')?.join(',') ?? undefined,
+      kinds: setValues(q, 'kind')?.join(',') ?? undefined,
+      project_ids: projectId ? undefined : setValues(q, 'project')?.join(',') ?? undefined,
+    };
+    // An empty tick list matches nothing; the API reads an empty value as "any", so send a value no entry has.
+    for (const k of ['person_ids', 'actions', 'kinds', 'project_ids'] as const) if (f[k] === '') f[k] = 'none';
+    return (projectId ? api.projectActivity(projectId, f) : api.companyActivity(companyId, f)).then((p) => ({ items: p.entries, total: p.total }));
+  }, [companyId, projectId]);
+  const { items: entries, total, loaded, error, paging, reload } = useServerPages<AuditEntry>(stateId, fetchPage, { sorts: [{ id: 'at', dir: 'desc' }] });
 
-  const load = useCallback(async () => {
-    try { const p = await fetchPage(); setEntries(p.entries); setNext(p.next_before); setError(null); }
-    catch (e) { setError(errorText(e)); }
-    setLoaded(true);
-  }, [fetchPage]);
-  useEffect(() => { load(); }, [load]);
-
-  const older = async () => {
-    if (next === null) return;
-    setBusy(true);
-    try { const p = await fetchPage(next); setEntries((have) => [...have, ...p.entries]); setNext(p.next_before); }
-    catch (e) { setError(errorText(e)); }
-    setBusy(false);
-  };
-
-  const byId = useMemo(() => new Map(entries.map((e) => [String(e.id), e])), [entries]);
+  // A ref, so a new page doesn't rebuild the grid (which would drop its filters).
+  const byId = useRef(new Map<string, AuditEntry>());
+  byId.current = useMemo(() => new Map(entries.map((e) => [String(e.id), e])), [entries]);
   const rows = useMemo<Row[]>(() => entries.map((e) => {
     const link = entryLink(e, companyId);
     return {
@@ -53,48 +51,56 @@ export function ActivityLog({ companyId, projectId, projects }: {
     };
   }), [entries, companyId]);
 
+  // Choices for the dropdown filters, since only one page of entries is loaded.
+  const choices = useRef({ who: [] as Choice[], project: [] as Choice[] });
+  choices.current.who = [...members.map((m) => ({ key: m.user_id, label: displayName(m.profile) })).sort((a, b) => a.label.localeCompare(b.label)), { key: 'system', label: 'System' }];
+  choices.current.project = (projects ?? []).map((p) => ({ key: p.id, label: p.name }));
+
   const options = useMemo(() => ({
     rowId: (r: Row) => r.id,
     toolbar: { quickFilter: true },
     groupPanel: false, statusBar: false,
-    emptyMessage: 'Nothing logged yet',
+    emptyMessage: 'Nothing logged',
     columns: [
       {
         field: 'at', header: 'When', width: 150, sort: 'desc', filter: false,
-        render: ({ data }: { data: Row }) => { const e = byId.get(data.id); return e ? gridEsc(friendlyTime(e.at)) : ''; },
+        render: ({ data }: { data: Row }) => { const e = byId.current.get(data.id); return e ? gridEsc(friendlyTime(e.at)) : ''; },
       },
-      { field: 'who', header: 'Who', width: 140, filter: 'set' },
-      { field: 'action', header: 'Did', width: 110, filter: 'set' },
-      { field: 'kind', header: 'What', width: 140, filter: 'set' },
+      { field: 'who', header: 'Who', width: 140, filter: 'set', sortable: false, setValues: () => choices.current.who },
+      { field: 'action', header: 'Did', width: 110, filter: 'set', sortable: false, setValues: () => Object.entries(ACTION_LABELS).map(([key, label]) => ({ key, label })) },
       {
-        field: 'item', header: 'Item', width: 220, wrap: true,
+        field: 'kind', header: 'What', width: 140, filter: 'set', sortable: false,
+        setValues: () => Object.entries(KIND_LABELS).map(([key, label]) => ({ key, label })).sort((a, b) => a.label.localeCompare(b.label)),
+      },
+      {
+        field: 'item', header: 'Item', width: 220, wrap: true, filter: false, sortable: false,
         render: ({ data }: { data: Row }) => (data.to ? gridLinkHtml(data.item, data.to, data.title) : gridEsc(data.item)),
       },
-      { field: 'changes', header: 'Details', width: 360, wrap: true },
-      ...(projectId ? [] : [{ field: 'project', header: 'Project', width: 160, filter: 'set' }]),
+      { field: 'changes', header: 'Details', width: 360, wrap: true, filter: false, sortable: false },
+      ...(projectId ? [] : [{ field: 'project', header: 'Project', width: 160, filter: 'set', sortable: false, setValues: () => choices.current.project }]),
     ],
-  }), [byId, projectId]);
+  }), [projectId]);
 
   if (!loaded) return <p className="text-muted">Loading…</p>;
-  const summary = entries.length ? `${entries.length}${next !== null ? '+' : ''} ${entries.length === 1 ? 'entry' : 'entries'}` : undefined;
+  const summary = total ? `${total.toLocaleString()} ${total === 1 ? 'entry' : 'entries'}` : undefined;
 
   return (
     <>
-      <Section id={projectId ? 'project.activity' : 'company.activity'} title="Activity" summary={summary} bodyClassName="flex flex-col gap-2">
+      <Section id={stateId} title="Activity" summary={summary} bodyClassName="flex flex-col gap-2">
         {error && <p className="error">{error}</p>}
         <p className="hint">
           Every add, change and delete{projectId ? ' in this project' : ' in the company and its projects, plus sign-ins'}, and each time a call sheet is opened, newest first.
           Only company admins can see this. Private journal entries show only that something happened, never what they say. Select an item to open it, if it still exists.
+          Filters and search cover the whole log; the search looks in item names, who did it and details.
         </p>
-        <LatticeGrid stateId={projectId ? 'project.activity' : 'company.activity'} options={options} rows={rows} height={Math.min(140 + rows.length * 56, 640)} />
-        {next !== null && (
-          <button type="button" className="btn btn-secondary sm:self-start" disabled={busy} onClick={older}>{busy ? 'Loading…' : 'Load older entries'}</button>
-        )}
+        <LatticeGrid stateId={stateId} options={options} rows={rows} paging={paging} height={Math.min(140 + Math.max(rows.length, 3) * 56, 640)} />
       </Section>
-      <ActivityCleanup companyId={companyId} projectId={projectId} projects={projects} onDone={load} />
+      <ActivityCleanup companyId={companyId} projectId={projectId} projects={projects} onDone={reload} />
     </>
   );
 }
+
+type Choice = { key: string; label: string };
 
 /**
  * Temporary: lets admins remove log entries while the platform is being set up.

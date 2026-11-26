@@ -1,6 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { authed, found, must } from '../context.ts';
-import { IdParam, ProjectNote, SceneNote, TaskNoteInput } from '../schemas.ts';
+import { IdParam, ProjectNote, ProjectNotePage, ProjectNoteQuery, SceneNote, TaskNoteInput } from '../schemas.ts';
 import { body, errors, ok, profileFields, router, secured, send, withAuthors } from './common.ts';
 
 // Scene notes (many per scene, like task notes), and every note on a project in one
@@ -10,6 +10,8 @@ const sceneNoteTags = ['Scene notes'];
 
 // deno-lint-ignore no-explicit-any
 type Row = any;
+type Db = Awaited<ReturnType<typeof authed>>['db'];
+type Note = z.infer<typeof ProjectNote>;
 
 // ---- Scene notes -------------------------------------------------------------
 
@@ -67,15 +69,8 @@ const dayLabel = (d: Row) => {
 const sceneLabel = (s: Row) => `Scene ${s.number}${s.set_name ? `: ${s.set_name}` : ''}`;
 const personName = (p: Row) => p?.nickname || p?.full_name || p?.email || 'Someone';
 
-notes.openapi(createRoute({
-  method: 'get', path: '/projects/{id}/notes', tags: ['Project notes'], security: secured,
-  summary: 'Every note on the project, newest first',
-  description: 'Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, shoot day notes, notes in a day\'s schedule and notes on people\'s calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.',
-  request: { params: IdParam },
-  responses: { 200: ok(z.array(ProjectNote)), 401: errors[401] },
-}), async (c) => {
-  const { db } = await authed(c);
-  const { id } = c.req.valid('param');
+/** Every note on the project, newest first. */
+async function projectNotes(db: Db, id: string): Promise<Note[]> {
   const [tasks, scenes, shots, days, items, calls] = await Promise.all([
     db.from('tasks').select('id, title').eq('project_id', id),
     db.from('scenes').select('id, number, set_name').eq('project_id', id),
@@ -155,5 +150,52 @@ notes.openapi(createRoute({
       item: { kind: 'shoot_day', id: cl.shoot_day_id, label: d ? dayLabel(d) : 'Shoot day', detail: `Call for ${personName(cl.profile)}` } });
   }
   out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
-  return send(c, out, 200);
+  return out;
+}
+
+notes.openapi(createRoute({
+  method: 'get', path: '/projects/{id}/notes', tags: ['Project notes'], security: secured,
+  summary: 'Every note on the project, newest first',
+  description: 'Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, shoot day notes, notes in a day\'s schedule and notes on people\'s calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.',
+  request: { params: IdParam },
+  responses: { 200: ok(z.array(ProjectNote)), 401: errors[401] },
+}), async (c) => {
+  const { db } = await authed(c);
+  return send(c, await projectNotes(db, c.req.valid('param').id), 200);
+});
+
+const list = (s: string | undefined) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : []);
+
+notes.openapi(createRoute({
+  method: 'get', path: '/projects/{id}/notes/page', tags: ['Project notes'], security: secured,
+  summary: 'One page of the project\'s notes, filtered and searched',
+  description: 'The same notes as /projects/{id}/notes, one page at a time. Filter by where the note was taken (`sources`) and who wrote it (`author_ids`, "none" for unknown), '
+    + 'search the note and what it was taken on (`q`), and sort newest or oldest first. `total` counts every match; `facets` count every note by where and by whom, for the filter lists.',
+  request: { params: IdParam, query: ProjectNoteQuery },
+  responses: { 200: ok(ProjectNotePage), 401: errors[401] },
+}), async (c) => {
+  const { db } = await authed(c);
+  const f = c.req.valid('query');
+  const all = await projectNotes(db, c.req.valid('param').id);
+  const sources = list(f.sources), authors = list(f.author_ids);
+  const words = (f.q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+  const text = (n: Note) => [n.body, n.item.label, n.item.detail ?? '', n.author ? personName(n.author) : ''].join('\u0001').toLowerCase();
+  const hits = all.filter((n) => (!sources.length || sources.includes(n.source))
+    && (!authors.length || authors.includes(n.author?.id ?? 'none'))
+    && words.every((w) => text(n).includes(w)));
+  if (f.order === 'oldest') hits.reverse();
+  const bySource = new Map<string, number>();
+  const byAuthor = new Map<string, { author: Row; count: number }>();
+  for (const n of all) {
+    bySource.set(n.source, (bySource.get(n.source) ?? 0) + 1);
+    const k = n.author?.id ?? 'none';
+    byAuthor.set(k, { author: n.author, count: (byAuthor.get(k)?.count ?? 0) + 1 });
+  }
+  return send(c, {
+    notes: hits.slice(f.offset, f.offset + f.limit), total: hits.length,
+    facets: {
+      sources: [...bySource].map(([source, count]) => ({ source, count })),
+      authors: [...byAuthor].map(([id, v]) => ({ id, author: v.author ?? null, count: v.count })),
+    },
+  }, 200);
 });

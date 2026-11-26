@@ -428,6 +428,7 @@
     flashChanges: true,
     rowClass: null,
     externalFilter: null,
+    serverSide: false, // movieproduction patch: rows are already filtered and paged by the server
     emptyMessage: 'No rows to show',
     contextMenuItems: null,
     exportFileName: 'export',
@@ -824,6 +825,7 @@
     }
 
     _passes(n) {
+      if (this.o.serverSide) return true; // movieproduction patch: the server already filtered
       for (const [id, m] of this.filters) {
         const c = this._colById(id); // movieproduction patch: includes the tree column
         if (c && !this._matchFilter(c, m, this._val(c, n.data))) return false;
@@ -1025,12 +1027,25 @@
       };
       walk(this.topNodes || [], 0);
       this.allDisplay = out;
+      // movieproduction patch: in tree mode a page holds `pageSize` top-level rows with
+      // their sub-rows, so a parent and its children stay on the same page.
+      // `_pageStarts[p]` is where page p begins in allDisplay.
+      const starts = [];
       if (this.o.pagination) {
         const size = this.o.pageSize;
-        const pages = Math.max(1, Math.ceil(out.length / size));
-        this.page = clamp(this.page, 0, pages - 1);
-        this.display = out.slice(this.page * size, (this.page + 1) * size);
+        let tops = 0;
+        out.forEach((e, i) => {
+          const top = this.o.treeData ? e.level === 0 && e.kind !== 'detail' : e.kind !== 'detail';
+          if (top) { if (tops % size === 0) starts.push(i); tops++; }
+        });
+        this._topCount = tops;
+        if (!starts.length) starts.push(0);
+        this._pageStarts = starts;
+        this.page = clamp(this.page, 0, starts.length - 1);
+        this.display = out.slice(starts[this.page], this.page + 1 < starts.length ? starts[this.page + 1] : out.length);
       } else {
+        this._pageStarts = [0];
+        this._topCount = out.length;
         this.display = out;
       }
       this._computeOffsets();
@@ -1738,21 +1753,26 @@
     _renderPager() {
       const p = this.pagerEl;
       if (!p) return;
-      p.style.display = this.o.pagination ? '' : 'none';
-      p.innerHTML = '';
-      if (!this.o.pagination) return;
+      // movieproduction patch: the pager shows only when there's more than one page
+      // (or the page size was changed from the smallest), counts top-level rows, and its
+      // buttons are big enough to tap.
       const size = this.o.pageSize;
-      const total = this.allDisplay.length;
+      const total = this._topCount || 0;
       const pages = Math.max(1, Math.ceil(total / size));
+      const show = this.o.pagination && (pages > 1 || (size > 25 && total > 25));
+      p.style.display = show ? '' : 'none';
+      p.innerHTML = '';
+      if (!show) return;
       const sel = el('select');
-      const sizes = [25, 50, 100, 250, 1000];
+      const sizes = [25, 50, 100, 250];
       if (sizes.indexOf(size) < 0) { sizes.push(size); sizes.sort((a, b) => a - b); }
       sizes.forEach((n) => { const op = el('option', null, String(n)); op.value = n; sel.appendChild(op); });
       sel.value = String(size);
       sel.addEventListener('change', () => this.setPageSize(+sel.value));
       const from = total ? this.page * size + 1 : 0, to = Math.min(total, (this.page + 1) * size);
       const mk = (t, title, pg, dis) => { const b = el('button', 'lg-btn lg-btn-sm', t); b.type = 'button'; b.title = title; b.disabled = dis; b.addEventListener('click', () => this.setPage(pg)); return b; };
-      p.append(el('span', null, 'Page size:'), sel, el('span', null, intFmt.format(from) + '–' + intFmt.format(to) + ' of ' + intFmt.format(total)),
+      sel.setAttribute('aria-label', 'Rows per page');
+      p.append(el('span', null, 'Rows per page'), sel, el('span', null, intFmt.format(from) + '–' + intFmt.format(to) + ' of ' + intFmt.format(total)),
         mk('«', 'First page', 0, this.page === 0), mk('‹', 'Previous page', this.page - 1, this.page === 0),
         el('span', null, 'Page ' + (this.page + 1) + ' of ' + pages),
         mk('›', 'Next page', this.page + 1, this.page >= pages - 1), mk('»', 'Last page', pages - 1, this.page >= pages - 1));
@@ -1781,8 +1801,15 @@
       this.o.pageSize = Math.floor(n);
       this.setPage(0);
     }
+    /** movieproduction patch: the page that shows allDisplay[i]. */
+    pageOfDisplayIndex(i) {
+      const s = this._pageStarts || [0];
+      let p = 0;
+      while (p + 1 < s.length && s[p + 1] <= i) p++;
+      return p;
+    }
     getPaginationInfo() {
-      const size = this.o.pageSize, total = this.allDisplay.length;
+      const size = this.o.pageSize, total = this._topCount || 0;
       return { enabled: !!this.o.pagination, page: this.page, pageSize: size, pageCount: this.o.pagination ? Math.max(1, Math.ceil(total / size)) : 1, rowCount: total };
     }
 
@@ -2553,7 +2580,8 @@
       if (this.o.treeData) return 'not available for tree data';
       if (this.pivotMode) return 'turn off pivot mode to reorder rows';
       if (this.groupCols.length) return 'remove row grouping to reorder rows';
-      if (this.o.pagination) return 'turn off paging to reorder rows';
+      // movieproduction patch: rows can be dragged within the page shown; the move
+      // applies to the full order (raise the page size to move a row further).
       return null;
     }
     canReorderRows() { return !this._reorderBlockReason(); }
@@ -2816,6 +2844,13 @@
     _uniqueValues(col) {
       let u = this._uvCache.get(col.id);
       if (u) return u;
+      // movieproduction patch: `setValues` gives a set filter its choices (e.g. from the
+      // server when only one page of rows is loaded): [{ key, label, count? }].
+      if (col.def && typeof col.def.setValues === 'function') {
+        u = col.def.setValues().map((v) => ({ key: v.key, raw: v.key, label: v.label, count: v.count }));
+        this._uvCache.set(col.id, u);
+        return u;
+      }
       const map = new Map();
       for (const n of this.nodes) {
         const v = this._val(col, n.data);
@@ -2866,7 +2901,7 @@
             cb.type = 'checkbox';
             cb.checked = cur.has(v.key);
             cb.dataset.key = v.key;
-            it.append(cb, el('span', 'lg-set-label', v.label), el('span', 'lg-set-count', intFmt.format(v.count)));
+            it.append(cb, el('span', 'lg-set-label', v.label), el('span', 'lg-set-count', v.count == null ? '' : intFmt.format(v.count)));
             list.appendChild(it);
           });
           if (shown.length > LIMIT) list.appendChild(el('div', 'lg-set-more', '+' + intFmt.format(shown.length - LIMIT) + ' more — refine the search'));

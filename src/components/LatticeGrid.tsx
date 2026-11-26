@@ -4,7 +4,8 @@ import { PickManyMenu, type PickManyOpen } from './PickManyMenu';
 import { useTheme } from '../lib/theme';
 import { confirmDiscard } from '../lib/unsaved';
 import { mapsUrl, openMaps } from '../lib/maps';
-import { readGridView, saveGridView } from '../lib/gridView';
+import { PAGE_SIZE, readGridView, saveGridView } from '../lib/gridView';
+import { ServerPager, type ServerPaging } from './ServerPager';
 import { ColumnChooser, type ChooserColumn } from './ColumnChooser';
 import '../vendor/lattice-grid/lattice-grid.js';
 import '../vendor/lattice-grid/lattice-grid.css';
@@ -51,13 +52,23 @@ interface Props<Row> {
    * the same row again.
    */
   reveal?: { id: string; n: number } | null;
+  /**
+   * For a table whose rows the server pages, sorts and filters (logs that keep growing,
+   * such as the activity log). `rows` is then just the current page; the grid's own
+   * filtering and paging are off, and filter, sort and quick search changes go to
+   * `paging.onQuery`. See ServerPaging.
+   */
+  paging?: ServerPaging;
 }
 
 // lattice-grid's own CSS sets min-height: 240px; match it so the box doesn't overflow.
 const MIN_GRID_HEIGHT = 240;
 
 /** React wrapper around Michael's lattice-grid library. */
-export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height = 480, className, reveal }: Props<Row>) {
+export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height = 480, className, reveal, paging }: Props<Row>) {
+  const pagingRef = useRef(paging);
+  pagingRef.current = paging;
+  const server = !!paging;
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<LatticeGridInstance<Row> | null>(null);
   const { theme } = useTheme();
@@ -76,8 +87,14 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
 
   useEffect(() => {
     if (!containerRef.current) return;
+    const savedView = readGridView(stateIdRef.current);
     const grid = new window.LatticeGrid<Row>(containerRef.current, {
       theme: themeRef.current,
+      // Every table pages (standard; see ARCHITECTURE.md). Filters, sort and quick search
+      // cover every row, on every page. Tables paged by the server pass `paging` instead.
+      pagination: !server,
+      pageSize: savedView?.pageSize ?? PAGE_SIZE,
+      serverSide: server,
       ...options,
       // A pick-list column (editor: 'select') filters by ticking values from a dropdown
       // list instead of typing, unless the column sets its own filter.
@@ -214,10 +231,12 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
         cols: { ...before?.cols, ...Object.fromEntries(gc.cols.map((c) => [c.id, { hidden: !!c.hidden, width: c.width, flex: c.flex }])) },
         group: gc._groupCol ? { width: gc._groupCol.width, flex: gc._groupCol.flex } : undefined,
         sorts: gc.sorts.map((x) => ({ id: x.id, dir: x.dir })),
+        // A server-paged table's rows per page are saved by useServerPages.
+        pageSize: server ? before?.pageSize : (grid as unknown as { o: { pageSize: number } }).o.pageSize,
       });
       sync();
     };
-    const saved = readGridView(stateIdRef.current);
+    const saved = savedView;
     if (saved) {
       // Saved order, then each column the saved view doesn't know (one added since, or
       // one only some views have, like the Task column outside the task tree) goes back
@@ -240,7 +259,15 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
       gc.sorts = (saved.sorts ?? []).filter((x) => gc.colMap.has(x.id) || x.id === '__group');
       gc.refresh();
     }
-    for (const name of ['columnResized', 'columnMoved', 'sortChanged']) grid.on(name, () => remember());
+    for (const name of ['columnResized', 'columnMoved', 'sortChanged', 'paginationChanged']) grid.on(name, () => remember());
+
+    // Server-paged tables: hand filter, sort and quick search changes to the page.
+    // `quickFilter` is a lattice-grid internal.
+    const query = () => pagingRef.current?.onQuery({
+      filters: grid.getFilterModel?.() ?? {}, sorts: gc.sorts.map((x) => ({ id: x.id, dir: x.dir })),
+      quick: (grid as unknown as { quickFilter?: string }).quickFilter ?? '',
+    });
+    if (server) { grid.on('filterChanged', query); grid.on('sortChanged', query); query(); }
     const setVisible = gc.setColumnVisible.bind(grid);
     gc.setColumnVisible = (id, visible) => { setVisible(id, visible); remember(); };
     const reset = gc.resetColumns.bind(grid);
@@ -287,7 +314,16 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
     revealed.current = reveal;
     if (g.o?.selection === 'single' && g.selected) { g.selected.clear(); g.selected.add(node.id); }
     // In tree mode the display wraps rows in tree nodes, so match on the row itself.
-    const r = g.display?.findIndex((e) => e.node === node || (e.node?.data !== undefined && e.node.data === node.data)) ?? -1;
+    // Paged: go to the page the row is on first. `allDisplay`, `pageOfDisplayIndex`,
+    // `page` and `setPage` are lattice-grid internals (pageOfDisplayIndex is a local patch).
+    const gp = g as unknown as { allDisplay?: { node?: { data?: unknown } }[]; page?: number; pageOfDisplayIndex?: (i: number) => number; setPage?: (p: number) => void; o?: { pagination?: boolean } };
+    const match = (e: { node?: { data?: unknown } }) => e.node === node || (e.node?.data !== undefined && e.node.data === node.data);
+    if (gp.o?.pagination && gp.allDisplay && gp.pageOfDisplayIndex) {
+      const i = gp.allDisplay.findIndex(match);
+      const p = i >= 0 ? gp.pageOfDisplayIndex(i) : gp.page;
+      if (p !== undefined && p !== gp.page) gp.setPage?.(p);
+    }
+    const r = g.display?.findIndex(match) ?? -1;
     const c = Math.max(0, g.visible?.findIndex((col) => !col.special || col.special === 'group') ?? 0);
     if (r >= 0) { g._setRange?.({ r, c }, { r, c }); g.ensureVisible?.(r, c); } else g._renderRows?.();
   }, [rows, reveal]);
@@ -330,6 +366,7 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
       <div ref={containerRef} className={className}
         style={{ height: typeof height === 'number' ? Math.max(height, MIN_GRID_HEIGHT) : height }}
         onMouseDownCapture={onMouseDown} onClick={onClick} />
+      {paging && <ServerPager {...paging} />}
       {picker && <PickManyMenu {...picker} />}
     </div>
   );
