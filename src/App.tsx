@@ -37,7 +37,7 @@ export function App() {
 
   if (!supabaseConfigured)
     return (
-      <main className="grid min-h-dvh place-items-center p-4">
+      <main className="grid flex-1 place-items-center p-4">
         <div className="card w-full max-w-sm">
           <h1>Setup needed</h1>
           <p>Copy <code>.env.example</code> to <code>.env.local</code> and add your Supabase URL and publishable key.</p>
@@ -45,7 +45,7 @@ export function App() {
       </main>
     );
   if (token) return token.shared ? <SharedSheetPage token={token.token} /> : <SheetLinkPage token={token.token} />;
-  if (loading) return <main className="grid min-h-dvh place-items-center p-4"><p className="text-muted">Loading…</p></main>;
+  if (loading) return <main className="grid flex-1 place-items-center p-4"><p className="text-muted">Loading…</p></main>;
   if (!session) return <><PreviewBanner /><SignIn /></>;
 
   return (

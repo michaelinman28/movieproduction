@@ -34,7 +34,7 @@ export function SheetLinkPage({ token }: { token: string }) {
   const home = import.meta.env.BASE_URL;
 
   return (
-    <div className="min-h-dvh">
+    <div className="flex-1">
       <div className="sheet-link-bar">
         <a href={home} className="mr-auto inline-flex min-h-11 items-center font-bold text-fg no-underline">Movie Production</a>
         {sheet && <button type="button" className="btn btn-secondary w-auto min-h-10 px-3 text-sm" onClick={() => window.print()}>Print or PDF</button>}

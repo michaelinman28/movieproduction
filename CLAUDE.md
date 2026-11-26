@@ -30,4 +30,4 @@ Read ARCHITECTURE.md first. These are the standards every change follows.
 `npm run typecheck`, `npm run test:db`, `npm run build`.
 
 ## Hosting
-Netlify hosts the app (`netlify.toml`): `main` publishes https://movie-prod.netlify.app/, and every pull request gets a Deploy Preview linked on the PR, built only if the checks above pass. Build in-app links from `window.location.origin` + `import.meta.env.BASE_URL` (never a hard-coded host), so they work on previews too.
+Netlify hosts the app (`netlify.toml`): `main` publishes https://movie-prod.netlify.app/, and every pull request gets a Deploy Preview linked on the PR, built only if the checks above pass. Build in-app links from `window.location.origin` + `import.meta.env.BASE_URL` (never a hard-coded host), so they work on previews too. The footer's version is the number of the PR that was published (`appVersion` in `vite.config.ts` reads it from the merge commit), so merge PRs with GitHub's merge or squash button.
