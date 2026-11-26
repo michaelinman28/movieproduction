@@ -90,9 +90,10 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
     const savedView = readGridView(stateIdRef.current);
     const grid = new window.LatticeGrid<Row>(containerRef.current, {
       theme: themeRef.current,
-      // Every table pages (standard; see ARCHITECTURE.md). Filters, sort and quick search
-      // cover every row, on every page. Tables paged by the server pass `paging` instead.
-      pagination: !server,
+      // Only tables paged by the server (`paging`: activity log, Project notes) page;
+      // every other table shows all its rows in one scrolling list (see ARCHITECTURE.md).
+      // A table can still turn on lattice-grid's own pager with `pagination: true`.
+      pagination: false,
       pageSize: savedView?.pageSize ?? PAGE_SIZE,
       serverSide: server,
       ...options,
