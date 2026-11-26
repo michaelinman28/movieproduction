@@ -4,6 +4,6 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss()],
-  // GitHub Pages serves the app from /movieproduction/; local dev uses /.
+  // Netlify and local dev serve the app from /. Set BASE_PATH to host it under a sub-path.
   base: loadEnv(mode, '.', 'BASE_PATH').BASE_PATH || '/',
 }));

@@ -388,7 +388,7 @@ There are three layers, and each one can be run and tested by itself.
 | API | Hono, `@hono/zod-openapi`, zod, `@hono/swagger-ui` | Small, fast, runs on both Node and Deno, generates the OpenAPI spec from the code |
 | Database and auth | Supabase (Postgres, Auth, Edge Functions) | Hosted Postgres with row-level security, email sign-in, and somewhere to run the API |
 | Tests | pglite (in-memory Postgres) for security rules; Playwright for browser checks | Security rules are tested without a live database |
-| Hosting | GitHub Pages for the web app (`.github/workflows/pages.yml`); Supabase Edge Functions for the API | Free, deploys on every push to `main` |
+| Hosting | Netlify for the web app (`netlify.toml`); Supabase Edge Functions for the API | Free, deploys on every push to `main`, and a Deploy Preview for every pull request |
 
 ## Styling: Tailwind CSS, mobile first
 
@@ -548,7 +548,7 @@ api/
   export-spec.ts             Writes api/openapi.json
   openapi.json               The OpenAPI spec
 tests/schema.test.mjs        Security rule tests on in-memory Postgres
-.github/workflows/pages.yml  Builds and publishes the web app preview
+netlify.toml                 Netlify build, environment and SPA routing
 ```
 
 ## Running it locally
@@ -574,7 +574,8 @@ Checks: `npm run typecheck` (app and API), `npm run test:db` (security rules), `
 
 | What | Where |
 |---|---|
-| Web app preview | https://michaelinman28.github.io/movieproduction/ (rebuilt on every push to `main`) |
+| Web app | https://movie-prod.netlify.app/ (rebuilt on every push to `main`) |
+| PR previews | `https://deploy-preview-<number>--movie-prod.netlify.app/` (one per pull request, linked on the PR) |
 | API | https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api (Swagger at [/docs](https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api/docs)) |
 | Database | Supabase project `qixblelhruxdzxfaeamz` |
 
