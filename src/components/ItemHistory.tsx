@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Section } from './Section';
-import { api, type AuditEntry } from '../lib/api';
+import { api, DATA_CHANGED, type AuditEntry } from '../lib/api';
 import { changeText, friendlyTime, sentence } from '../lib/activity';
 import { errorText } from '../lib/format';
 
 /**
  * An item's history from the activity log, for company admins: who added it, each
  * change with before and after, and what happened to the things on it (notes, tags,
- * shots, calls). Starts closed; loads when opened.
+ * shots, calls). Starts closed; loads when opened, and reloads while open whenever a
+ * change is saved anywhere on the page, so the latest change shows straight away.
  */
 export function ItemHistory({ companyId, kind, id, refresh }: {
   companyId: string;
@@ -27,11 +28,17 @@ export function ItemHistory({ companyId, kind, id, refresh }: {
 function HistoryList({ companyId, kind, id, refresh }: { companyId: string; kind: string; id: string; refresh?: unknown }) {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(0);
+  useEffect(() => {
+    const bump = () => setSaved((n) => n + 1);
+    window.addEventListener(DATA_CHANGED, bump);
+    return () => window.removeEventListener(DATA_CHANGED, bump);
+  }, []);
   useEffect(() => {
     let live = true;
     api.itemHistory(companyId, kind, id).then((e) => { if (live) { setEntries(e); setError(null); } }, (e) => live && setError(errorText(e)));
     return () => { live = false; };
-  }, [companyId, kind, id, refresh]);
+  }, [companyId, kind, id, refresh, saved]);
 
   if (error) return <p className="error">{error}</p>;
   if (!entries) return <p className="text-muted">Loading…</p>;

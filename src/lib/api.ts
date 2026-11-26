@@ -22,10 +22,17 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   } catch {
     throw new ApiError(`Can't reach the API at ${BASE}. Is it running?`, 0);
   }
+  if (res.ok && method !== 'GET') announceChange();
   if (res.status === 204) return undefined as T;
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(json.error ?? `Request failed (${res.status})`, res.status);
   return json as T;
+}
+
+/** Fired on window after any change the API accepts (a save, add, delete…), e.g. so an open History reloads. */
+export const DATA_CHANGED = 'mp:data-changed';
+function announceChange() {
+  window.dispatchEvent(new Event(DATA_CHANGED));
 }
 
 export interface Profile { id: string; full_name: string | null; nickname: string | null; email: string | null; phone: string | null; has_account: boolean }
