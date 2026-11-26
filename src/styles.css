@@ -30,6 +30,10 @@
   --color-danger: #f97066;
 }
 
+/* Tables scroll inside their box but never bounce or pull away from its edges
+   (iOS/Mac rubber-banding), sideways or up and down. */
+.lg-root .lg-viewport { overscroll-behavior: none; }
+
 /* Tint lattice-grid's selection and focus colors to match. */
 .lg-theme-light { --lg-accent: #15803d; --lg-accent-fg: #ffffff; --lg-selected: #e8f7ee; --lg-range: rgba(21, 128, 61, 0.12); }
 .lg-theme-dark {

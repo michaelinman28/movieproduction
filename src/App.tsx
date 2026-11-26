@@ -22,6 +22,7 @@ import { SharedSheetPage } from './pages/SharedSheetPage';
 import { ThemeSwitch } from './components/ThemeSwitch';
 import { PinnedAction } from './components/PinnedAction';
 import { UnsavedGuard } from './components/UnsavedGuard';
+import { PreviewBanner } from './components/PreviewBanner';
 
 /** Call sheet links open on their own page, with no sign-in: personal (/sheet/:token) or shared (/call-sheet/:token). */
 function sheetToken() {
@@ -45,10 +46,11 @@ export function App() {
     );
   if (token) return token.shared ? <SharedSheetPage token={token.token} /> : <SheetLinkPage token={token.token} />;
   if (loading) return <main className="grid min-h-dvh place-items-center p-4"><p className="text-muted">Loading…</p></main>;
-  if (!session) return <SignIn />;
+  if (!session) return <><PreviewBanner /><SignIn /></>;
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+      <PreviewBanner />
       <header className="no-print sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-surface px-4 py-1">
         <Link to="/" className="mr-auto font-bold text-fg no-underline">Movie Production</Link>
         <Link to="/profile" className="btn-link text-sm text-muted no-underline">
