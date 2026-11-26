@@ -21,6 +21,7 @@ import { ProjectActivity } from './pages/project/ProjectActivity';
 import { SheetLinkPage } from './pages/SheetLinkPage';
 import { SharedSheetPage } from './pages/SharedSheetPage';
 import { ThemeSwitch } from './components/ThemeSwitch';
+import { HeaderAccount } from './components/HeaderAccount';
 import { PinnedAction } from './components/PinnedAction';
 import { UnsavedGuard } from './components/UnsavedGuard';
 import { PreviewBanner } from './components/PreviewBanner';
@@ -54,13 +55,10 @@ export function App() {
     <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
       <PreviewBanner />
       <header className="no-print sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-surface px-4 py-1">
-        <Link to="/" className="mr-auto font-bold text-fg no-underline">Movie Production</Link>
-        <Link to="/profile" className="btn-link text-sm text-muted no-underline">
-          <span className="sm:hidden">Profile</span>
-          <span className="hidden sm:inline">{session.user.email}</span>
-        </Link>
+        <Link to="/" className="mr-auto shrink-0 font-bold text-fg no-underline">Movie Production</Link>
+        <HeaderAccount email={session.user.email} />
         <ThemeSwitch />
-        <button className="btn-link text-sm" onClick={() => supabase.auth.signOut()}>Sign out</button>
+        <button className="btn-link shrink-0 whitespace-nowrap text-sm" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </header>
       <PinnedAction />
       <UnsavedGuard />

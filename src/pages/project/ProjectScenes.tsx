@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLinkList } from '../../components/LatticeGrid';
+import { TableHint } from '../../components/TableHint';
+import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLinkList, gridHeight } from '../../components/LatticeGrid';
 import { OpenLink } from '../../components/OpenLink';
 import { SceneNotes } from '../../components/Notes';
 import { itemPath } from '../../lib/links';
@@ -199,8 +200,13 @@ export function ProjectScenes() {
       </form>
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
+      {rows.length > 0 && (
+        <TableHint more="Drag the handle at the left of a row to change the order (clear any sort or filter first). Pages are in eighths, like 1 3/8.">
+          Double-tap (or double-click) a cell to change it, or select a scene to edit it and its shot list.
+        </TableHint>
+      )}
       <div className="flex flex-col gap-4">
-        <LatticeGrid stateId="project.scenes" options={options} rows={rows} height={Math.min(80 + rows.length * 34, 420)} reveal={reveal}
+        <LatticeGrid stateId="project.scenes" options={options} rows={rows} height={gridHeight(80, rows.length, 420)} reveal={reveal}
           onReady={(g) => { gridRef.current = g; }}
           on={{
             cellValueChanged: saveCell,
@@ -212,12 +218,6 @@ export function ProjectScenes() {
             isAdmin={isAdmin} canDelete={isAdmin || selected.created_by === me} onDeleted={() => setSelectedId(null)} onShotsChanged={load} />
         )}
       </div>
-      {rows.length > 0 && (
-        <p className="hint mt-2">
-          Double-click a cell to change it, or select a scene to edit it and its shot list below. Drag the handle at the left of a row to change the order
-          (clear any sort or filter first). Pages are in eighths, like 1 3/8.
-        </p>
-      )}
     </Section>
   );
 }
@@ -509,7 +509,7 @@ function ShotList({ scene, onChanged }: { scene: Scene; onChanged: () => Promise
       </form>
       {error && <p className="error">{error}</p>}
       <div className="flex flex-col gap-4">
-        <LatticeGrid stateId="project.scenes.shots" options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)} reveal={reveal}
+        <LatticeGrid stateId="project.scenes.shots" options={options} rows={rows} height={gridHeight(80, rows.length, 360)} reveal={reveal}
           onReady={(g) => { gridRef.current = g; }}
           on={{
             cellValueChanged: saveCell,

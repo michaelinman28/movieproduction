@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { LatticeGrid, gridDropdown, gridEsc, gridLinkList } from '../../components/LatticeGrid';
+import { TableHint } from '../../components/TableHint';
+import { LatticeGrid, gridDropdown, gridEsc, gridLinkList, gridHeight } from '../../components/LatticeGrid';
 import { OpenLink } from '../../components/OpenLink';
 import { CharacterNotes } from '../../components/Notes';
 import { Section } from '../../components/Section';
@@ -211,8 +212,13 @@ export function ProjectCharacters() {
       </form>
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
+      {rows.length > 0 && (
+        <TableHint more="Tap a type, casting status or person to pick from its list. Double-tap (or double-click) any other cell to type a change; type scenes as their numbers, like 1, 4, 12A.">
+          Select a character to edit everything about them, including how they look in each scene.
+        </TableHint>
+      )}
       <div className="flex flex-col gap-4">
-        <LatticeGrid stateId="project.characters" options={options} rows={rows} height={Math.min(80 + rows.length * 34, 420)} reveal={reveal}
+        <LatticeGrid stateId="project.characters" options={options} rows={rows} height={gridHeight(80, rows.length, 420)} reveal={reveal}
           on={{
             cellValueChanged: saveCell,
             selectionChanged: (r: CharRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
@@ -223,12 +229,6 @@ export function ProjectCharacters() {
             onDeleted={() => setSelectedId(null)} />
         )}
       </div>
-      {rows.length > 0 && (
-        <p className="hint mt-2">
-          Click a type, casting status or person to pick from its list. Double-click any other cell to type a change; type scenes as their numbers, like 1, 4, 12A.
-          Select a character to edit everything about them below, including how they look in each scene.
-        </p>
-      )}
       {!rows.length && <p className="hint mt-2">Characters typed into a scene's Characters on the Scenes page show up here too.</p>}
     </Section>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { tableDate } from '../lib/format';
 import { useNavigate } from 'react-router-dom';
 import { PickManyMenu, type PickManyOpen } from './PickManyMenu';
 import { useTheme } from '../lib/theme';
@@ -62,6 +63,24 @@ interface Props<Row> {
   paging?: ServerPaging;
 }
 
+/** Whether the main pointer is a finger (iPad, phone) rather than a mouse. */
+const touchScreen = () => window.matchMedia?.('(pointer: coarse)').matches ?? false;
+const TOUCH_SIZES = { rowHeight: 44, headerHeight: 44, groupHeaderHeight: 36, floatingFilterHeight: 48 };
+const TOUCH = typeof window !== 'undefined' && touchScreen();
+/** A table row's height: 34px with a mouse, 44px on a touch screen. */
+export const ROW_H = TOUCH ? TOUCH_SIZES.rowHeight : 34;
+
+/**
+ * A table's height for `rows` rows: `chrome` px for its toolbar and header rows (as
+ * measured with a mouse), then a row height each, up to `max` (also taller on touch
+ * screens, where rows and headers are bigger).
+ */
+export function gridHeight(chrome: number, rows: number, max: number) {
+  const extra = TOUCH ? 20 : 0;
+  const cap = TOUCH ? Math.round(max * 1.25) : max;
+  return Math.min(chrome + extra + rows * ROW_H, cap);
+}
+
 // lattice-grid's own CSS sets min-height: 240px; match it so the box doesn't overflow.
 const MIN_GRID_HEIGHT = 240;
 
@@ -97,11 +116,16 @@ export function LatticeGrid<Row>({ stateId, options, rows, on, onReady, height =
       pagination: false,
       pageSize: savedView?.pageSize ?? PAGE_SIZE,
       serverSide: server,
+      // Touch screens (iPad, phones) get rows and header rows tall enough to tap (44px);
+      // a mouse keeps the compact sizes. The matching CSS is in styles.css (pointer: coarse).
+      ...(touchScreen() ? TOUCH_SIZES : {}),
       ...options,
       // A pick-list column (editor: 'select') filters by ticking values from a dropdown
       // list instead of typing, unless the column sets its own filter.
       // A pick-many column filters by each name in it.
-      columns: (options.columns as { editor?: string; filter?: unknown; pickMany?: unknown; filterSplit?: string }[] | undefined)?.map((c) =>
+      // Date columns show dates as 'Mar 12, 2027' (the value, filters and editor stay ISO).
+      columns: (options.columns as { editor?: string; filter?: unknown; pickMany?: unknown; filterSplit?: string; type?: string; format?: unknown }[] | undefined)?.map((c) =>
+        c.type === 'date' && !c.format ? { ...c, format: (v: unknown) => (v ? tableDate(String(v)) : '') } : c).map((c) =>
         c.pickMany && c.filter === undefined ? { ...c, filter: 'set', filterSplit: c.filterSplit ?? ',' }
           : c.editor === 'select' && c.filter === undefined ? { ...c, filter: 'set' } : c) as LatticeGridOptions<Row>['columns'],
       rows: rowsRef.current,

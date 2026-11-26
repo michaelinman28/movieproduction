@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { TableHint } from '../../components/TableHint';
 import { Link } from 'react-router-dom';
-import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLink, gridLinkHtml, gridLinkList } from '../../components/LatticeGrid';
+import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLink, gridLinkHtml, gridLinkList, gridHeight } from '../../components/LatticeGrid';
 import { OpenLink } from '../../components/OpenLink';
 import { TagPicker } from '../../components/TagPicker';
 import { characterChoices, characterIdsPlayedBy, characterLabel, setCharactersPlayed } from '../../lib/casting';
@@ -179,8 +180,14 @@ export function ProjectShootDays() {
       </form>}
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
+      {rows.length > 0 && readOnly && <p className="hint mb-2">Open a day's Call sheet to see your call. Crew plan the days.</p>}
+      {rows.length > 0 && !readOnly && (
+        <TableHint more="Type times like 4:30 PM. Days are numbered by date. Scenes come from the Scenes page.">
+          Double-tap (or double-click) a cell to change it, or select a day to plan it.
+        </TableHint>
+      )}
       <div className="flex flex-col gap-4">
-        <LatticeGrid stateId="project.shootDays" options={options} rows={rows} height={Math.min(80 + rows.length * 34, 420)} reveal={reveal}
+        <LatticeGrid stateId="project.shootDays" options={options} rows={rows} height={gridHeight(80, rows.length, 420)} reveal={reveal}
           on={{
             cellValueChanged: saveCell,
             selectionChanged: (r: DayRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
@@ -190,12 +197,6 @@ export function ProjectShootDays() {
             canDelete={isAdmin || selected.created_by === me} onDeleted={() => setSelectedId(null)} />
         )}
       </div>
-      {rows.length > 0 && readOnly && <p className="hint mt-2">Open a day's Call sheet to see your call. Crew plan the days.</p>}
-      {rows.length > 0 && !readOnly && (
-        <p className="hint mt-2">
-          Double-click a cell to change it (times like 4:30 PM), or select a day to plan it below. Days are numbered by date. Scenes come from the Scenes page.
-        </p>
-      )}
     </Section>
   );
 }
@@ -452,7 +453,7 @@ function DaySchedule({ day, scenes, onChanged }: { day: ShootDay; scenes: Scene[
       </form>
       {error && <p className="error">{error}</p>}
       <div className="flex flex-col gap-4">
-        <LatticeGrid stateId="project.shootDays.schedule" options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)} reveal={reveal}
+        <LatticeGrid stateId="project.shootDays.schedule" options={options} rows={rows} height={gridHeight(80, rows.length, 360)} reveal={reveal}
           onReady={(g) => { gridRef.current = g; }}
           on={{
             cellValueChanged: saveCell,
@@ -658,7 +659,7 @@ function DayCalls({ day, onChanged }: { day: ShootDay; onChanged: () => Promise<
       </div>
       {error && <p className="error">{error}</p>}
       <div className="flex flex-col gap-4">
-        <LatticeGrid stateId="project.shootDays.calls" options={options} rows={rows} height={Math.min(80 + rows.length * 34, 400)} reveal={reveal}
+        <LatticeGrid stateId="project.shootDays.calls" options={options} rows={rows} height={gridHeight(80, rows.length, 400)} reveal={reveal}
           on={{
             cellValueChanged: saveCell,
             selectionChanged: (r: CallRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },

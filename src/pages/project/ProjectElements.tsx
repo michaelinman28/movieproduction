@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLinkList } from '../../components/LatticeGrid';
+import { TableHint } from '../../components/TableHint';
+import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLinkList, gridHeight } from '../../components/LatticeGrid';
 import { OpenLink } from '../../components/OpenLink';
 import { RenameForm } from '../../components/RenameForm';
 import { Section } from '../../components/Section';
@@ -207,8 +208,13 @@ export function ProjectElements() {
         </form>
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
+        {rows.length > 0 ? (
+          <TableHint more="Tap a category, status, scene list, character, owner or location to pick from its list. Double-tap (or double-click) any other cell to type a change.">
+            Select an element to edit everything about it, including a note for each scene.
+          </TableHint>
+        ) : <p className="hint mb-2">Elements are the things the shoot needs: props, wardrobe, vehicles, animals, effects. You can also add them from a scene's form on the Scenes page.</p>}
         <div className="flex flex-col gap-4">
-          <LatticeGrid stateId="project.elements" options={options} rows={rows} height={Math.min(80 + rows.length * 34, 420)} reveal={reveal}
+          <LatticeGrid stateId="project.elements" options={options} rows={rows} height={gridHeight(80, rows.length, 420)} reveal={reveal}
             on={{
               cellValueChanged: saveCell,
               selectionChanged: (r: ElementRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
@@ -219,12 +225,6 @@ export function ProjectElements() {
               companyId={project.company_id} onDeleted={() => setSelectedId(null)} />
           )}
         </div>
-        {rows.length > 0 ? (
-          <p className="hint mt-2">
-            Click a category, status, scene list, character, owner or location to pick from its list. Double-click any other cell to type a change.
-            Select an element to edit everything about it below, including a note for each scene.
-          </p>
-        ) : <p className="hint mt-2">Elements are the things the shoot needs: props, wardrobe, vehicles, animals, effects. You can also add them from a scene's form on the Scenes page.</p>}
       </Section>
       {isAdmin && <ElementCategories companyId={project.company_id} categories={categories} reload={load} />}
     </div>
@@ -428,13 +428,13 @@ function ElementCategories({ companyId, categories, reload }: { companyId: strin
 
   return (
     <Section id="project.elements.categories" title="Element categories" summary={categories.length} bodyClassName="flex flex-col gap-2">
-      <p className="hint">The kinds of elements, shared by every project in the company. Double-click a category to rename it, or select it to rename or delete it below.</p>
+      <p className="hint">The kinds of elements, shared by every project in the company. Double-tap (or double-click) a category to rename it, or select it to rename or delete it below.</p>
       <form className="form-row" onSubmit={add}>
         <input className="field" placeholder="New category, e.g. Drones" aria-label="New element category" value={newName} maxLength={60} required onChange={(e) => setNewName(e.target.value)} />
         <button type="submit" className="btn btn-secondary">Add category</button>
       </form>
       {error && <p className="error">{error}</p>}
-      <LatticeGrid stateId="project.elements.categories" options={options} rows={rows} reveal={reveal} height={Math.min(80 + rows.length * 34, 320)}
+      <LatticeGrid stateId="project.elements.categories" options={options} rows={rows} reveal={reveal} height={gridHeight(80, rows.length, 320)}
         on={{
           selectionChanged: (r: { id: string }[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
           cellValueChanged: (e: { data: { id: string }; newValue: unknown }) => {
