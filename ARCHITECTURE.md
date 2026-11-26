@@ -239,7 +239,8 @@ day to day.
   lists; each scene they're in is highlighted, with their character marked in its cast). They read the Shoot days list but can't add, change or delete days,
   schedules or calls, send the sheet or share it (`is_project_crew` in the rules), and
   can't read `shoot_days.share_token` (column privileges, `hide_share_token()`; crew get
-  it from `shoot_day_share_tokens`). Crew see the full sheet. People who are both get a
+  it from `shoot_day_share_tokens`). Crew see the full sheet, which is the same for everyone: no "Your call" box or "You"
+  markers (Confirm sits above it). People who are both get a
   **My call / Full sheet** switch (`src/components/SheetViewSwitch.tsx`), starting on My
   call and remembered on the device. Migration `20261126060000_call_sheet_cast_view.sql`.
   A column added to `shoot_days` later needs `select public.hide_share_token();` again.

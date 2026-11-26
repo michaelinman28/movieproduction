@@ -36,6 +36,12 @@ export function SheetLinkPage({ token }: { token: string }) {
   }, [sheet]);
 
   const home = import.meta.env.BASE_URL;
+  const confirmBox = sheet && (sheet.confirmed
+    ? <span className="cs-confirmed">✓ Confirmed version {sheet.day.version}</span>
+    : <>
+        <button type="button" className="btn sm:w-auto" disabled={busy} onClick={confirm}>{busy ? 'Confirming…' : 'Confirm I got it'}</button>
+        {confirmError && <span className="error">{confirmError}</span>}
+      </>);
 
   return (
     <div className="flex-1">
@@ -56,14 +62,15 @@ export function SheetLinkPage({ token }: { token: string }) {
         ) : (
           <div className="flex flex-col gap-4">
             {sheet.view === 'both' && <SheetViewSwitch mode={mode} onChange={setMode} />}
-            <CallSheetDocument sheet={mode === 'mine' ? ownSheet(sheet, sheet.me) : sheet} me={sheet.me} own={mode === 'mine'} sectionPrefix="sheetLink" youAction={
-              sheet.confirmed
-                ? <span className="cs-confirmed">✓ Confirmed version {sheet.day.version}</span>
-                : <>
-                    <button type="button" className="btn" disabled={busy} onClick={confirm}>{busy ? 'Confirming…' : 'Confirm I got it'}</button>
-                    {confirmError && <span className="error">{confirmError}</span>}
-                  </>
-            } />
+            {mode === 'full' && (
+              <div className="no-print flex flex-col gap-2 rounded-lg border border-line bg-surface p-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="m-0">You're called on this day. Version {sheet.day.version} was sent.</p>
+                {confirmBox}
+              </div>
+            )}
+            {/* The full sheet is the same for everyone: no "Your call" or "You" markers (those are on My call). */}
+            <CallSheetDocument sheet={mode === 'mine' ? ownSheet(sheet, sheet.me) : sheet} me={mode === 'mine' ? sheet.me : null} own={mode === 'mine'}
+              sectionPrefix="sheetLink" youAction={mode === 'mine' ? confirmBox : undefined} />
             <p className="no-print m-0 text-center text-sm text-muted">
               This is your personal call sheet, so please don't forward the link. <a href={home}>Go to Movie Production</a>
             </p>

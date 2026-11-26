@@ -65,7 +65,7 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  */
 export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links }: {
   sheet: SheetData;
-  /** The person reading it: their call is shown at the top and their rows are marked. */
+  /** The person reading it, on My call only: their call is shown at the top and their rows are marked. The full sheet passes none. */
   me?: string | null;
   /** Only the reader's own call sheet ("My call"): no key contacts, cast or crew lists. */
   own?: boolean;
