@@ -107,6 +107,10 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   const sceneLine = (s: { int_ext: SheetData['scenes'][number]['int_ext']; time_of_day: SheetData['scenes'][number]['time_of_day'] }) =>
     [s.int_ext && labelOf(SCENE_INT_EXT, s.int_ext), s.time_of_day && labelOf(SCENE_TIMES, s.time_of_day)].filter(Boolean) as string[];
   const isMe = (c: SheetCall) => c.user_id === me;
+  // On My call, the characters the reader plays are highlighted in each scene they're in.
+  const myChars = new Set(own && mine ? (mine.characters ?? []).map((ch) => ch.name.trim().toLowerCase()) : []);
+  const sceneChars = (text: string | null) => (text ?? '').split(',').map((n) => n.trim()).filter(Boolean);
+  const playsIn = (text: string | null) => sceneChars(text).filter((n) => myChars.has(n.toLowerCase()));
   // The day's elements by category (in the company's order, as sent); the reader's own character's first in each.
   const elements = sheet.elements ?? [];
   const isMine = (e: SheetElement) => Boolean(me && e.character?.actor_id === me);
@@ -244,8 +248,9 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
                 }
                 const s = sheet.scenes.find((x) => x.id === i.scene_id);
                 if (!s) return null;
+                const mineHere = playsIn(s.characters);
                 return (
-                  <li key={i.id} className="cs-row">
+                  <li key={i.id} className={`cs-row ${mineHere.length ? 'cs-row-mine' : ''}`}>
                     <span className="cs-row-time">{time}</span>
                     <div className="cs-row-body">
                       <div className="cs-row-head">
@@ -253,11 +258,13 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
                         <span className="cs-row-set"><To to={links?.scene(s.id)} title={`Open scene ${s.number} on the Scenes page`}>{s.set_name || 'Scene'}</To></span>
                         {sceneLine(s).map((t) => <span key={t} className="cs-pill">{t}</span>)}
                         {s.pages_eighths != null && <span className="cs-pages">{pagesLabel(s.pages_eighths)} pg</span>}
+                        {mineHere.length > 0 && <span className="cs-in-scene">You: {mineHere.join(', ')}</span>}
                       </div>
                       {s.synopsis && <p className="cs-row-text">{s.synopsis}</p>}
                       {(s.characters || s.needs || elementsIn(s.id).length > 0) && (
                         <p className="cs-row-meta">
-                          {s.characters && <span><b>Cast</b> {s.characters}</span>}
+                          {s.characters && <span><b>Cast</b> {sceneChars(s.characters).map((n, k) => (
+                            <span key={n}>{k > 0 && ', '}{myChars.has(n.toLowerCase()) ? <mark className="cs-mine-char">{n}</mark> : n}</span>))}</span>}
                           {elementsIn(s.id).length > 0 && <span><b>Elements</b> {elementsIn(s.id).map((e) => e.name).join(', ')}</span>}
                           {s.needs && <span><b>Other needs</b> {s.needs}</span>}
                         </p>

@@ -236,7 +236,7 @@ day to day.
   their own call: the database returns only their own `shoot_day_calls` row, so the
   in-app call sheet and their personal link show "My call" (their call, their dietary
   needs, the schedule, location, weather and hospital; no key contacts, cast or crew
-  lists). They read the Shoot days list but can't add, change or delete days,
+  lists; each scene they're in is highlighted, with their character marked in its cast). They read the Shoot days list but can't add, change or delete days,
   schedules or calls, send the sheet or share it (`is_project_crew` in the rules), and
   can't read `shoot_days.share_token` (column privileges, `hide_share_token()`; crew get
   it from `shoot_day_share_tokens`). Crew see the full sheet. People who are both get a
