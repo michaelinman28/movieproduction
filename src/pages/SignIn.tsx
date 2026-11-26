@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
 import { ThemeSwitch } from '../components/ThemeSwitch';
+import { PasswordField } from '../components/PasswordField';
 import { readInvite } from '../lib/invite';
 
 export function SignIn() {
@@ -66,8 +67,7 @@ export function SignIn() {
         </label>
         <label className="label">
           Password
-          <input
-            type="password"
+          <PasswordField
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
