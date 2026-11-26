@@ -142,6 +142,14 @@ export const CASTING_STATUSES: { value: CastingStatus; label: string }[] = [
   { value: 'cast', label: 'Cast' },
 ];
 
+/** An element is needed (still to find), sourced (found, not yet on hand) or ready (on hand for the shoot). */
+export type ElementStatus = 'needed' | 'sourced' | 'ready';
+export const ELEMENT_STATUSES: { value: ElementStatus; label: string }[] = [
+  { value: 'needed', label: 'Needed' },
+  { value: 'sourced', label: 'Sourced' },
+  { value: 'ready', label: 'Ready' },
+];
+
 /**
  * Who someone plays on a call sheet: the character typed on their call, or else the
  * characters they're cast as on the Characters page, e.g. "Ellie (#1)".

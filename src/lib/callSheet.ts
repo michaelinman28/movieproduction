@@ -47,6 +47,13 @@ export function callSheetBody(sheet: CallSheet, t: SheetText) {
       }
     }
   }
+  if (sheet.elements?.length) {
+    lines.push('', 'Elements:');
+    for (const e of sheet.elements) {
+      const scenes = e.scenes.map((s) => s.number).join(', ');
+      lines.push(`- ${e.category ? `${e.category}: ` : ''}${e.name}${e.quantity && e.quantity > 1 ? ` x${e.quantity}` : ''}${e.character ? ` (${e.character.name})` : ''}${scenes ? `, sc ${scenes}` : ''}`);
+    }
+  }
   if (d.notes) lines.push('', 'Notes:', d.notes);
   return lines.join('\n');
 }

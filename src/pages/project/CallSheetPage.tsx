@@ -71,7 +71,7 @@ export function CallSheetPage() {
     project: { name: project.name, company_name: project.company.name },
     day: sheet.day, location: sheet.location, items: sheet.items, scenes: sheet.scenes, calls: sheet.calls,
     roles: roles.map((r) => ({ id: r.id, name: r.name, department: r.department, sort_order: r.sort_order })),
-    next_day: sheet.next_day,
+    next_day: sheet.next_day, elements: sheet.elements ?? [],
   }, [sheet, project, roles]);
 
   async function copyLink(userId: string, token: string) {
@@ -98,6 +98,7 @@ export function CallSheetPage() {
     person: (userId) => itemPath.teamMember(projectId, userId),
     location: sheet.day.location_id ? itemPath.location(projectId, sheet.day.location_id) : null,
     nextDay: sheet.next_day ? itemPath.callSheet(projectId, sheet.next_day.day.id) : null,
+    element: (id) => itemPath.element(projectId, id),
   } : undefined;
 
   if (error && !sheet) return <p className="error">{error} <Link to={`/projects/${projectId}/shoot-days`}>Back to shoot days</Link></p>;

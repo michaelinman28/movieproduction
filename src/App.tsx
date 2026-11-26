@@ -10,6 +10,7 @@ import { ProjectLocationsPage, ProjectOverview, ProjectTasks } from './pages/pro
 import { ProjectTeam } from './pages/project/ProjectTeam';
 import { ProjectScenes } from './pages/project/ProjectScenes';
 import { ProjectCharacters } from './pages/project/ProjectCharacters';
+import { ProjectElements } from './pages/project/ProjectElements';
 import { ProjectShootDays } from './pages/project/ProjectShootDays';
 import { CallSheetPage } from './pages/project/CallSheetPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -73,6 +74,7 @@ export function App() {
             <Route path="tasks" element={<ProjectTasks />} />
             <Route path="scenes" element={<ProjectScenes />} />
             <Route path="characters" element={<ProjectCharacters />} />
+            <Route path="elements" element={<ProjectElements />} />
             <Route path="shoot-days" element={<ProjectShootDays />} />
             <Route path="shoot-days/:dayId" element={<CallSheetPage />} />
             <Route path="locations" element={<ProjectLocationsPage />} />

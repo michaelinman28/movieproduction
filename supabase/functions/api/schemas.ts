@@ -397,7 +397,7 @@ export const Scene = z.object({
   pages_eighths: z.number().int().nullable().openapi({ description: 'Length in eighths of a page (11 = 1 3/8 pages)', example: 11 }),
   synopsis: nullableText.openapi({ example: 'Maya confronts Leo about the money' }),
   characters: nullableText.openapi({ example: 'Maya, Leo, Waitress', description: 'The names of the scene\'s characters, by cast number. Kept in step with character_ids.' }),
-  needs: nullableText.openapi({ example: 'Practical neon sign, rain on windows' }),
+  needs: nullableText.openapi({ example: 'Rain on windows after 3pm', description: 'Other needs, as a free note; the things the scene needs are its elements' }),
   location_id: Uuid.nullable().openapi({ description: 'One of the project\'s locations' }),
   status: SceneStatus,
   sort_order: z.number().int(),
@@ -408,6 +408,7 @@ export const Scene = z.object({
   shots_done: z.number().int().openapi({ description: 'How many of them are done' }),
   est_minutes: z.number().int().openapi({ description: 'The shots\' estimated minutes added up' }),
   character_ids: z.array(Uuid).openapi({ description: 'The characters in the scene (see Characters). `characters` holds their names.' }),
+  element_ids: z.array(Uuid).openapi({ description: 'The elements in the scene (see Elements)' }),
 }).openapi('Scene');
 
 export const SceneInput = z.object({
@@ -565,6 +566,7 @@ export const CallSheet = z.object({
   scenes: z.array(z.any()).openapi({ description: 'The scenes on the day (see Scene)' }),
   calls: z.array(ShootDayCall),
   next_day: z.object({ day: ShootDay, scenes: z.array(z.any()) }).nullable().openapi({ description: 'A look ahead at the following shoot day' }),
+  elements: z.array(z.any()).openapi({ description: 'The elements of the day\'s scenes (see SheetElement)' }),
 }).openapi('CallSheet');
 
 export const TokenParam = z.object({ token: Uuid.openapi({ param: { name: 'token', in: 'path' } }) });
@@ -579,6 +581,7 @@ export const LinkedCallSheet = z.object({
   scenes: z.array(z.any()).openapi({ description: 'The scenes on the day, in order' }),
   calls: z.array(z.any()).openapi({ description: 'Everyone called: their call, character, the characters they play, pickup, makeup, note, name, nickname, phone and role ids (no emails). On a personal link, the reader\'s own call also has their dietary needs.' }),
   roles: z.array(z.object({ id: Uuid, name: z.string(), department: z.string().nullable(), sort_order: z.number().int().nullable() })),
+  elements: z.array(z.any()).openapi({ description: 'The elements of the day\'s scenes (see SheetElement)' }),
   next_day: z.any().nullable(),
 }).openapi('LinkedCallSheet');
 
@@ -699,9 +702,6 @@ export const Character = z.object({
   actor_id: Uuid.nullable().openapi({ description: 'Someone on the project\'s team. Picking an actor marks the character cast.' }),
   stand_in_id: Uuid.nullable(),
   double_id: Uuid.nullable().openapi({ description: 'Stunt double' }),
-  wardrobe: nullableText,
-  hair_makeup: nullableText,
-  props: nullableText,
   continuity: nullableText,
   created_by: Uuid.nullable(),
   created_at: z.string(),
@@ -721,9 +721,6 @@ const characterFields = {
   actor_id: Uuid.nullable().optional(),
   stand_in_id: Uuid.nullable().optional(),
   double_id: Uuid.nullable().optional(),
-  wardrobe: optText(4000),
-  hair_makeup: optText(4000),
-  props: optText(4000),
   continuity: optText(4000),
 };
 export const CharacterInput = z.object(characterFields).openapi('CharacterInput');
@@ -783,3 +780,73 @@ export const TeamNoteInput = z.object({
   type_id: Uuid.nullable().optional(),
 }).openapi('TeamNoteInput');
 export const TeamNoteUpdate = TeamNoteInput.partial().openapi('TeamNoteUpdate');
+
+// ---- Elements ---------------------------------------------------------------------
+
+export const ElementStatus = z.enum(['needed', 'sourced', 'ready']).openapi('ElementStatus');
+
+export const ElementCategory = z.object({
+  id: Uuid,
+  company_id: Uuid,
+  name: z.string().openapi({ example: 'Props' }),
+  sort_order: z.number().int(),
+  elements: z.number().int().openapi({ description: 'How many elements use it' }),
+}).openapi('ElementCategory');
+
+export const ElementCategoryInput = z.object({
+  name: z.string().trim().min(1).max(60).openapi({ example: 'Drones' }),
+}).openapi('ElementCategoryInput');
+
+export const ElementScene = z.object({
+  scene_id: Uuid,
+  note: nullableText.openapi({ description: 'Anything about it in this scene', example: 'Crashes into the lake' }),
+}).openapi('ElementScene');
+
+export const Element = z.object({
+  id: Uuid,
+  project_id: Uuid,
+  name: z.string().openapi({ example: 'Hero drone' }),
+  category_id: Uuid.nullable().openapi({ description: 'One of the company\'s element categories' }),
+  description: nullableText.openapi({ example: 'White quadcopter with a red stripe' }),
+  status: ElementStatus,
+  owner_id: Uuid.nullable().openapi({ description: 'Who looks after it: someone on the project\'s team' }),
+  quantity: z.number().int().nullable().openapi({ example: 2 }),
+  character_id: Uuid.nullable().openapi({ description: 'The character it belongs to, if any' }),
+  location_id: Uuid.nullable().openapi({ description: 'The location it stays at, if any' }),
+  notes: nullableText,
+  created_by: Uuid.nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  scenes: z.array(ElementScene).openapi({ description: 'The scenes it\'s in, in scene order' }),
+}).openapi('Element');
+
+const elementFields = {
+  name: z.string().trim().min(1).max(100).openapi({ example: 'Hero drone' }),
+  category_id: Uuid.nullable().optional(),
+  description: optText(4000),
+  status: ElementStatus.optional().openapi({ description: 'Defaults to needed' }),
+  owner_id: Uuid.nullable().optional(),
+  quantity: z.number().int().min(1).max(100000).nullable().optional(),
+  character_id: Uuid.nullable().optional(),
+  location_id: Uuid.nullable().optional(),
+  notes: optText(4000),
+};
+export const ElementInput = z.object(elementFields).openapi('ElementInput');
+export const ElementUpdate = z.object(elementFields).partial().openapi('ElementUpdate');
+
+export const SceneElementNoteInput = z.object({ note: optText(500) }).openapi('SceneElementNoteInput');
+export const SceneElementParams = z.object({
+  id: Uuid.openapi({ param: { name: 'id', in: 'path' }, description: 'The scene' }),
+  elementId: Uuid.openapi({ param: { name: 'elementId', in: 'path' } }),
+});
+
+export const SheetElement = z.object({
+  id: Uuid,
+  name: z.string(),
+  category: z.string().nullable(),
+  quantity: z.number().int().nullable(),
+  description: z.string().nullable(),
+  status: ElementStatus,
+  character: z.object({ id: Uuid, name: z.string(), cast_number: z.number().int().nullable(), actor_id: Uuid.nullable() }).nullable(),
+  scenes: z.array(z.object({ scene_id: Uuid, number: z.string(), note: z.string().nullable() })).openapi({ description: 'The day\'s scenes it\'s in' }),
+}).openapi('SheetElement');

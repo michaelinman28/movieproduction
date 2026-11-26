@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { LinkedCallSheet } from '../lib/api';
+import type { LinkedCallSheet, SheetElement } from '../lib/api';
 import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, clockLabel, labelOf, longDate, pagesLabel, shortDate } from '../lib/format';
 import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
@@ -32,6 +32,7 @@ export interface SheetLinks {
   location: string | null;
   /** The next shoot day's call sheet. */
   nextDay: string | null;
+  element: (id: string) => string;
 }
 
 /** Text that links to an item's page when there's somewhere to go; plain text otherwise. */
@@ -104,6 +105,17 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
   const sceneLine = (s: { int_ext: SheetData['scenes'][number]['int_ext']; time_of_day: SheetData['scenes'][number]['time_of_day'] }) =>
     [s.int_ext && labelOf(SCENE_INT_EXT, s.int_ext), s.time_of_day && labelOf(SCENE_TIMES, s.time_of_day)].filter(Boolean) as string[];
   const isMe = (c: SheetCall) => c.user_id === me;
+  // The day's elements by category (in the company's order, as sent); the reader's own character's first in each.
+  const elements = sheet.elements ?? [];
+  const isMine = (e: SheetElement) => Boolean(me && e.character?.actor_id === me);
+  const elementGroups: [string, SheetElement[]][] = [];
+  for (const e of elements) {
+    const cat = e.category || 'Other';
+    const g = elementGroups.find(([c]) => c === cat);
+    if (g) g[1].push(e); else elementGroups.push([cat, [e]]);
+  }
+  const elementsIn = (sceneId: string) => elements.filter((e) => e.scenes.some((s) => s.scene_id === sceneId));
+  for (const [, list] of elementGroups) list.sort((a, b) => Number(isMine(b)) - Number(isMine(a)));
   // The day's other times, leaving out any that aren't set.
   const times = ([
     ['Shooting call', day.shooting_call], ['Lunch', day.lunch], ['Est. wrap', day.wrap], ['Sunrise', day.sunrise], ['Sunset', day.sunset],
@@ -239,10 +251,11 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
                         {s.pages_eighths != null && <span className="cs-pages">{pagesLabel(s.pages_eighths)} pg</span>}
                       </div>
                       {s.synopsis && <p className="cs-row-text">{s.synopsis}</p>}
-                      {(s.characters || s.needs) && (
+                      {(s.characters || s.needs || elementsIn(s.id).length > 0) && (
                         <p className="cs-row-meta">
                           {s.characters && <span><b>Cast</b> {s.characters}</span>}
-                          {s.needs && <span><b>Needs</b> {s.needs}</span>}
+                          {elementsIn(s.id).length > 0 && <span><b>Elements</b> {elementsIn(s.id).map((e) => e.name).join(', ')}</span>}
+                          {s.needs && <span><b>Other needs</b> {s.needs}</span>}
                         </p>
                       )}
                     </div>
@@ -252,6 +265,33 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
             </ol>
           ) : <p className="cs-muted">Nothing scheduled yet</p>}
         </Section>
+
+        {elements.length > 0 && (
+          <Section id={`${sectionPrefix}.elements`} title="Elements" summary={`${elements.length} for today's scenes`}>
+            <div className="cs-depts">
+              {elementGroups.map(([cat, list]) => (
+                <div key={cat} className="cs-dept">
+                  <h4 className="cs-dept-h">{cat}</h4>
+                  <ul className="cs-els">
+                    {list.map((e) => (
+                      <li key={e.id} className={isMine(e) ? 'cs-me' : ''}>
+                        <span>
+                          <span className="cs-el-name"><To to={links?.element(e.id)} title={`Open ${e.name} on the Elements page`}>{e.name}</To></span>
+                          {e.quantity != null && e.quantity > 1 && <span className="cs-muted"> × {e.quantity}</span>}
+                          {isMine(e) && <span className="cs-you-badge">Yours</span>}
+                        </span>
+                        <span className="cs-el-meta">
+                          {[e.character && `${e.character.cast_number != null ? `${e.character.cast_number}. ` : ''}${e.character.name}`,
+                            e.scenes.map((s) => `Sc ${s.number}${s.note ? `: ${s.note}` : ''}`).join('; ')].filter(Boolean).join(' · ')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
 
         <Section id={`${sectionPrefix}.cast`} title="Cast" summary={cast.length ? String(cast.length) : undefined}>
           {cast.length ? (

@@ -12,6 +12,7 @@ import { locations } from './routes/locations.ts';
 import { people } from './routes/people.ts';
 import { scenes } from './routes/scenes.ts';
 import { characters } from './routes/characters.ts';
+import { elements } from './routes/elements.ts';
 import { teamNotes } from './routes/teamNotes.ts';
 import { shootDays } from './routes/shootDays.ts';
 import { notes } from './routes/notes.ts';
@@ -50,6 +51,7 @@ export function createApp(config: ApiConfig) {
   api.route('/', people);
   api.route('/', scenes);
   api.route('/', characters);
+  api.route('/', elements);
   api.route('/', teamNotes);
   api.route('/', shootDays);
   api.route('/', notes);
@@ -84,8 +86,10 @@ export function createApp(config: ApiConfig) {
       { name: 'Task tags', description: 'Free-form task tags, shared across a company' },
       { name: 'People', description: 'People\'s names, phones and extra contacts. Admins look after the people in their company; only the person changes their sign-in email' },
       { name: 'Locations', description: 'A project\'s locations, with address and on-site contact; tasks can be assigned to one' },
-      { name: 'Scenes', description: 'A project\'s scenes in order: set, interior or exterior, time of day, pages, characters, needs and location' },
-      { name: 'Characters', description: 'A project\'s characters: cast number, type, casting (actor, stand-in, stunt double), look and continuity, and the scenes they\'re in' },
+      { name: 'Scenes', description: 'A project\'s scenes in order: set, interior or exterior, time of day, pages, characters, elements, other needs and location' },
+      { name: 'Characters', description: 'A project\'s characters: cast number, type, casting (actor, stand-in, stunt double), continuity, and the scenes they\'re in' },
+      { name: 'Elements', description: 'A project\'s breakdown elements (props, wardrobe, vehicles, effects…): category, status, owner, quantity, an optional character and location, and the scenes that use them' },
+      { name: 'Element categories', description: 'The company\'s list of element categories, which its admins manage' },
       { name: 'Character notes', description: 'Any number of notes on a character' },
       { name: 'Team member notes', description: 'Notes about a person on a project, each with a type. Only company admins and the person see them' },
       { name: 'Team note types', description: 'Each company\'s list of team note types, set up by its admins' },
