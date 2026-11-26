@@ -23,7 +23,7 @@ export interface ServerPaging {
 const SIZES = [25, 50, 100, 250];
 const fmt = new Intl.NumberFormat();
 
-/** The pager under a server-paged table; looks like lattice-grid's own pager. */
+/** The pager under a server-paged table, always shown (Michael, 2026-11-26) so the count and rows per page are visible. */
 export function ServerPager({ page, pageSize, total, loading, onPage, onPageSize }: ServerPaging) {
   const { theme } = useTheme();
   const pages = Math.max(1, Math.ceil(total / pageSize));
