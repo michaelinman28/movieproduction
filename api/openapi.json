@@ -791,14 +791,27 @@
               "can_manage": {
                 "type": "boolean",
                 "description": "Whether the caller is an admin of the project's company"
+              },
+              "view": {
+                "$ref": "#/components/schemas/ProjectView"
               }
             },
             "required": [
               "company",
-              "can_manage"
+              "can_manage",
+              "view"
             ]
           }
         ]
+      },
+      "ProjectView": {
+        "type": "string",
+        "enum": [
+          "crew",
+          "cast",
+          "both"
+        ],
+        "description": "The caller on this project: crew (a company admin, or a role outside Cast), cast (plays a character or has a Cast role, or has no roles), or both. Cast only see their own call on shoot days and cannot change shoot days; both can switch between their own call and the full sheet."
       },
       "ProjectUpdate": {
         "type": "object",
@@ -3609,7 +3622,7 @@
             ],
             "format": "uuid",
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
-            "description": "The day's shared call sheet link, for anyone: /shared-call-sheets/{token}, and the app page /call-sheet/{token}. Null when off"
+            "description": "The day's shared call sheet link, for anyone: /shared-call-sheets/{token}, and the app page /call-sheet/{token}. Null when off, and always null for cast only"
           },
           "share_phones": {
             "type": "boolean",
@@ -4269,6 +4282,16 @@
             "type": "boolean",
             "description": "Whether they have confirmed the version sent"
           },
+          "view": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectView"
+              },
+              {
+                "description": "The link's person on the project. For cast only, calls holds just their own call"
+              }
+            ]
+          },
           "project": {
             "type": "object",
             "properties": {
@@ -4349,6 +4372,7 @@
         "required": [
           "me",
           "confirmed",
+          "view",
           "project",
           "items",
           "scenes",
@@ -11272,7 +11296,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Add a shoot day (anyone on the project)",
+        "summary": "Add a shoot day (crew on the project)",
         "parameters": [
           {
             "schema": {
@@ -11349,7 +11373,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Change a shoot day (anyone on the project). Send the call sheet again to share the change",
+        "summary": "Change a shoot day (crew on the project). Send the call sheet again to share the change",
         "parameters": [
           {
             "schema": {
@@ -11424,7 +11448,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Delete a shoot day (whoever added it, or a company admin)",
+        "summary": "Delete a shoot day (whoever added it, if crew, or a company admin)",
         "parameters": [
           {
             "schema": {
@@ -12311,7 +12335,7 @@
           }
         ],
         "summary": "Turn the day's shared call sheet link on or off, make a new one, or choose whether it shows phones",
-        "description": "The shared link is one view-only page of the whole sent call sheet, for anyone who has it, with no sign-in. It never shows emails; phone numbers only when `phones` is on. Anyone on the project can change it.",
+        "description": "The shared link is one view-only page of the whole sent call sheet, for anyone who has it, with no sign-in. It never shows emails; phone numbers only when `phones` is on. Crew on the project can change it.",
         "parameters": [
           {
             "schema": {

@@ -157,9 +157,15 @@ export const Project = z.object({
   created_at: z.string(),
 }).openapi('Project');
 
+export const ProjectView = z.enum(['crew', 'cast', 'both']).openapi('ProjectView', {
+  description: 'The caller on this project: crew (a company admin, or a role outside Cast), cast (plays a character or has a Cast role, or has no roles), or both. '
+    + 'Cast only see their own call on shoot days and cannot change shoot days; both can switch between their own call and the full sheet.',
+});
+
 export const ProjectDetail = Project.extend({
   company: z.object({ id: Uuid, name: z.string() }),
   can_manage: z.boolean().openapi({ description: 'Whether the caller is an admin of the project\'s company' }),
+  view: ProjectView,
 }).openapi('ProjectDetail');
 
 export const ProjectCreate = z.object({
@@ -485,7 +491,7 @@ export const ShootDay = z.object({
   version: z.number().int().openapi({ description: 'How many times the call sheet has been sent (0 = not yet)' }),
   sent_at: z.string().nullable(),
   sent_by: Uuid.nullable(),
-  share_token: Uuid.nullable().openapi({ description: 'The day\'s shared call sheet link, for anyone: /shared-call-sheets/{token}, and the app page /call-sheet/{token}. Null when off' }),
+  share_token: Uuid.nullable().openapi({ description: 'The day\'s shared call sheet link, for anyone: /shared-call-sheets/{token}, and the app page /call-sheet/{token}. Null when off, and always null for cast only' }),
   share_phones: z.boolean().openapi({ description: 'Whether the shared link shows phone numbers' }),
   created_by: Uuid.nullable(),
   created_at: z.string(),
@@ -574,6 +580,7 @@ export const TokenParam = z.object({ token: Uuid.openapi({ param: { name: 'token
 export const LinkedCallSheet = z.object({
   me: Uuid.openapi({ description: 'The person the link belongs to' }),
   confirmed: z.boolean().openapi({ description: 'Whether they have confirmed the version sent' }),
+  view: ProjectView.openapi({ description: 'The link\'s person on the project. For cast only, calls holds just their own call' }),
   project: z.object({ name: z.string(), company_name: z.string() }),
   day: z.any().openapi({ description: 'The day: date, title, times, weather, notes, version, sent_at, day_number, total_days' }),
   location: z.any().nullable().openapi({ description: 'Name, description, address, parking, nearest hospital and on-site contact' }),
@@ -585,7 +592,7 @@ export const LinkedCallSheet = z.object({
   next_day: z.any().nullable(),
 }).openapi('LinkedCallSheet');
 
-export const SharedCallSheet = LinkedCallSheet.omit({ me: true, confirmed: true }).extend({
+export const SharedCallSheet = LinkedCallSheet.omit({ me: true, confirmed: true, view: true }).extend({
   phones: z.boolean().openapi({ description: 'Whether phone numbers are shown (the sharer chooses); emails never are' }),
 }).openapi('SharedCallSheet');
 

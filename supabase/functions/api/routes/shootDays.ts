@@ -23,10 +23,19 @@ type Db = any;
 const clean = (o: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === '' ? null : v]));
 
-/** Days of a project with their number, scenes, pages and call counts. */
+/** Every column of shoot_days but the shared link code, which only crew can read (shoot_day_share_tokens). */
+const DAY_COLS = 'id, project_id, shoot_date, title, location_id, crew_call, shooting_call, lunch, wrap, weather, sunrise, sunset, notes, '
+  + 'version, sent_at, sent_by, created_by, created_at, updated_at, note_by, note_at, share_phones';
+
+/** Days of a project with their number, scenes, pages and call counts (for cast only, just their own call). */
 async function describeDays(db: Db, projectId: string, rows?: Row[]) {
-  const all = must<Row[]>(await db.from('shoot_days').select('*').eq('project_id', projectId).order('shoot_date').order('created_at'));
-  const list = rows ?? all;
+  const [days, tokens] = await Promise.all([
+    db.from('shoot_days').select(DAY_COLS).eq('project_id', projectId).order('shoot_date').order('created_at'),
+    db.rpc('shoot_day_share_tokens', { pid: projectId }),
+  ]);
+  const shared = new Map(must<Row[]>(tokens).map((t) => [t.id, t.share_token]));
+  const all = must<Row[]>(days).map((d) => ({ ...d, share_token: shared.get(d.id) ?? null }));
+  const list = rows ? all.filter((d) => rows.some((r) => r.id === d.id)) : all;
   const ids = list.map((d) => d.id);
   const [items, calls] = ids.length
     ? await Promise.all([
@@ -52,7 +61,7 @@ async function describeDays(db: Db, projectId: string, rows?: Row[]) {
 }
 
 async function oneDay(db: Db, id: string) {
-  const row = found(must<Row[]>(await db.from('shoot_days').select('*').eq('id', id)));
+  const row = found(must<Row[]>(await db.from('shoot_days').select('id, project_id').eq('id', id)));
   return (await describeDays(db, row.project_id, [row]))[0];
 }
 
@@ -89,19 +98,19 @@ shootDays.openapi(createRoute({
 
 shootDays.openapi(createRoute({
   method: 'post', path: '/projects/{id}/shoot-days', tags, security: secured,
-  summary: 'Add a shoot day (anyone on the project)',
+  summary: 'Add a shoot day (crew on the project)',
   request: { params: IdParam, ...body(ShootDayInput) },
   responses: { 201: ok(ShootDay, 'Created'), 400: errors[400], 401: errors[401], 403: errors[403] },
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  const row = must<Row>(await db.from('shoot_days').insert({ ...clean(c.req.valid('json')), project_id: id }).select('*').single());
+  const row = must<Row>(await db.from('shoot_days').insert({ ...clean(c.req.valid('json')), project_id: id }).select('id').single());
   return send(c, await oneDay(db, row.id), 201);
 });
 
 shootDays.openapi(createRoute({
   method: 'patch', path: '/shoot-days/{id}', tags, security: secured,
-  summary: 'Change a shoot day (anyone on the project). Send the call sheet again to share the change',
+  summary: 'Change a shoot day (crew on the project). Send the call sheet again to share the change',
   request: { params: IdParam, ...body(ShootDayUpdate) },
   responses: { 200: ok(ShootDay), 400: errors[400], 401: errors[401], 404: errors[404] },
 }), async (c) => {
@@ -113,7 +122,7 @@ shootDays.openapi(createRoute({
 
 shootDays.openapi(createRoute({
   method: 'delete', path: '/shoot-days/{id}', tags, security: secured,
-  summary: 'Delete a shoot day (whoever added it, or a company admin)',
+  summary: 'Delete a shoot day (whoever added it, if crew, or a company admin)',
   request: { params: IdParam },
   responses: { 204: { description: 'Deleted' }, 401: errors[401], 404: errors[404] },
 }), async (c) => {
@@ -338,7 +347,7 @@ shootDays.openapi(createRoute({
   method: 'post', path: '/shoot-days/{id}/share', tags: sheetTags, security: secured,
   summary: 'Turn the day\'s shared call sheet link on or off, make a new one, or choose whether it shows phones',
   description: 'The shared link is one view-only page of the whole sent call sheet, for anyone who has it, with no sign-in. '
-    + 'It never shows emails; phone numbers only when `phones` is on. Anyone on the project can change it.',
+    + 'It never shows emails; phone numbers only when `phones` is on. Crew on the project can change it.',
   request: { params: IdParam, ...body(ShareInput) },
   responses: { 200: ok(ShareResult), 400: errors[400], 401: errors[401], 403: errors[403] },
 }), async (c) => {
@@ -347,8 +356,9 @@ shootDays.openapi(createRoute({
   const b = c.req.valid('json');
   const r = await db.rpc('share_call_sheet', { day: id, enabled: b.enabled, new_link: b.new_link ?? false, phones: b.phones ?? null });
   if (r.error) fail(r.error);
-  const row = found(must<Row[]>(await db.from('shoot_days').select('share_token, share_phones').eq('id', id)));
-  return send(c, row, 200);
+  const row = found(must<Row[]>(await db.from('shoot_days').select('project_id, share_phones').eq('id', id)));
+  const tokens = must<Row[]>(await db.rpc('shoot_day_share_tokens', { pid: row.project_id }));
+  return send(c, { share_token: tokens.find((t) => t.id === id)?.share_token ?? null, share_phones: row.share_phones }, 200);
 });
 
 shootDays.openapi(createRoute({

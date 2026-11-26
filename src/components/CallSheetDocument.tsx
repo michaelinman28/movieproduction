@@ -6,7 +6,7 @@ import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
 
 /** What the call sheet shows. A personal link gets exactly this; the project's call sheet page maps its data to it. */
-export type SheetData = Omit<LinkedCallSheet, 'me' | 'confirmed'>;
+export type SheetData = Omit<LinkedCallSheet, 'me' | 'confirmed' | 'view'>;
 type SheetCall = SheetData['calls'][number];
 
 // Roles listed as key contacts near the top, in this order.
@@ -63,10 +63,12 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
  * call sheet page and by each person's private link.
  */
-export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNote, youAction, links }: {
+export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links }: {
   sheet: SheetData;
   /** The person reading it: their call is shown at the top and their rows are marked. */
   me?: string | null;
+  /** Only the reader's own call sheet ("My call"): no key contacts, cast or crew lists. */
+  own?: boolean;
   /** Section ids, so each page remembers its own opened and closed sections. */
   sectionPrefix: string;
   /** Each person's call sheet status (on the project's page only; not printed). */
@@ -157,6 +159,8 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
         </div>
       </header>
 
+      {own && !mine && <p className="cs-you cs-muted">You're not called on this day.</p>}
+
       {mine && (
         <section className="cs-you" aria-label="Your call">
           <div>
@@ -182,7 +186,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
         </dl>
       )}
 
-      <div className="cs-info">
+      <div className={`cs-info ${own ? 'cs-info-3' : ''}`}>
         <Card title="Location">
           {loc ? (
             <>
@@ -213,7 +217,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
             <li><span className="cs-muted">Emergency</span><span>Police, fire, ambulance</span><a className="cs-phone" href="tel:911">911</a></li>
           </ul>
         </Card>
-        <Card title="Key contacts">
+        {!own && <Card title="Key contacts">
           {keys.length ? (
             <ul className="cs-keys">
               {keys.map(({ role, c }) => (
@@ -221,7 +225,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
               ))}
             </ul>
           ) : <p className="cs-muted cs-small">None listed</p>}
-        </Card>
+        </Card>}
       </div>
 
       <div className="cs-body">
@@ -293,7 +297,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
           </Section>
         )}
 
-        <Section id={`${sectionPrefix}.cast`} title="Cast" summary={cast.length ? String(cast.length) : undefined}>
+        {!own && <Section id={`${sectionPrefix}.cast`} title="Cast" summary={cast.length ? String(cast.length) : undefined}>
           {cast.length ? (
             <ul className="cs-people">
               {cast.map((c) => person(c,
@@ -301,9 +305,9 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
                 <><TimeChip label="Pickup" time={c.pickup_time} /><TimeChip label="Makeup" time={c.makeup_time} /><span className="cs-chip cs-chip-strong"><span>On set</span> {callOf(c) || '—'}</span></>))}
             </ul>
           ) : <p className="cs-muted">No cast called</p>}
-        </Section>
+        </Section>}
 
-        <Section id={`${sectionPrefix}.crew`} title="Crew" summary={String(sheet.calls.length - cast.length)}>
+        {!own && <Section id={`${sectionPrefix}.crew`} title="Crew" summary={String(sheet.calls.length - cast.length)}>
           {crew.length ? (
             <div className="cs-depts">
               {crew.map(([dept, list]) => (
@@ -318,10 +322,10 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
               ))}
             </div>
           ) : <p className="cs-muted">No crew called yet</p>}
-        </Section>
+        </Section>}
 
         {food.length > 0 && (
-          <Section id={`${sectionPrefix}.dietary`} title="Dietary needs"
+          <Section id={`${sectionPrefix}.dietary`} title={own ? 'Your dietary needs' : 'Dietary needs'}
             summary={`${food.length} ${food.length === 1 ? 'person' : 'people'}${allergies ? `, ${allergies} ${allergies === 1 ? 'allergy' : 'allergies'}` : ''}`}>
             <ul className="cs-food">
               {food.map((c) => (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CallSheetDocument, type SheetData, type SheetLinks } from '../../components/CallSheetDocument';
+import { SheetViewSwitch, ownSheet, useSheetMode } from '../../components/SheetViewSwitch';
 import { itemPath } from '../../lib/links';
 import { Section } from '../../components/Section';
 import { api, type CallSheet } from '../../lib/api';
@@ -13,15 +14,19 @@ import { useProject } from './ProjectLayout';
 /**
  * A shoot day's call sheet, built from the day: times, weather, location, the day's
  * scenes and breaks, cast and crew with their own calls, notes, and the next day.
- * Anyone on the project can send it (a new version); everyone called sees their own
- * call at the top and confirms. Each person also has a private, view-only link to the
- * sheet (Personal links). Print gives the same design laid out for paper.
+ * Crew send it (a new version); everyone called sees their own call at the top and
+ * confirms. Each person also has a private, view-only link to the sheet (Personal
+ * links). Print gives the same design laid out for paper.
+ *
+ * Cast only see just their own call ("My call"; the API gives them nothing else).
+ * Crew see the full sheet. People who are both switch between the two (useSheetMode).
  */
 export function CallSheetPage() {
   const { dayId = '' } = useParams();
   const { project, projectId, roles } = useProject();
   const { session } = useAuth();
   const me = session?.user.id;
+  const [mode, setMode] = useSheetMode(project.view);
   const [sheet, setSheet] = useState<CallSheet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -101,6 +106,8 @@ export function CallSheetPage() {
     element: (id) => itemPath.element(projectId, id),
   } : undefined;
 
+  const shown = data && mode === 'mine' ? ownSheet(data, me) : data;
+
   if (error && !sheet) return <p className="error">{error} <Link to={`/projects/${projectId}/shoot-days`}>Back to shoot days</Link></p>;
   if (!sheet) return <p className="text-muted">Loading…</p>;
   const { day } = sheet;
@@ -122,7 +129,15 @@ export function CallSheetPage() {
         </div>
       )}
 
-      <div className="no-print flex flex-col gap-4">
+      {project.view === 'both' && <SheetViewSwitch mode={mode} onChange={setMode} />}
+      {mode === 'mine' && (
+        <div className="no-print flex flex-col gap-2 sm:flex-row sm:items-center">
+          <button type="button" className="btn btn-secondary sm:w-auto" onClick={() => window.print()}>Print or save as PDF</button>
+          {project.view === 'both' && <p className="hint m-0">Showing only your own call. Choose Full sheet to see everyone and to send or share the sheet.</p>}
+        </div>
+      )}
+
+      {mode === 'full' && <div className="no-print flex flex-col gap-4">
       <Section id="callSheet.send" title="Send" summary={day.version ? `Version ${day.version}, ${day.confirmed} of ${day.called} confirmed` : 'Not sent yet'}>
         <div className="flex flex-col gap-2" data-pin-scope>
           <p className="m-0 text-sm">
@@ -201,9 +216,9 @@ export function CallSheetPage() {
           </div>
         ) : <p className="hint m-0">Send the call sheet first. Then each person gets their own link here to email, text or copy.</p>}
       </Section>
-      </div>
+      </div>}
 
-      {data && <CallSheetDocument sheet={data} me={me} sectionPrefix="callSheet" status={(id) => { const c = sheet.calls.find((x) => x.user_id === id); return c ? callStatus(day, c) : ''; }}
+      {shown && <CallSheetDocument sheet={shown} me={me} own={mode === 'mine'} sectionPrefix="callSheet" status={(id) => { const c = sheet.calls.find((x) => x.user_id === id); return c ? callStatus(day, c) : ''; }}
         versionNote={day.version ? `Version ${day.version}` : 'Draft, not sent'} links={links} />}
     </div>
   );

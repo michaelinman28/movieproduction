@@ -14,7 +14,7 @@ grant usage on schema public, auth to authenticated;
 grant execute on all functions in schema auth to authenticated;
 `);
 for (const f of fs.readdirSync('supabase/migrations').sort()) await db.exec(fs.readFileSync('supabase/migrations/' + f, 'utf8'));
-await db.exec(`grant all on all tables in schema public to authenticated;`);
+await db.exec(`grant all on all tables in schema public to authenticated; select public.hide_share_token();`);
 const U = { a:'00000000-0000-0000-0000-00000000000a', b:'00000000-0000-0000-0000-00000000000b', c:'00000000-0000-0000-0000-00000000000c', d:'00000000-0000-0000-0000-00000000000d' };
 for (const [n,id] of Object.entries(U)) await db.query(`insert into auth.users (id,email,raw_user_meta_data) values ($1,$2,$3)`, [id, n+'@x.com', {full_name: n.toUpperCase()}]);
 let pass=0, fail=0;
@@ -427,14 +427,19 @@ await expect('deleting a type keeps its notes', () => as(U.a, `select type_id fr
 await as(U.a, `delete from project_members where project_id=$1 and user_id=$2`, [tnp.id, U.d]);
 await expect('taking someone off the project removes notes about them', () => as(U.a, `select * from team_notes where user_id=$1`, [U.d]), len(0));
 // shoot days and call sheets
+// Crew on a project: a role outside the Cast department (people with no roles count as cast).
+const crewRole = (await db.query(`select id from roles where company_id is null and name='Gaffer'`)).rows[0].id;
+const castRole = (await db.query(`select id from roles where company_id is null and name='Actor'`)).rows[0].id;
+const makeCrew = (pid, uid) => db.query(`insert into project_member_roles values ($1,$2,$3) on conflict do nothing`, [pid, uid, crewRole]);
+await makeCrew(lp.id, U.b);
 const [sdLoc] = await as(U.b, `insert into project_locations (project_id,name,parking,nearest_hospital) values ($1,'Diner',' Lot behind ','  St. Mary ER ') returning *`, [lp.id]);
 await expect('location parking and hospital tidied', () => Promise.resolve([sdLoc]), r => r[0].parking === 'Lot behind' && r[0].nearest_hospital === 'St. Mary ER');
 const [scA] = await as(U.b, `insert into scenes (project_id,number) values ($1,'30') returning id`, [lp.id]);
-const [day] = await as(U.b, `insert into shoot_days (project_id,shoot_date,location_id,crew_call,version) values ($1,'2027-03-12',$2,'16:00',5) returning *`, [lp.id, sdLoc.id]);
+const [day] = await as(U.b, `insert into shoot_days (project_id,shoot_date,location_id,crew_call,version) values ($1,'2027-03-12',$2,'16:00',5) returning id, version, created_by`, [lp.id, sdLoc.id]);
 await expect('member adds a shoot day, unsent', () => Promise.resolve([day]), r => r[0].version === 0 && r[0].created_by === U.b);
 await expect('version cannot be set by hand', () => as(U.b, `update shoot_days set version=9 where id=$1 returning version`, [day.id]), r => r[0]?.version === 0);
 await expect('day location from another project refused', () => as(U.b, `update shoot_days set location_id=$1 where id=$2`, [farLoc.id, day.id]), isErr);
-await expect('off-project member cannot see days', () => as(U.d, `select * from shoot_days where project_id=$1`, [lp.id]), len(0));
+await expect('off-project member cannot see days', () => as(U.d, `select id from shoot_days where project_id=$1`, [lp.id]), len(0));
 await expect('outsider cannot add a day', () => as(U.c, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-03-13')`, [lp.id]), isErr);
 await expect('scene goes on the day', () => as(U.b, `insert into shoot_day_items (shoot_day_id,kind,scene_id) values ($1,'scene',$2) returning project_id, sort_order`, [day.id, scA.id]), r => r[0]?.project_id === lp.id && r[0]?.sort_order === 1);
 await expect('scene on a day is scheduled', () => as(U.b, `select status from scenes where id=$1`, [scA.id]), r => r[0]?.status === 'scheduled');
@@ -536,6 +541,7 @@ await expect('but not to people who are not their admins', () => as(U.b, `select
 await db.query(`insert into auth.sessions (user_id, user_agent) values ($1, 'Test browser')`, [U.c]);
 await expect('sign-ins are logged', () => as(U.a, `select * from audit_log where action='sign_in' and subject_user_id=$1`, [U.c]), r => r.length === 1 && r[0].actor_id === U.c && r[0].detail === 'Test browser');
 // call sheet views
+await makeCrew(ap.id, U.b);
 const [aday] = await as(U.b, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-04-01') returning id`, [ap.id]);
 await as(U.b, `insert into shoot_day_calls (shoot_day_id,user_id) values ($1,$2)`, [aday.id, U.c]);
 await as(U.b, `select publish_call_sheet($1)`, [aday.id]);
@@ -551,12 +557,16 @@ await asAnon(`select confirm_call_sheet_link($1)`, [cTok.link_token]);
 await expect('confirming from a link is logged as that person', () => as(U.a, `select * from audit_log where company_id=$1 and table_name='shoot_day_calls' and action='update' and source='link'`, [ac.id]), r => r.length === 1 && r[0].actor_id === U.c && r[0].changed.includes('confirmed_at'));
 await expect('link codes are not kept in the log', () => as(U.a, `select * from audit_log where table_name='shoot_day_calls'`), r => r.length > 0 && !JSON.stringify(r).includes(cTok.link_token));
 // shared call sheet link (one for the whole day)
-await expect('a day has no shared link until it is turned on', () => as(U.b, `select share_token from shoot_days where id=$1`, [aday.id]), r => r[0]?.share_token === null);
-await expect('the shared link cannot be set directly', () => as(U.b, `update shoot_days set share_token=gen_random_uuid(), share_phones=true where id=$1 returning share_token, share_phones`, [aday.id]), r => r[0]?.share_token === null && r[0]?.share_phones === false);
+await expect('a day has no shared link until it is turned on', () => as(U.b, `select share_token from shoot_day_share_tokens($1) where id=$2`, [ap.id, aday.id]), r => r[0]?.share_token === null);
+await expect('the shared link cannot be set directly', () => as(U.b, `update shoot_days set share_token=gen_random_uuid(), share_phones=true where id=$1`, [aday.id]).then(() => as(U.b, `select t.share_token, d.share_phones from shoot_day_share_tokens($1) t join shoot_days d on d.id=t.id where t.id=$2`, [ap.id, aday.id])), r => r[0]?.share_token === null && r[0]?.share_phones === false);
 await expect('outsiders cannot turn it on', () => as(U.d, `select share_call_sheet($1, true)`, [aday.id]), isErr);
 const [slSh1] = await as(U.b, `select share_call_sheet($1, true) t`, [aday.id]);
 await expect('anyone on the project turns it on', () => Promise.resolve(slSh1), r => /^[0-9a-f-]{36}$/.test(r?.t));
-await expect('turning it on again keeps the same link', () => as(U.c, `select share_call_sheet($1, true) t`, [aday.id]), r => r[0]?.t === slSh1.t);
+await expect('cast cannot turn on the shared link', () => as(U.c, `select share_call_sheet($1, true)`, [aday.id]), isErr);
+await expect('cast cannot read the shared link code', () => as(U.c, `select share_token from shoot_days where id=$1`, [aday.id]), isErr);
+await expect('nor through the crew function', () => as(U.c, `select * from shoot_day_share_tokens($1)`, [ap.id]), len(0));
+
+await expect('turning it on again keeps the same link', () => as(U.b, `select share_call_sheet($1, true) t`, [aday.id]), r => r[0]?.t === slSh1.t);
 await as(U.a, `update profiles set phone='9195550111' where id=$1`, [U.c]);
 const [slShared] = await asAnon(`select call_sheet_for_share($1) s`, [slSh1.t]);
 await expect('the shared link opens the whole sheet without signing in', () => Promise.resolve(slShared.s), s => s?.day?.version === 1 && s.calls.length === 1 && s.project.name === 'Audit Film' && s.me === undefined);
@@ -618,6 +628,7 @@ await expect('element links to scenes', () => as(U.b, `insert into scene_element
 await expect('element from another project cannot go in a scene', () => as(U.a, `insert into scene_elements (scene_id,element_id) values ($1,(select id from elements where project_id<>$2 limit 1))`, [eSc1.id, ep.id]), isErr);
 await expect('category usage counts elements', () => as(U.a, `select elements::int n from element_category_usage($1) where id=$2`, [ec.id, eDrones.id]), r => r[0]?.n === 1);
 // on the call sheet
+await makeCrew(ep.id, U.b);
 const [eDay] = await as(U.b, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-05-01') returning id`, [ep.id]);
 await as(U.b, `insert into shoot_day_items (shoot_day_id,kind,scene_id) values ($1,'scene',$2)`, [eDay.id, eSc2.id]);
 const [el2] = await as(U.b, `insert into elements (project_id,name) values ($1,'Rowboat') returning id`, [ep.id]);
@@ -644,5 +655,43 @@ await expect('deleting a scene removes its links', () => as(U.b, `select count(*
 await as(U.b, `delete from elements where id=$1`, [el1.id]);
 await expect('the creator deletes an element, with its links', () => as(U.b, `select count(*)::int n from scene_elements where scene_id=$1`, [eSc2.id]), r => r[0].n === 0);
 await expect('characters no longer hold wardrobe, hair or props', () => db.query(`select column_name from information_schema.columns where table_name='characters' and column_name in ('wardrobe','hair_makeup','props')`).then((r) => r.rows), len(0));
+// ---- call sheets by cast and crew ----
+const [vc] = await as(U.a, `insert into companies (name) values ('View Co') returning id`);
+await as(U.a, `insert into company_members (company_id,user_id) values ($1,$2),($1,$3),($1,$4)`, [vc.id, U.b, U.c, U.d]);
+const [vp] = await as(U.a, `insert into projects (company_id,name) values ($1,'View Film') returning id`, [vc.id]);
+await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2),($1,$3),($1,$4),($1,$5)`, [vp.id, U.a, U.b, U.c, U.d]);
+const roleIn = (uid, rid) => as(U.a, `insert into project_member_roles values ($1,$2,$3)`, [vp.id, uid, rid]);
+const viewOf = (uid) => as(uid, `select my_project_view($1) v`, [vp.id]).then((r) => r[0].v);
+await expect('no roles counts as cast', () => viewOf(U.c), (v) => v === 'cast');
+await expect('an admin is crew', () => viewOf(U.a), (v) => v === 'crew');
+await roleIn(U.b, crewRole); await roleIn(U.c, castRole); await roleIn(U.d, castRole);
+await expect('a crew role is crew', () => viewOf(U.b), (v) => v === 'crew');
+await expect('a Cast role is cast', () => viewOf(U.c), (v) => v === 'cast');
+await roleIn(U.d, crewRole);
+await expect('cast and crew roles are both', () => viewOf(U.d), (v) => v === 'both');
+await as(U.a, `insert into characters (project_id,name,actor_id) values ($1,'Pilot',$2)`, [vp.id, U.b]);
+await expect('playing a character makes crew both', () => viewOf(U.b), (v) => v === 'both');
+await as(U.a, `delete from characters where project_id=$1`, [vp.id]);
+await expect('nobody else asks about another person', () => as(U.b, `select project_view_of($1,$2)`, [vp.id, U.c]), isErr);
+const [vDay] = await as(U.b, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-06-01') returning id`, [vp.id]);
+await as(U.b, `insert into shoot_day_calls (shoot_day_id,user_id,note) values ($1,$2,'Bring the drone'),($1,$3,'Wardrobe at 6'),($1,$4,null)`, [vDay.id, U.b, U.c, U.d]);
+await as(U.b, `select publish_call_sheet($1)`, [vDay.id]);
+await expect('cast see only their own call', () => as(U.c, `select user_id, note from shoot_day_calls where shoot_day_id=$1`, [vDay.id]), r => r.length === 1 && r[0].user_id === U.c);
+await expect('crew see every call', () => as(U.b, `select * from shoot_day_calls where shoot_day_id=$1`, [vDay.id]), len(3));
+await expect('both see every call', () => as(U.d, `select * from shoot_day_calls where shoot_day_id=$1`, [vDay.id]), len(3));
+await expect('cast still see the day', () => as(U.c, `select id from shoot_days where id=$1`, [vDay.id]), len(1));
+await expect('cast cannot add a day', () => as(U.c, `insert into shoot_days (project_id,shoot_date) values ($1,'2027-06-02')`, [vp.id]), isErr);
+await expect('cast cannot change a day', () => as(U.c, `update shoot_days set title='Mine' where id=$1 returning id`, [vDay.id]), len(0));
+await expect('cast cannot delete a day', () => as(U.c, `delete from shoot_days where id=$1 returning id`, [vDay.id]), len(0));
+await expect('cast cannot add to the schedule', () => as(U.c, `insert into shoot_day_items (shoot_day_id,kind,label) values ($1,'note','Hi')`, [vDay.id]), isErr);
+await expect('cast cannot change their own call', () => as(U.c, `update shoot_day_calls set note='Late' where shoot_day_id=$1 returning note`, [vDay.id]), len(0));
+await expect('cast cannot call people', () => as(U.c, `insert into shoot_day_calls (shoot_day_id,user_id) values ($1,$2)`, [vDay.id, U.a]), isErr);
+await expect('cast cannot send the call sheet', () => as(U.c, `select publish_call_sheet($1)`, [vDay.id]), isErr);
+await expect('cast confirm their own call', () => as(U.c, `select mark_call_sheet($1,true)`, [vDay.id]).then(() => as(U.b, `select confirmed_version from shoot_day_calls where shoot_day_id=$1 and user_id=$2`, [vDay.id, U.c])), r => r[0]?.confirmed_version === 1);
+const linkOf = (uid) => db.query(`select link_token from shoot_day_calls where shoot_day_id=$1 and user_id=$2`, [vDay.id, uid]).then((r) => r.rows[0].link_token);
+const sheetOf = async (uid) => (await asAnon(`select call_sheet_for_link($1) s`, [await linkOf(uid)]))[0].s;
+await expect('a cast personal link has only their call', () => sheetOf(U.c), s => s.view === 'cast' && s.calls.length === 1 && s.calls[0].user_id === U.c && s.roles.length === 1);
+await expect('a crew personal link has everyone', () => sheetOf(U.b), s => s.view === 'crew' && s.calls.length === 3);
+await expect('a both personal link has everyone, to switch', () => sheetOf(U.d), s => s.view === 'both' && s.calls.length === 3);
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

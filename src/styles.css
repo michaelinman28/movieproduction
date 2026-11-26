@@ -296,6 +296,8 @@
   .cs-you-details { flex: 1; }
   .cs-you-action { align-items: flex-end; text-align: right; }
   .cs-info { grid-template-columns: repeat(2, 1fr); }
+  /* My call has no Key contacts card: the third card takes the full row. */
+  .cs-info-3 > :last-child { grid-column: span 2; }
   /* minmax(0, 1fr) and wrapping labels keep six times inside the box on an iPad in portrait. */
   .cs-times { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
   .cs-time { min-width: 0; }
@@ -308,6 +310,8 @@
 }
 @media (min-width: 1024px) {
   .cs-info { grid-template-columns: repeat(4, 1fr); }
+  .cs-info-3 { grid-template-columns: repeat(3, 1fr); }
+  .cs-info-3 > :last-child { grid-column: auto; }
   .cs-depts { grid-template-columns: repeat(2, 1fr); }
 }
 
@@ -341,6 +345,8 @@
   .cs-time + .cs-time { border-top: 0; border-left: 1px solid var(--color-line); }
   .cs-time dd { font-size: 12pt; }
   .cs-info { grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+  .cs-info-3 { grid-template-columns: repeat(3, 1fr); }
+  .cs-info-3 > :last-child { grid-column: auto; }
   .cs-card { padding: 0.5rem 0.7rem; border-radius: 0.5rem; font-size: 9pt; }
   .cs-card p, .cs-card .cs-small, .cs-keys { font-size: 8.5pt; }
   .cs-keys li > .cs-muted { font-size: 7pt; }

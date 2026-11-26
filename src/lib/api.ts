@@ -48,7 +48,9 @@ export interface Project {
   id: string; company_id: string; name: string; logline: string | null; description: string | null;
   status: ProjectStatus; start_date: string | null; end_date: string | null; created_by: string; created_at: string;
 }
-export interface ProjectDetail extends Project { company: { id: string; name: string }; can_manage: boolean }
+/** The caller on a project: crew (an admin, or a role outside Cast), cast (plays a character, has a Cast role, or no roles), or both. Cast only see their own call. */
+export type ProjectView = 'crew' | 'cast' | 'both';
+export interface ProjectDetail extends Project { company: { id: string; name: string }; can_manage: boolean; view: ProjectView }
 export interface ProjectMember {
   user_id: string; joined_at: string; profile: Profile; role_ids: string[];
   /** Dietary needs on this project (for catering and the call sheet); dietary_allergy shows it as an allergy. */
@@ -168,6 +170,8 @@ export interface CallSheet {
 /** What a personal call sheet link shows: the sent sheet, view only, no emails. */
 export interface LinkedCallSheet {
   me: string;
+  /** The link's person on the project; for cast only, calls holds just their own. */
+  view: ProjectView;
   /** Whether they have confirmed the version sent. */
   confirmed: boolean;
   project: { name: string; company_name: string };
@@ -188,7 +192,7 @@ export interface LinkedCallSheet {
 }
 
 /** What a shared call sheet link shows: the whole sent sheet, view only, no emails, phones only if chosen. */
-export type SharedCallSheet = Omit<LinkedCallSheet, 'me' | 'confirmed'> & { phones: boolean };
+export type SharedCallSheet = Omit<LinkedCallSheet, 'me' | 'confirmed' | 'view'> & { phones: boolean };
 
 /** A note on a task or scene (many per item; the author edits it). */
 export interface Note { id: string; author_id: string; author: Profile; body: string; created_at: string; updated_at: string }

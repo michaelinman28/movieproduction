@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CallSheetDocument } from '../components/CallSheetDocument';
+import { SheetViewSwitch, ownSheet, useSheetMode } from '../components/SheetViewSwitch';
 import { ThemeSwitch } from '../components/ThemeSwitch';
 import { api, type LinkedCallSheet } from '../lib/api';
 import { errorText, shortDate } from '../lib/format';
@@ -7,12 +8,15 @@ import { errorText, shortDate } from '../lib/format';
 /**
  * A person's own call sheet, from the private link they were sent: view only, no
  * sign-in. It's a page on its own, outside the app, with a link back to the site.
+ * Cast only get just their own call; crew get the whole day; people who are both can
+ * switch, starting on My call.
  */
 export function SheetLinkPage({ token }: { token: string }) {
   const [sheet, setSheet] = useState<LinkedCallSheet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [mode, setMode] = useSheetMode(sheet?.view ?? 'cast');
 
   async function confirm() {
     setBusy(true); setConfirmError(null);
@@ -51,7 +55,8 @@ export function SheetLinkPage({ token }: { token: string }) {
           <p className="text-center text-muted">Loading your call sheet…</p>
         ) : (
           <div className="flex flex-col gap-4">
-            <CallSheetDocument sheet={sheet} me={sheet.me} sectionPrefix="sheetLink" youAction={
+            {sheet.view === 'both' && <SheetViewSwitch mode={mode} onChange={setMode} />}
+            <CallSheetDocument sheet={mode === 'mine' ? ownSheet(sheet, sheet.me) : sheet} me={sheet.me} own={mode === 'mine'} sectionPrefix="sheetLink" youAction={
               sheet.confirmed
                 ? <span className="cs-confirmed">✓ Confirmed version {sheet.day.version}</span>
                 : <>

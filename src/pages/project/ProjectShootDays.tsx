@@ -57,7 +57,9 @@ interface DayRow {
  * scenes and breaks, and the people called; its call sheet is built from all that.
  */
 export function ProjectShootDays() {
-  const { projectId, isAdmin, locations, reloadLocations } = useProject();
+  const { project, projectId, isAdmin, locations, reloadLocations } = useProject();
+  // Cast only read the days and open their own call sheet; crew plan them.
+  const readOnly = project.view === 'cast';
   const { session } = useAuth();
   const me = session?.user.id;
   const [days, setDays] = useState<ShootDay[]>([]);
@@ -134,9 +136,9 @@ export function ProjectShootDays() {
       },
       { field: 'pages', header: 'Pages', width: 90, filter: false },
       { field: 'sent', header: 'Sent', width: 110, filter: 'set' },
-      { field: 'confirmed', header: 'Confirmed', width: 110, filter: false },
-    ],
-  }), [locationNames, projectId, sceneNumber]);
+      ...(readOnly ? [] : [{ field: 'confirmed', header: 'Confirmed', width: 110, filter: false }]),
+    ].map((c) => (readOnly ? { ...c, editable: false } : c)),
+  }), [locationNames, projectId, sceneNumber, readOnly]);
 
   async function saveCell(e: { data: DayRow; column: string; newValue: unknown }) {
     const v = String(e.newValue ?? '').trim();
@@ -171,10 +173,10 @@ export function ProjectShootDays() {
 
   return (
     <Section id="project.shootDays" title="Shoot days" summary={summary}>
-      <form className="form-row mb-2" onSubmit={add}>
+      {!readOnly && <form className="form-row mb-2" onSubmit={add}>
         <input className="field" type="date" aria-label="New shoot day's date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
         <button type="submit" className="btn" data-pin>Add shoot day</button>
-      </form>
+      </form>}
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
       <div className="flex flex-col gap-4">
@@ -183,12 +185,13 @@ export function ProjectShootDays() {
             cellValueChanged: saveCell,
             selectionChanged: (r: DayRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
           }} />
-        {selected && (
+        {selected && !readOnly && (
           <DayPanel key={selected.id} day={selected} scenes={scenes} run={run} onChanged={load}
             canDelete={isAdmin || selected.created_by === me} onDeleted={() => setSelectedId(null)} />
         )}
       </div>
-      {rows.length > 0 && (
+      {rows.length > 0 && readOnly && <p className="hint mt-2">Open a day's Call sheet to see your call. Crew plan the days.</p>}
+      {rows.length > 0 && !readOnly && (
         <p className="hint mt-2">
           Double-click a cell to change it (times like 4:30 PM), or select a day to plan it below. Days are numbered by date. Scenes come from the Scenes page.
         </p>
