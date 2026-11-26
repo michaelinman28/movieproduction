@@ -326,7 +326,7 @@ function TeamPanel({ projectId, companyId, companyName, projectName, member, rol
 
   const foodSummary = member.dietary ? `${member.dietary_allergy ? 'Allergy: ' : ''}${member.dietary}` : 'None';
   return (
-    <aside data-pin-scope data-form-for={member.user_id} className="card gap-2">
+    <aside data-pin-scope data-form-for={member.user_id} data-form-label={name} className="card gap-2">
       {/* The person's name opens them on the company's People list, with all their details. */}
       <h3><Link to={itemPath.person(companyId, member.user_id)} title={`Open ${name} in the company's people`}>{name}</Link></h3>
       <p className="hint mt-2">{member.profile.email}{member.profile.phone ? <><br />{member.profile.phone}</> : null}</p>

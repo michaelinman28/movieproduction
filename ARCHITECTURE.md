@@ -499,6 +499,23 @@ Every screen is designed for a phone first, then enhanced for larger screens.
   day (`CallSheetDocument`'s `links`); a personal call sheet link (`/sheet/<token>`)
   is outside the signed-in app, so it stays plain text. Unsaved form changes are
   asked about before leaving, as with any link.
+- **"Back to …" after an item link (standard).** Following any item link remembers
+  where it was followed from, and the page it opens shows "‹ Back to Scene 3" above
+  its heading (and in the pinned bar under the header once that scrolls away). Going
+  back, by that link or the browser's Back, returns to the same page with the same
+  item's form open; each step keeps the one before, so shoot day → scene → character
+  walks back to the scene and then the day. It's all in one place, so every item link
+  gets it with nothing to add: `src/lib/backLink.ts` (`linkOut`, `goBack`),
+  `LinkOutTracker` and `BackLink` (`src/components/BackLink.tsx`, mounted in `App.tsx`)
+  and the table links in `LatticeGrid`. An item link is any in-app link with
+  `?open=`/`?person=` or to a call sheet; plain page navigation (the left nav,
+  breadcrumbs) doesn't set one. Where it came from lives in the browser's history
+  state, so it survives a reload but not a copied link. The origin is named by the
+  outermost open item form, marked `data-form-for="<id>"` and `data-form-label="Scene 3"`
+  (the form a link sits in, else the page's open one); with no form open it's the
+  page (`data-page-label`, else its name from the address, e.g. "Shoot days").
+  `useOpenFromLink` reopens the form from the history state (`reopen`) and keeps the
+  rest of that state.
 - **Dropdown filters for fixed values (standard).** In every table, a column whose
   values come from a fixed set (person assigned, status, priority, category, location,
   department, admin, roles, tags…) filters with a dropdown of tick boxes and counts.

@@ -202,7 +202,7 @@ function LocationPanel({ location, run, canDelete, onDeleted }: {
   }
 
   return (
-    <aside data-pin-scope data-form-for={location.id} className="card gap-2">
+    <aside data-pin-scope data-form-for={location.id} data-form-label={location.name} className="card gap-2">
       <h3>{location.address ? <a {...mapsLinkProps(location.address)} title="Open the address in maps">{location.name}</a> : location.name}</h3>
       <p className="hint">{location.tasks ? `${location.tasks === 1 ? '1 task is' : `${location.tasks} tasks are`} here.` : 'No tasks here yet.'}</p>
       <form className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-x-4" onSubmit={save}>

@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { BackTo } from './BackLink';
+import type { LinkState } from '../lib/backLink';
 
 /**
  * Keeps one action button in reach while scrolling.
@@ -16,24 +18,33 @@ import { useLocation } from 'react-router-dom';
  * While a button is pinned, a spacer of the bar's height sits in the page above `main`,
  * so the bar never covers the top of the page. When the bar appears or goes away while
  * scrolled down, the page scrolls by the same amount, so what's on screen stays put.
+ *
+ * A page reached by an item link has "‹ Back to …" at its top (BackLink); once that
+ * scrolls out of sight, the bar shows a copy of it on the left, beside any pinned button.
  */
 export function PinnedAction() {
   const [pin, setPin] = useState<{ label: string; disabled: boolean; className: string; top: number } | null>(null);
   const target = useRef<HTMLButtonElement | null>(null);
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
+  const back = (location.state as LinkState)?.back;
+  const [backHidden, setBackHidden] = useState(false);
+  const showBar = !!pin || (!!back && backHidden);
   const bar = useRef<HTMLDivElement | null>(null);
-  const [space, setSpace] = useState(0);
+  const [spaceH, setSpace] = useState(0);
+  const space = useRef(0);
+  space.current = spaceH;
   const shown = useRef(0);
 
   // Keep the spacer the bar's height, and keep the view still when it changes.
   useLayoutEffect(() => {
-    const h = pin && bar.current ? bar.current.offsetHeight : 0;
+    const h = showBar && bar.current ? bar.current.offsetHeight : 0;
     const delta = h - shown.current;
     if (!delta) return;
     shown.current = h;
     setSpace(h);
     if (window.scrollY > 0) window.scrollBy(0, delta);
-  }, [pin]);
+  }, [pin, showBar]);
 
   useEffect(() => {
     let frame = 0;
@@ -42,6 +53,8 @@ export function PinnedAction() {
       const header = document.querySelector('body header');
       const top = header ? header.getBoundingClientRect().bottom : 0;
       const bottom = window.innerHeight;
+      const backLink = document.querySelector('main [data-back-link]');
+      setBackHidden(!!backLink && backLink.getBoundingClientRect().bottom < top + space.current);
       let best: { el: HTMLButtonElement; prio: number; dist: number } | null = null;
       for (const el of document.querySelectorAll<HTMLButtonElement>('main button[data-pin]')) {
         // Hidden buttons (a form that isn't open) never pin.
@@ -107,13 +120,16 @@ export function PinnedAction() {
 
   return (
     <>
-      <div aria-hidden="true" style={{ height: space }} />
-      {pin && (
-    <div ref={bar} className="pinned-action" style={{ top: pin.top }}>
-      <div className="mx-auto flex w-full max-w-screen-2xl justify-end px-4">
-        <button type="button" className={`${pin.className} w-full sm:w-auto`} disabled={pin.disabled} onClick={click}>
-          {pin.label}
-        </button>
+      <div aria-hidden="true" style={{ height: spaceH }} />
+      {showBar && (
+    <div ref={bar} className="pinned-action" style={{ top: pin?.top ?? document.querySelector('body header')?.getBoundingClientRect().bottom ?? 0 }}>
+      <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-end gap-3 px-4">
+        {back && backHidden && <BackTo back={back} className="mr-auto" />}
+        {pin && (
+          <button type="button" className={`${pin.className} ${back && backHidden ? 'shrink-0' : 'w-full'} sm:w-auto`} disabled={pin.disabled} onClick={click}>
+            {pin.label}
+          </button>
+        )}
       </div>
     </div>
       )}

@@ -24,6 +24,7 @@ import { ThemeSwitch } from './components/ThemeSwitch';
 import { PinnedAction } from './components/PinnedAction';
 import { UnsavedGuard } from './components/UnsavedGuard';
 import { PreviewBanner } from './components/PreviewBanner';
+import { BackLink, LinkOutTracker } from './components/BackLink';
 
 /** Call sheet links open on their own page, with no sign-in: personal (/sheet/:token) or shared (/call-sheet/:token). */
 function sheetToken() {
@@ -63,7 +64,9 @@ export function App() {
       </header>
       <PinnedAction />
       <UnsavedGuard />
+      <LinkOutTracker />
       <main className="mx-auto w-full max-w-screen-2xl px-4 py-6 md:py-8">
+        <BackLink />
         <Routes>
           <Route path="/companies/:companyId" element={<CompanyPage />} />
           <Route path="/companies/:companyId/roles" element={<RolesPage />} />

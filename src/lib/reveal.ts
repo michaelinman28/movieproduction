@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import type { LinkState } from './backLink';
 
 /**
  * After adding something, its form opens; bring it into view. On a phone (one column)
@@ -19,17 +20,21 @@ export function scrollToForm(id: string) {
  * Opens the item a link points at (?open=<id>, see itemPath in src/lib/links.ts) once
  * it has loaded: `has` says whether the page has that item yet, `open` selects it,
  * highlights its row and opens its form (as after adding it). The parameter is then
- * taken off the address, so going back or reloading doesn't reopen it.
+ * taken off the address, so reloading doesn't reopen it. Going back to a page an item
+ * link was followed from reopens the form that was open there (`reopen` in the history
+ * state, set by linkOut in src/lib/backLink.ts); the rest of the history state, such as
+ * the page's own "Back to …", is kept.
  */
 export function useOpenFromLink(has: (id: string) => boolean, open: (id: string) => void, param = 'open') {
   const [params, setParams] = useSearchParams();
-  const id = params.get(param);
+  const state = useLocation().state as LinkState;
+  const id = params.get(param) ?? (param === 'open' ? state?.reopen ?? null : null);
   const ready = !!id && has(id);
   useEffect(() => {
     if (!id || !ready) return;
     open(id);
     const next = new URLSearchParams(params);
     next.delete(param);
-    setParams(next, { replace: true });
+    setParams(next, { replace: true, state: state ? { ...state, reopen: undefined } : state });
   }, [id, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 }

@@ -675,7 +675,7 @@ function TaskPanel({ task, projectId, companyId, tasks, kids, categories, locati
     if (await run(() => api.deleteTask(task.id), `Deleted "${task.title}".`)) onDeleted();
   }
   return (
-    <aside data-pin-scope data-form-for={task.id} className="card gap-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
+    <aside data-pin-scope data-form-for={task.id} data-form-label={task.title} className="card gap-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
       <form className="flex flex-col gap-2" onSubmit={save}>
         <label className="label">Task<input className="field" value={draft.title} maxLength={200} required onChange={(e) => set('title', e.target.value)} /></label>
         <label className="label">Description<textarea className="field" rows={3} value={draft.description} maxLength={5000} onChange={(e) => set('description', e.target.value)} /></label>
