@@ -27,7 +27,7 @@ const fmt = new Intl.NumberFormat();
 export function ServerPager({ page, pageSize, total, loading, onPage, onPageSize }: ServerPaging) {
   const { theme } = useTheme();
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  if (pages <= 1 && (pageSize <= SIZES[0] || total <= SIZES[0])) return null;
+  if (!total) return null;
   const from = total ? page * pageSize + 1 : 0;
   const to = Math.min(total, (page + 1) * pageSize);
   const btn = (text: string, title: string, p: number, off: boolean) => (
