@@ -41,7 +41,7 @@ export function SignIn() {
   }
 
   return (
-    <main className="relative grid min-h-dvh place-items-center p-4">
+    <main className="relative grid flex-1 place-items-center p-4">
       <div className="absolute top-2 right-2"><ThemeSwitch /></div>
       <form className="card w-full max-w-sm" onSubmit={submit}>
         <h1>Movie Production</h1>
