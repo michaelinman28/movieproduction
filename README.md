@@ -4,7 +4,7 @@ A web platform for running movie productions. A production company signs up, cre
 its film projects, brings its people on board, and runs each project day to day with
 tasks, sub-tasks and (next) a project journal.
 
-- **Preview:** https://michaelinman28.github.io/movieproduction/
+- **App:** https://movie-prod.netlify.app/ (every pull request also gets its own Deploy Preview)
 - **API docs (Swagger):** https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api/docs
 - **Architecture and technology overview:** [ARCHITECTURE.md](ARCHITECTURE.md)
 
@@ -72,8 +72,11 @@ as is. To set up a new Supabase project instead, apply the files in
 
 ## Deploying
 
-- **Web app:** every push to `main` builds the app and publishes it to GitHub Pages
-  (`.github/workflows/pages.yml`).
+- **Web app:** Netlify builds and hosts it (`netlify.toml`). Every push to `main`
+  publishes https://movie-prod.netlify.app/, and every pull request gets a Deploy
+  Preview at `https://deploy-preview-<number>--movie-prod.netlify.app/` (Netlify posts
+  the link on the PR). The build runs `test:db` and `typecheck` first, so a failing
+  check fails the deploy.
 - **API:** deploy to Supabase Edge Functions after API changes:
   `npx supabase functions deploy api --remote=qixblelhruxdzxfaeamz --no-verify-jwt --use-api`
   (add `--yes` when running without a prompt). `--no-verify-jwt` is needed because
@@ -81,10 +84,11 @@ as is. To set up a new Supabase project instead, apply the files in
 - **Database:** apply each new file in `supabase/migrations` to the live project, in
   order, before deploying API code that needs it.
 
-One-time setup for the preview: repository Settings > Pages > Source: **GitHub
-Actions**. In Supabase, Authentication > URL Configuration: set the Site URL to the
-preview address and add it (plus `http://localhost:5173/**`) to the Redirect URLs, so
-confirmation emails link back to the app.
+Supabase, Authentication > URL Configuration: the Site URL is
+`https://movie-prod.netlify.app/`, and the Redirect URLs allow
+`https://movie-prod.netlify.app/**`, `https://*--movie-prod.netlify.app/**` (Deploy
+Previews) and `http://localhost:5173/**`, so confirmation emails link back to the app.
+Sign-up emails sent from a Deploy Preview link back to that preview.
 
 ## Pages
 

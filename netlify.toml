@@ -1,0 +1,24 @@
+# Netlify builds and hosts the web app: production from `main`
+# (https://movie-prod.netlify.app/) and a Deploy Preview for every pull request
+# (https://deploy-preview-<number>--movie-prod.netlify.app/).
+
+[build]
+  # The same checks CI ran before: security rules, type check, then the build.
+  command = "npm run test:db && npm run typecheck && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # The publishable key is meant to be public: it ships in the browser bundle,
+  # and row-level security in the database decides what each user can see.
+  # Values here win over the same names set in Netlify's site settings.
+  VITE_SUPABASE_URL = "https://qixblelhruxdzxfaeamz.supabase.co"
+  VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_BquGY3OdzY50DT65X0Vyzw_uzPowxQM"
+  VITE_API_URL = "https://qixblelhruxdzxfaeamz.supabase.co/functions/v1/api"
+
+# The app routes in the browser, so every path (deep links, /sheet/<token>,
+# /call-sheet/<token>) serves index.html. Real files are served first.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
