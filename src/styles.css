@@ -57,9 +57,16 @@
 @layer components {
   /* 16px text stops phones zooming in on focus; 44px min height is a comfortable tap target. */
   .field {
-    @apply min-h-11 w-full rounded-md border border-line bg-surface px-3 py-2 text-base text-fg;
+    @apply min-h-11 w-full max-w-full min-w-0 rounded-md border border-line bg-surface px-3 py-2 text-base text-fg;
     @apply focus:outline-2 focus:outline-accent disabled:opacity-70;
   }
+  /* Safari on iPad and iPhone draws date and time pickers at their own fixed width and
+     ignores width: 100%, so they spill over the next field. Drop the native box so they
+     fit their column like any other field; tapping still opens the native picker. */
+  .field:is([type='date'], [type='time'], [type='datetime-local'], [type='month']) {
+    @apply block appearance-none text-left;
+  }
+  .field::-webkit-date-and-time-value { text-align: left; }
   .btn {
     @apply inline-flex min-h-11 w-full items-center justify-center rounded-md bg-accent px-4 py-2 text-base font-medium text-accent-fg;
     @apply cursor-pointer hover:bg-accent-strong disabled:cursor-default disabled:opacity-60 sm:w-auto;
@@ -72,7 +79,8 @@
   .form-row { @apply flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center; }
   .form-row > .field { @apply sm:w-auto sm:min-w-48 sm:flex-1; }
   .card { @apply flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 sm:p-6; }
-  .label { @apply flex flex-col gap-1 text-sm; }
+  /* min-w-0: a label in a grid or flex row may shrink to its column, never push past it. */
+  .label { @apply flex min-w-0 flex-col gap-1 text-sm; }
   .check { @apply inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm; }
   .check input { @apply size-5 accent-accent; }
   /* A checkbox that sits in a form row with fields: same height and border as a field. */
@@ -280,7 +288,10 @@
   .cs-you-details { flex: 1; }
   .cs-you-action { align-items: flex-end; text-align: right; }
   .cs-info { grid-template-columns: repeat(2, 1fr); }
-  .cs-times { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+  /* minmax(0, 1fr) and wrapping labels keep six times inside the box on an iPad in portrait. */
+  .cs-times { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .cs-time { min-width: 0; }
+  .cs-time dt { white-space: normal; }
   .cs-time { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 0.125rem; padding: 0.625rem 0.875rem; }
   .cs-time + .cs-time { border-top: 0; border-left: 1px solid var(--color-line); }
   .cs-body { padding: 0.75rem 1.5rem 1.25rem; }
@@ -317,7 +328,7 @@
   .cs-hero-time { font-size: 24pt; }
   .cs-you { flex-direction: row; align-items: center; gap: 1rem; padding: 0.6rem 1rem; border-radius: 0.6rem; }
   .cs-you-time { font-size: 22pt; }
-  .cs-times { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border-radius: 0.5rem; }
+  .cs-times { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border-radius: 0.5rem; }
   .cs-time { flex-direction: column; align-items: flex-start; gap: 0.1rem; padding: 0.35rem 0.6rem; }
   .cs-time + .cs-time { border-top: 0; border-left: 1px solid var(--color-line); }
   .cs-time dd { font-size: 12pt; }

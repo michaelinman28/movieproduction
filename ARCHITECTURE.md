@@ -260,7 +260,9 @@ cascade, a personal call sheet link, or a fix made straight in the database). Mi
   changes (names for linked ids, even deleted ones). The app shows them on the company's
   Activity page (`/companies/:id/activity`), the project's Activity page, and a closed
   History section on task, scene, shoot day, location and person forms
-  (`src/components/ActivityLog.tsx`, `ItemHistory.tsx`, `src/lib/activity.ts`).
+  (`src/components/ActivityLog.tsx`, `ItemHistory.tsx`, `src/lib/activity.ts`). An open
+  History reloads after every change the API accepts: `src/lib/api.ts` fires
+  `DATA_CHANGED` on window after each successful non-GET call.
 
 ## Architecture
 
