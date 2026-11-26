@@ -51,11 +51,12 @@ projects.openapi(createRoute({
   const { db, userId } = await authed(c);
   const { id } = c.req.valid('param');
   const p = must<Row & { company_id: string }>(await db.from('projects').select('*').eq('id', id).single());
-  const [co, me] = await Promise.all([
+  const [co, me, view] = await Promise.all([
     db.from('companies').select('id, name').eq('id', p.company_id).single(),
     db.from('company_members').select('is_admin').match({ company_id: p.company_id, user_id: userId }).maybeSingle(),
+    db.rpc('my_project_view', { pid: id }),
   ]);
-  return send(c, { ...p, company: must(co), can_manage: Boolean(must<{ is_admin: boolean } | null>(me)?.is_admin) }, 200);
+  return send(c, { ...p, company: must(co), can_manage: Boolean(must<{ is_admin: boolean } | null>(me)?.is_admin), view: must<string>(view) ?? 'cast' }, 200);
 });
 
 projects.openapi(createRoute({

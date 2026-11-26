@@ -210,7 +210,7 @@ day to day.
 - **Shared link:** one private, unguessable link per day to a view-only page of the
   whole call sheet, for anyone (`shoot_days.share_token`), at `/call-sheet/{token}`
   (`src/pages/SharedSheetPage.tsx`, same design and Print as the personal page, no
-  "your call" and no Confirm). It's off until someone on the project turns it on in the
+  "your call" and no Confirm). It's off until someone on the project's crew turns it on in the
   call sheet page's **Shared link** section (`share_call_sheet`, `POST /shoot-days/{id}/share`),
   which also copies, emails or texts it, makes a new link (the old one stops working)
   or turns it off. It works only once the sheet is sent and always shows the latest
@@ -229,6 +229,21 @@ day to day.
   change only through `publish_call_sheet()`, and viewed/confirmed only through
   `mark_call_sheet()` for the signed-in person, so neither can be faked with a direct
   update. Migration `20261125010000_shoot_days.sql`.
+- **Cast and crew:** on each project a person is crew (a company admin, or a role
+  outside the Cast department), cast (plays a character or has a Cast role; people
+  with no roles count as cast) or both (`project_view_of`, `my_project_view`; the API
+  returns it as `ProjectDetail.view`, and a personal link as `view`). Cast only see just
+  their own call: the database returns only their own `shoot_day_calls` row, so the
+  in-app call sheet and their personal link show "My call" (their call, their dietary
+  needs, the schedule, location, weather and hospital; no key contacts, cast or crew
+  lists; each scene they're in is highlighted, with their character marked in its cast). They read the Shoot days list but can't add, change or delete days,
+  schedules or calls, send the sheet or share it (`is_project_crew` in the rules), and
+  can't read `shoot_days.share_token` (column privileges, `hide_share_token()`; crew get
+  it from `shoot_day_share_tokens`). Crew see the full sheet, which is the same for everyone: no "Your call" box or "You"
+  markers (Confirm sits above it). People who are both get a
+  **My call / Full sheet** switch (`src/components/SheetViewSwitch.tsx`), starting on My
+  call and remembered on the device. Migration `20261126060000_call_sheet_cast_view.sql`.
+  A column added to `shoot_days` later needs `select public.hide_share_token();` again.
 
 ### How people join
 
@@ -371,9 +386,11 @@ There are three layers, and each one can be run and tested by itself.
     categories; anyone in the company can create tags; admins rename or delete them.
   - Everyone on a project (and admins) sees, adds, edits and reorders its scenes and
     shots. Whoever added a scene, or an admin, deletes it; anyone on the project deletes a shot.
-  - Everyone on a project (and admins) sees and edits its shoot days, schedules and
-    calls, and sends call sheets. Whoever added a day, or an admin, deletes it. People
-    mark a call sheet viewed or confirmed only for themselves.
+  - Everyone on a project (and admins) sees its shoot days and schedules. Crew (admins,
+    or anyone with a role outside Cast) also see everyone's calls, edit days, schedules
+    and calls, and send and share call sheets; cast only see their own call. Whoever
+    added a day (if crew), or an admin, deletes it. People mark a call sheet viewed or
+    confirmed only for themselves.
   - Private journal entries are visible only to the author and the people they
     share them with. Only the author can edit them.
 - Integrity rules live in the database too. A company always keeps at least one

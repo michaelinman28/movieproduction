@@ -6,7 +6,7 @@ import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
 
 /** What the call sheet shows. A personal link gets exactly this; the project's call sheet page maps its data to it. */
-export type SheetData = Omit<LinkedCallSheet, 'me' | 'confirmed'>;
+export type SheetData = Omit<LinkedCallSheet, 'me' | 'confirmed' | 'view'>;
 type SheetCall = SheetData['calls'][number];
 
 // Roles listed as key contacts near the top, in this order.
@@ -63,10 +63,12 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
  * call sheet page and by each person's private link.
  */
-export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNote, youAction, links }: {
+export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links }: {
   sheet: SheetData;
-  /** The person reading it: their call is shown at the top and their rows are marked. */
+  /** The person reading it, on My call only: their call is shown at the top and their rows are marked. The full sheet passes none. */
   me?: string | null;
+  /** Only the reader's own call sheet ("My call"): no key contacts, cast or crew lists. */
+  own?: boolean;
   /** Section ids, so each page remembers its own opened and closed sections. */
   sectionPrefix: string;
   /** Each person's call sheet status (on the project's page only; not printed). */
@@ -105,6 +107,10 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
   const sceneLine = (s: { int_ext: SheetData['scenes'][number]['int_ext']; time_of_day: SheetData['scenes'][number]['time_of_day'] }) =>
     [s.int_ext && labelOf(SCENE_INT_EXT, s.int_ext), s.time_of_day && labelOf(SCENE_TIMES, s.time_of_day)].filter(Boolean) as string[];
   const isMe = (c: SheetCall) => c.user_id === me;
+  // On My call, the characters the reader plays are highlighted in each scene they're in.
+  const myChars = new Set(own && mine ? (mine.characters ?? []).map((ch) => ch.name.trim().toLowerCase()) : []);
+  const sceneChars = (text: string | null) => (text ?? '').split(',').map((n) => n.trim()).filter(Boolean);
+  const playsIn = (text: string | null) => sceneChars(text).filter((n) => myChars.has(n.toLowerCase()));
   // The day's elements by category (in the company's order, as sent); the reader's own character's first in each.
   const elements = sheet.elements ?? [];
   const isMine = (e: SheetElement) => Boolean(me && e.character?.actor_id === me);
@@ -157,6 +163,8 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
         </div>
       </header>
 
+      {own && !mine && <p className="cs-you cs-muted">You're not called on this day.</p>}
+
       {mine && (
         <section className="cs-you" aria-label="Your call">
           <div>
@@ -182,7 +190,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
         </dl>
       )}
 
-      <div className="cs-info">
+      <div className={`cs-info ${own ? 'cs-info-3' : ''}`}>
         <Card title="Location">
           {loc ? (
             <>
@@ -213,7 +221,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
             <li><span className="cs-muted">Emergency</span><span>Police, fire, ambulance</span><a className="cs-phone" href="tel:911">911</a></li>
           </ul>
         </Card>
-        <Card title="Key contacts">
+        {!own && <Card title="Key contacts">
           {keys.length ? (
             <ul className="cs-keys">
               {keys.map(({ role, c }) => (
@@ -221,7 +229,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
               ))}
             </ul>
           ) : <p className="cs-muted cs-small">None listed</p>}
-        </Card>
+        </Card>}
       </div>
 
       <div className="cs-body">
@@ -240,8 +248,9 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
                 }
                 const s = sheet.scenes.find((x) => x.id === i.scene_id);
                 if (!s) return null;
+                const mineHere = playsIn(s.characters);
                 return (
-                  <li key={i.id} className="cs-row">
+                  <li key={i.id} className={`cs-row ${mineHere.length ? 'cs-row-mine' : ''}`}>
                     <span className="cs-row-time">{time}</span>
                     <div className="cs-row-body">
                       <div className="cs-row-head">
@@ -249,11 +258,13 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
                         <span className="cs-row-set"><To to={links?.scene(s.id)} title={`Open scene ${s.number} on the Scenes page`}>{s.set_name || 'Scene'}</To></span>
                         {sceneLine(s).map((t) => <span key={t} className="cs-pill">{t}</span>)}
                         {s.pages_eighths != null && <span className="cs-pages">{pagesLabel(s.pages_eighths)} pg</span>}
+                        {mineHere.length > 0 && <span className="cs-in-scene">You: {mineHere.join(', ')}</span>}
                       </div>
                       {s.synopsis && <p className="cs-row-text">{s.synopsis}</p>}
                       {(s.characters || s.needs || elementsIn(s.id).length > 0) && (
                         <p className="cs-row-meta">
-                          {s.characters && <span><b>Cast</b> {s.characters}</span>}
+                          {s.characters && <span><b>Cast</b> {sceneChars(s.characters).map((n, k) => (
+                            <span key={n}>{k > 0 && ', '}{myChars.has(n.toLowerCase()) ? <mark className="cs-mine-char">{n}</mark> : n}</span>))}</span>}
                           {elementsIn(s.id).length > 0 && <span><b>Elements</b> {elementsIn(s.id).map((e) => e.name).join(', ')}</span>}
                           {s.needs && <span><b>Other needs</b> {s.needs}</span>}
                         </p>
@@ -293,7 +304,7 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
           </Section>
         )}
 
-        <Section id={`${sectionPrefix}.cast`} title="Cast" summary={cast.length ? String(cast.length) : undefined}>
+        {!own && <Section id={`${sectionPrefix}.cast`} title="Cast" summary={cast.length ? String(cast.length) : undefined}>
           {cast.length ? (
             <ul className="cs-people">
               {cast.map((c) => person(c,
@@ -301,9 +312,9 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
                 <><TimeChip label="Pickup" time={c.pickup_time} /><TimeChip label="Makeup" time={c.makeup_time} /><span className="cs-chip cs-chip-strong"><span>On set</span> {callOf(c) || '—'}</span></>))}
             </ul>
           ) : <p className="cs-muted">No cast called</p>}
-        </Section>
+        </Section>}
 
-        <Section id={`${sectionPrefix}.crew`} title="Crew" summary={String(sheet.calls.length - cast.length)}>
+        {!own && <Section id={`${sectionPrefix}.crew`} title="Crew" summary={String(sheet.calls.length - cast.length)}>
           {crew.length ? (
             <div className="cs-depts">
               {crew.map(([dept, list]) => (
@@ -318,10 +329,10 @@ export function CallSheetDocument({ sheet, me, sectionPrefix, status, versionNot
               ))}
             </div>
           ) : <p className="cs-muted">No crew called yet</p>}
-        </Section>
+        </Section>}
 
         {food.length > 0 && (
-          <Section id={`${sectionPrefix}.dietary`} title="Dietary needs"
+          <Section id={`${sectionPrefix}.dietary`} title={own ? 'Your dietary needs' : 'Dietary needs'}
             summary={`${food.length} ${food.length === 1 ? 'person' : 'people'}${allergies ? `, ${allergies} ${allergies === 1 ? 'allergy' : 'allergies'}` : ''}`}>
             <ul className="cs-food">
               {food.map((c) => (
