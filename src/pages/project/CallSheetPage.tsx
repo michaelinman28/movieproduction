@@ -28,6 +28,7 @@ export function CallSheetPage() {
   const me = session?.user.id;
   const [mode, setMode] = useSheetMode(project.view);
   const [sheet, setSheet] = useState<CallSheet | null>(null);
+  const [roster, setRoster] = useState<{ name: string; cast_number: number | null }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,6 +41,7 @@ export function CallSheetPage() {
   const load = useCallback(async () => {
     try { setSheet(await api.callSheet(dayId)); } catch (e) { setError(errorText(e)); }
   }, [dayId]);
+  useEffect(() => { api.characters(projectId).then((rows) => setRoster(rows.map((c) => ({ name: c.name, cast_number: c.cast_number })))).catch(() => undefined); }, [projectId]);
   useEffect(() => { load(); }, [load]);
   // Each opening of the call sheet page goes in the activity log.
   useEffect(() => { api.openedCallSheet(dayId).catch(() => undefined); }, [dayId]);
@@ -220,7 +222,7 @@ export function CallSheetPage() {
       </div>}
 
       {shown && <CallSheetDocument sheet={shown} me={mode === 'mine' ? me : null} own={mode === 'mine'} sectionPrefix="callSheet" status={(id) => { const c = sheet.calls.find((x) => x.user_id === id); return c ? callStatus(day, c) : ''; }}
-        versionNote={day.version ? `Version ${day.version}` : 'Draft, not sent'} links={links} />}
+        versionNote={day.version ? `Version ${day.version}` : 'Draft, not sent'} links={links} roster={roster} />}
     </div>
   );
 }

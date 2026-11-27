@@ -4,7 +4,7 @@
  * There's no email server, the same way invites and task summaries work.
  */
 import type { CallSheet, ShootDayCall } from './api';
-import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, clockLabel, labelOf, longDate, pagesLabel } from './format';
+import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castNumbersByName, clockLabel, labelOf, longDate, orderCastNames, pagesLabel } from './format';
 
 /** " at Diner" or " at Diner, then Park" (the day's locations in order), or nothing. */
 function placeNames(sheet: CallSheet) {
@@ -57,7 +57,10 @@ export function callSheetBody(sheet: CallSheet, t: SheetText) {
         if (!s) continue;
         const ie = [s.int_ext && labelOf(SCENE_INT_EXT, s.int_ext), s.time_of_day && labelOf(SCENE_TIMES, s.time_of_day)].filter(Boolean).join(' ');
         const place = scenePlace(sheet, s);
-        lines.push(`- ${time}Scene ${s.number}${s.set_name ? ` ${s.set_name}` : ''}${place ? ` at ${place}` : ''}${ie ? ` (${ie})` : ''}${s.pages_eighths != null ? `, ${pagesLabel(s.pages_eighths)} pg` : ''}${s.characters ? `, ${s.characters}` : ''}`);
+        const cast = s.characters
+          ? orderCastNames(s.characters.split(',').map((n) => n.trim()).filter(Boolean), castNumbersByName(sheet.calls.flatMap((c) => c.characters ?? []))).join(', ')
+          : '';
+        lines.push(`- ${time}Scene ${s.number}${s.set_name ? ` ${s.set_name}` : ''}${place ? ` at ${place}` : ''}${ie ? ` (${ie})` : ''}${s.pages_eighths != null ? `, ${pagesLabel(s.pages_eighths)} pg` : ''}${cast ? `, ${cast}` : ''}`);
       } else {
         lines.push(`- ${time}${labelOf(SHOOT_ITEM_KINDS, i.kind)}${i.label ? `: ${i.label}` : ''}`);
       }

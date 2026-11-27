@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { LinkedCallSheet, SheetElement } from '../lib/api';
-import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, clockLabel, labelOf, longDate, pagesLabel, shortDate } from '../lib/format';
+import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, castNumberValue, castNumbersByName, clockLabel, compareCastNumbers, labelOf, longDate, orderCastNames, pagesLabel, shortDate } from '../lib/format';
 import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
 
@@ -65,7 +65,7 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
  * call sheet page and by each person's private link.
  */
-export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links }: {
+export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links, roster }: {
   sheet: SheetData;
   /** The person reading it, on My call only: their call is shown at the top and their rows are marked. The full sheet passes none. */
   me?: string | null;
@@ -81,6 +81,8 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   youAction?: ReactNode;
   /** Links from each item to its own page (the project's call sheet page only). */
   links?: SheetLinks;
+  /** The project's characters, so a scene's cast is ordered by cast number even when someone isn't called. */
+  roster?: { name: string; cast_number: number | null }[];
 }) {
   const { day, locations, project } = sheet;
   // Each distinct nearest hospital, with the locations it's nearest to.
@@ -99,14 +101,28 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   const crewCall = clockLabel(day.crew_call);
   const callOf = (c: SheetCall) => clockLabel(c.call_time) || crewCall;
   const byName = (a: SheetCall, b: SheetCall) => nameOf(a).localeCompare(nameOf(b));
-  // The Cast list follows cast number (1, then 2, then 11). Someone who plays more
+  // Cast number by character name: the project's roster, then whoever is called.
+  const numberOf = castNumbersByName([
+    ...(roster ?? []),
+    ...sheet.calls.flatMap((c) => c.characters ?? []),
+  ]);
+  // The Cast list follows cast number (1, then 3, then 11). Someone who plays more
   // than one character is listed at their lowest number; a name with no number is last.
-  const castRank = (c: SheetCall) => {
-    const numbers = (c.characters ?? []).flatMap((ch) => (ch.cast_number == null ? [] : [ch.cast_number]));
-    return numbers.length ? Math.min(...numbers) : Number.POSITIVE_INFINITY;
+  const castRank = (c: SheetCall): number | null => {
+    const numbers = (c.characters ?? []).flatMap((ch) => {
+      const n = castNumberValue(ch.cast_number);
+      return n == null ? [] : [n];
+    });
+    if (!numbers.length && c.character_name) {
+      for (const part of c.character_name.split(',')) {
+        const n = numberOf.get(part.trim().toLowerCase());
+        if (n != null) numbers.push(n);
+      }
+    }
+    return numbers.length ? Math.min(...numbers) : null;
   };
 
-  const cast = sheet.calls.filter((c) => castLabel(c)).sort((a, b) => castRank(a) - castRank(b) || byName(a, b));
+  const cast = sheet.calls.filter((c) => castLabel(c)).sort((a, b) => compareCastNumbers(castRank(a), castRank(b)) || byName(a, b));
   const depts = new Map<string, SheetCall[]>();
   for (const c of sheet.calls.filter((x) => !castLabel(x))) depts.set(department(c), [...(depts.get(department(c)) ?? []), c]);
   const rank = (d: string) => (DEPARTMENTS.includes(d) ? DEPARTMENTS.indexOf(d) : DEPARTMENTS.length);
@@ -127,7 +143,7 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   const isMe = (c: SheetCall) => c.user_id === me;
   // On My call, the characters the reader plays are highlighted in each scene they're in.
   const myChars = new Set(own && mine ? (mine.characters ?? []).map((ch) => ch.name.trim().toLowerCase()) : []);
-  const sceneChars = (text: string | null) => (text ?? '').split(',').map((n) => n.trim()).filter(Boolean);
+  const sceneChars = (text: string | null) => orderCastNames((text ?? '').split(',').map((n) => n.trim()).filter(Boolean), numberOf);
   const playsIn = (text: string | null) => sceneChars(text).filter((n) => myChars.has(n.toLowerCase()));
   // The day's elements by category (in the company's order, as sent); the reader's own character's first in each.
   const elements = sheet.elements ?? [];

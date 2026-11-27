@@ -195,7 +195,7 @@ day to day.
   parking and on-site contact, the nearest hospital of each (one line per distinct
   hospital, saying which locations it's near), weather, key contacts
   (producer, director, ADs, location manager and others found by role), scenes with
-  their location, breaks and page total, cast in cast-number order, crew grouped by department, notes, and
+  their location, breaks and page total, each scene's cast in cast-number order (1, then 3, then 11), the Cast list in that same order, crew grouped by department, notes, and
   the next day's advance schedule (that day's locations, and each scene with its
   location). On the project's own sheet a location name links to the Locations page;
   personal and shared links stay plain text. People called see their own call at the top and **Confirm I got it**; opening
