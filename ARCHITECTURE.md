@@ -170,11 +170,11 @@ day to day.
   `src/pages/project/ProjectShootDays.tsx`) and each day's call sheet
   (`/projects/:id/shoot-days/:dayId`, `src/pages/project/CallSheetPage.tsx`).
 - **Days table:** one row per date, numbered by date ("Day 1 of 12"). Date, title,
-  the note under the title, locations (a dropdown of tick boxes; newly ticked ones go at the end) and the four
+  the title note, locations (a dropdown of tick boxes; newly ticked ones go at the end) and the four
   times are editable in place; scenes, pages, sent version and
   confirmations are read from the day. Add a day by picking its date.
 - **Day form** (select a day; under the table) has three parts:
-  - **Details** (held until **Save day**): date, title, a note directly under the title,
+  - **Details** (held until **Save day**): date, title, the title note across the full width under them,
     locations, crew call, shooting
     call, lunch, estimated wrap, weather, sunrise, sunset and notes for the call sheet. **Locations** is an
     ordered list (add from a dropdown, move up, take off); the first is the main one,

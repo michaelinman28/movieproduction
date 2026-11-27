@@ -138,7 +138,7 @@ async function projectNotes(db: Db, id: string): Promise<Note[]> {
   }
   for (const d of days.filter((x: Row) => x.note)) {
     out.push({ key: `shoot_day_title:${d.id}`, source: 'shoot_day', note_id: null, body: d.note, author: titleWriter(d), at: d.title_note_at ?? d.updated_at, edited: false,
-      item: { kind: 'shoot_day', id: d.id, label: dayLabel(d), detail: 'Under the title' } });
+      item: { kind: 'shoot_day', id: d.id, label: dayLabel(d), detail: 'Title Note' } });
   }
   for (const d of days.filter((x: Row) => x.notes)) {
     out.push({ key: `shoot_day:${d.id}`, source: 'shoot_day', note_id: null, body: d.notes, author: writer(d), at: d.note_at ?? d.updated_at, edited: false,
@@ -161,7 +161,7 @@ async function projectNotes(db: Db, id: string): Promise<Note[]> {
 notes.openapi(createRoute({
   method: 'get', path: '/projects/{id}/notes', tags: ['Project notes'], security: secured,
   summary: 'Every note on the project, newest first',
-  description: 'Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, the note under a shoot day\'s title, a shoot day\'s call sheet notes, notes in a day\'s schedule and notes on people\'s calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.',
+  description: 'Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, a shoot day\'s title note, a shoot day\'s call sheet notes, notes in a day\'s schedule and notes on people\'s calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.',
   request: { params: IdParam },
   responses: { 200: ok(z.array(ProjectNote)), 401: errors[401] },
 }), async (c) => {

@@ -135,7 +135,7 @@ export interface ShootDay {
   /** The day's locations, in order; the first is the main one (the weather lookup uses its address). */
   location_ids: string[];
   crew_call: string | null; shooting_call: string | null; lunch: string | null; wrap: string | null;
-  /** Shown under the day's title, on the day and on the call sheet. */
+  /** Title note, shown under the day's title on the day and on the call sheet. */
   note: string | null;
   weather: string | null; sunrise: string | null; sunset: string | null; notes: string | null;
   /** How many times the call sheet has been sent; 0 = not yet. */
