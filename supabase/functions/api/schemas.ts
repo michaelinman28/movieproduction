@@ -569,9 +569,13 @@ export const CallSheet = z.object({
   day: ShootDay,
   locations: z.array(z.any()).openapi({ description: 'The day\'s locations in order, the main one first (see Location)' }),
   items: z.array(ShootDayItem),
-  scenes: z.array(z.any()).openapi({ description: 'The scenes on the day (see Scene)' }),
+  scenes: z.array(z.any()).openapi({ description: 'The scenes on the day, in schedule order. Each has location_name when the scene has a location (see Scene)' }),
   calls: z.array(ShootDayCall),
-  next_day: z.object({ day: ShootDay, scenes: z.array(z.any()) }).nullable().openapi({ description: 'A look ahead at the following shoot day' }),
+  next_day: z.object({
+    day: ShootDay,
+    locations: z.array(z.object({ id: Uuid, name: z.string() })).openapi({ description: 'The following day\'s locations, in order, including any added from its scenes' }),
+    scenes: z.array(z.any()).openapi({ description: 'The following day\'s scenes, each with location_name' }),
+  }).nullable().openapi({ description: 'A look ahead at the following shoot day' }),
   elements: z.array(z.any()).openapi({ description: 'The elements of the day\'s scenes (see SheetElement)' }),
 }).openapi('CallSheet');
 

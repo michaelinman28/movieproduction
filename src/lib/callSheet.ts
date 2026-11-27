@@ -12,6 +12,13 @@ function placeNames(sheet: CallSheet) {
   return names.length ? ` at ${names.join(', then ')}` : '';
 }
 
+/** The scene's location, when it has one. */
+function scenePlace(sheet: CallSheet, s: { location_id: string | null; location_name?: string | null }) {
+  const named = s.location_name?.trim();
+  if (named) return named;
+  return (s.location_id && sheet.locations.find((l) => l.id === s.location_id)?.name) || '';
+}
+
 export interface SheetText { projectName: string; url: string }
 
 export function callSheetSubject(sheet: CallSheet, t: SheetText) {
@@ -47,7 +54,8 @@ export function callSheetBody(sheet: CallSheet, t: SheetText) {
         const s = sheet.scenes.find((x) => x.id === i.scene_id);
         if (!s) continue;
         const ie = [s.int_ext && labelOf(SCENE_INT_EXT, s.int_ext), s.time_of_day && labelOf(SCENE_TIMES, s.time_of_day)].filter(Boolean).join(' ');
-        lines.push(`- ${time}Scene ${s.number}${s.set_name ? ` ${s.set_name}` : ''}${ie ? ` (${ie})` : ''}${s.pages_eighths != null ? `, ${pagesLabel(s.pages_eighths)} pg` : ''}${s.characters ? `, ${s.characters}` : ''}`);
+        const place = scenePlace(sheet, s);
+        lines.push(`- ${time}Scene ${s.number}${s.set_name ? ` ${s.set_name}` : ''}${place ? ` at ${place}` : ''}${ie ? ` (${ie})` : ''}${s.pages_eighths != null ? `, ${pagesLabel(s.pages_eighths)} pg` : ''}${s.characters ? `, ${s.characters}` : ''}`);
       } else {
         lines.push(`- ${time}${labelOf(SHOOT_ITEM_KINDS, i.kind)}${i.label ? `: ${i.label}` : ''}`);
       }

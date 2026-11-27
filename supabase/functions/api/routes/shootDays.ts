@@ -276,22 +276,27 @@ shootDays.openapi(createRoute({
   const all = await describeDays(db, day.project_id);
   const next = all[day.day_number] ?? null; // day_number is 1-based, so this is the following day
   const sceneIds = [...new Set([...day.scene_ids, ...(next?.scene_ids ?? [])])];
-  const [loc, items, scenes, calls, elems] = await Promise.all([
-    day.location_ids.length ? db.from('project_locations').select('*').in('id', day.location_ids) : { data: [], error: null },
+  const [items, scenes, calls, elems] = await Promise.all([
     db.from('shoot_day_items').select('*').eq('shoot_day_id', day.id).order('sort_order'),
     sceneIds.length ? db.from('scenes').select('*').in('id', sceneIds) : { data: [], error: null },
     callsFor(db, day),
     db.rpc('call_sheet_elements', { day: day.id }),
   ]);
   const sceneRows = must<Row[]>(scenes);
-  const pick = (ids: string[]) => ids.map((id) => sceneRows.find((s) => s.id === id)).filter(Boolean);
+  // Today's locations, the next day's, and any scene location (so a name still shows if it was taken off the day).
+  const locIds = [...new Set([...day.location_ids, ...(next?.location_ids ?? []), ...sceneRows.map((s) => s.location_id).filter(Boolean)])];
+  const loc = locIds.length ? must<Row[]>(await db.from('project_locations').select('*').in('id', locIds)) : [];
+  const byId = new Map(loc.map((l) => [l.id, l]));
+  const named = (s: Row) => ({ ...s, location_name: s.location_id ? byId.get(s.location_id)?.name ?? null : null });
+  const pick = (ids: string[]) => ids.map((id) => sceneRows.find((s) => s.id === id)).filter(Boolean).map(named);
+  const places = (ids: string[]) => ids.map((id) => byId.get(id)).filter(Boolean).map((l) => ({ id: l.id, name: l.name }));
   return send(c, {
     day,
-    locations: day.location_ids.map((lid: string) => must<Row[]>(loc).find((l) => l.id === lid)).filter(Boolean),
+    locations: day.location_ids.map((lid: string) => byId.get(lid)).filter(Boolean),
     items: must<Row[]>(items),
     scenes: pick(day.scene_ids),
     calls,
-    next_day: next ? { day: next, scenes: pick(next.scene_ids) } : null,
+    next_day: next ? { day: next, locations: places(next.location_ids), scenes: pick(next.scene_ids) } : null,
     elements: must<Row[]>(elems) ?? [],
   }, 200);
 });

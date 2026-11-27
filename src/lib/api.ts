@@ -164,9 +164,12 @@ export interface ShootDayCall {
 export interface CallCharacter { name: string; cast_number: number | null }
 export interface Dietary { needs: string; allergy: boolean }
 export type ShootDayCallInput = Partial<Pick<ShootDayCall, 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note'>>;
+/** A scene as a call sheet lists it: the scene, plus the name of its location. */
+export type SheetScene = Scene & { location_name: string | null };
 export interface CallSheet {
-  day: ShootDay; locations: Location[]; items: ShootDayItem[]; scenes: Scene[]; calls: ShootDayCall[];
-  next_day: { day: ShootDay; scenes: Scene[] } | null;
+  day: ShootDay; locations: Location[]; items: ShootDayItem[]; scenes: SheetScene[]; calls: ShootDayCall[];
+  /** The following shoot day: its locations (in order) and its scenes, each named with its location. */
+  next_day: { day: ShootDay; locations: { id: string; name: string }[]; scenes: SheetScene[] } | null;
   elements: SheetElement[];
 }
 /** What a personal call sheet link shows: the sent sheet, view only, no emails. */
@@ -181,7 +184,7 @@ export interface LinkedCallSheet {
   /** The day's locations in order, the main one first. */
   locations: Pick<Location, 'name' | 'description' | 'address' | 'parking' | 'nearest_hospital' | 'contact_name' | 'contact_phone'>[];
   items: Pick<ShootDayItem, 'id' | 'kind' | 'scene_id' | 'label' | 'at_time'>[];
-  scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths' | 'synopsis' | 'characters' | 'needs'>[];
+  scenes: (Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths' | 'synopsis' | 'characters' | 'needs' | 'location_id'> & { location_name: string | null })[];
   calls: (Pick<ShootDayCall, 'user_id' | 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note' | 'role_ids'> & {
     profile: { id: string; full_name: string | null; nickname: string | null; phone: string | null };
     characters?: CallCharacter[];
@@ -191,7 +194,12 @@ export interface LinkedCallSheet {
   roles: { id: string; name: string; department: string | null; sort_order: number | null }[];
   /** The elements of the day's scenes. */
   elements: SheetElement[];
-  next_day: { day: Pick<ShootDay, 'shoot_date' | 'crew_call' | 'title' | 'day_number'>; scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths'>[] } | null;
+  next_day: {
+    day: Pick<ShootDay, 'shoot_date' | 'crew_call' | 'title' | 'day_number'>;
+    /** The following day's locations, in order. */
+    locations: { id: string; name: string }[];
+    scenes: (Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths' | 'location_id'> & { location_name: string | null })[];
+  } | null;
 }
 
 /** What a shared call sheet link shows: the whole sent sheet, view only, no emails, phones only if chosen. */

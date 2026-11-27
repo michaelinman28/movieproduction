@@ -102,6 +102,7 @@ export function CallSheetPage() {
     scene: (id) => itemPath.scene(projectId, id),
     person: (userId) => itemPath.teamMember(projectId, userId),
     locations: sheet.day.location_ids.map((id) => itemPath.location(projectId, id)),
+    location: (id) => itemPath.location(projectId, id),
     nextDay: sheet.next_day ? itemPath.callSheet(projectId, sheet.next_day.day.id) : null,
     element: (id) => itemPath.element(projectId, id),
   } : undefined;

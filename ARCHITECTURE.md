@@ -183,6 +183,9 @@ day to day.
   - **Schedule:** the day's run in order (drag to reorder, `PUT /shoot-days/{id}/item-order`):
     scenes from the Scenes page, meal breaks, company moves and notes, each with an
     optional time. A scene can be on a day once; putting it on a day marks it Scheduled.
+    If that scene has a location the day doesn't already list, the location is added
+    at the end (the first stays the main one). Giving a scene that's already on a day
+    a location adds it the same way. Taking a location off the day leaves it off.
   - **Who's called:** people on the project's team. Call, pickup, makeup, character and
     note are edited in place or in the call's form. A blank call means the crew call; a
     character makes someone cast. **Call everyone** adds the whole team.
@@ -191,8 +194,10 @@ day to day.
   parking and on-site contact, the nearest hospital of each (one line per distinct
   hospital, saying which locations it's near), weather, key contacts
   (producer, director, ADs, location manager and others found by role), scenes with
-  breaks and page total, cast, crew grouped by department, notes, and the next day's
-  scenes. People called see their own call at the top and **Confirm I got it**; opening
+  their location, breaks and page total, cast, crew grouped by department, notes, and
+  the next day's advance schedule (that day's locations, and each scene with its
+  location). On the project's own sheet a location name links to the Locations page;
+  personal and shared links stay plain text. People called see their own call at the top and **Confirm I got it**; opening
   the sheet marks it viewed. The sheet itself is one designed, read-only component
   (`src/components/CallSheetDocument.tsx`, styles under `.cs` in `src/styles.css`):
   a green header band with the crew call, the reader's own call, time tiles, location,
@@ -238,7 +243,9 @@ day to day.
   per location per day) replaced `shoot_days.location_id` in migration
   `20261127000000_shoot_day_locations.sql`. The API returns them as `location_ids` on
   each day (in order) and takes `location_ids` to replace the list; the call sheet and
-  both link functions return `locations` (an array, main first). Crew change them;
+  both link functions return `locations` (an array, main first). A scene's location is
+  added to that list when the scene is scheduled, or when the scene's location changes,
+  if the day doesn't already have it. Crew change them;
   everyone on the project sees them. Deleting a location takes it off its days; each
   change is logged on the day's History.
 - **Cast and crew:** on each project a person is crew (a company admin, or a role
