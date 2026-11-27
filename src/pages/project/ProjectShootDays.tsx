@@ -24,9 +24,9 @@ import { useProject } from './ProjectLayout';
 type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
 
 
-/** Where a day can be: every location not marked Not using, plus its current one. */
-const locationChoices = (locations: Location[], currentId?: string | null) =>
-  locations.filter((l) => l.status !== 'not_using' || l.id === currentId);
+/** Where a day can be: every location not marked Not using, plus the ones it's already at. */
+const locationChoices = (locations: Location[], currentIds: string[] = []) =>
+  locations.filter((l) => l.status !== 'not_using' || currentIds.includes(l.id));
 
 /** Where someone stands with the sent call sheet. */
 export function callStatus(day: Pick<ShootDay, 'version'>, c: Pick<ShootDayCall, 'viewed_version' | 'confirmed_version'>) {
@@ -47,14 +47,14 @@ const TIME_FIELDS = ['crew_call', 'shooting_call', 'lunch', 'wrap'] as const;
 // ---- Days ---------------------------------------------------------------------
 
 interface DayRow {
-  id: string; day: string; date: string; title: string; location: string;
+  id: string; day: string; date: string; title: string; locations: string;
   crew_call: string; shooting_call: string; lunch: string; wrap: string;
   scenes: string; pages: string; sent: string; confirmed: string; open: string;
-  locationId: string | null; sceneIds: string[];
+  locationIds: string[]; sceneIds: string[];
 }
 
 /**
- * A project's shoot days, by date. Each day has a location, times, a schedule of
+ * A project's shoot days, by date. Each day has one or more locations, times, a schedule of
  * scenes and breaks, and the people called; its call sheet is built from all that.
  */
 export function ProjectShootDays() {
@@ -102,13 +102,13 @@ export function ProjectShootDays() {
   useOpenFromLink((id) => days.some((d) => d.id === id), open);
   const rows = useMemo(() => days.map((d): DayRow => ({
     id: d.id, day: `${d.day_number} of ${d.total_days}`, date: d.shoot_date, title: d.title ?? '',
-    location: locations.find((l) => l.id === d.location_id)?.name ?? '',
+    locations: d.location_ids.map((id) => locations.find((l) => l.id === id)?.name).filter(Boolean).join(', '),
     crew_call: clockLabel(d.crew_call), shooting_call: clockLabel(d.shooting_call), lunch: clockLabel(d.lunch), wrap: clockLabel(d.wrap),
     scenes: d.scene_ids.map(sceneNumber).join(', '), pages: pagesLabel(d.pages_eighths || null),
     sent: d.version ? `Version ${d.version}` : 'Not sent', confirmed: d.version ? `${d.confirmed} of ${d.called}` : '', open: 'Call sheet',
-    locationId: d.location_id, sceneIds: d.scene_ids,
+    locationIds: d.location_ids, sceneIds: d.scene_ids,
   })), [days, locations, sceneNumber]);
-  const locationNames = useMemo(() => locationChoices(locations).map((l) => l.name), [locations]);
+  const locationById = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
 
   const options = useMemo(() => ({
     rowId: (r: DayRow) => r.id,
@@ -121,9 +121,20 @@ export function ProjectShootDays() {
       { field: 'open', header: '', width: 110, sortable: false, filter: false, render: ({ data }: { data: DayRow }) => gridLink('Call sheet', `/projects/${projectId}/shoot-days/${data.id}`) },
       { field: 'title', header: 'Title', width: 160, editable: true },
       {
-        field: 'location', header: 'Location', width: 170, editable: true, editor: 'select', editorOptions: [NONE, ...locationNames],
-        render: ({ value, data }: { value: string; data: DayRow }) => gridDropdown(gridEsc(value || NONE),
-          data.locationId && value ? { to: itemPath.location(projectId, data.locationId), title: `Open ${value} on the Locations page` } : null),
+        // The same list as the Locations box in the day's form; the first is the main one.
+        field: 'locations', header: 'Locations', width: 220,
+        pickMany: {
+          choices: (r: DayRow) => locationChoices(locations, r.locationIds).map((l) => ({ id: l.id, name: l.name })),
+          selected: (r: DayRow) => r.locationIds,
+          editable: !readOnly,
+        } satisfies PickMany<DayRow>,
+        tooltip: () => 'Where the day shoots, in order. The first is the main one: the crew call is there and the weather is looked up for it.',
+        render: ({ data }: { data: DayRow }) => {
+          const list = gridLinkList(data.locationIds.map((id) => locationById.get(id)).filter(Boolean).map((l) => ({
+            text: l!.name, to: itemPath.location(projectId, l!.id), title: `Open ${l!.name} on the Locations page`,
+          })));
+          return readOnly ? (list || gridEsc(NONE)) : gridDropdown(data.locationIds.length ? list : gridEsc(NONE));
+        },
       },
       { field: 'crew_call', header: 'Crew call', width: 110, editable: true },
       { field: 'shooting_call', header: 'Shooting call', width: 120, editable: true },
@@ -139,14 +150,18 @@ export function ProjectShootDays() {
       { field: 'sent', header: 'Sent', width: 110, filter: 'set' },
       ...(readOnly ? [] : [{ field: 'confirmed', header: 'Confirmed', width: 110, filter: false }]),
     ].map((c) => (readOnly ? { ...c, editable: false } : c)),
-  }), [locationNames, projectId, sceneNumber, readOnly]);
+  }), [locations, locationById, projectId, sceneNumber, readOnly]);
 
   async function saveCell(e: { data: DayRow; column: string; newValue: unknown }) {
-    const v = String(e.newValue ?? '').trim();
+    const v = Array.isArray(e.newValue) ? '' : String(e.newValue ?? '').trim();
     const patch: ShootDayInput = {};
     if (e.column === 'date') { if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { await load(); return; } patch.shoot_date = v; }
     else if (e.column === 'title') patch.title = v || null;
-    else if (e.column === 'location') patch.location_id = locations.find((l) => l.name === v)?.id ?? null;
+    else if (e.column === 'locations') {
+      // Keep the order the day already has; newly ticked locations go at the end.
+      const picked = Array.isArray(e.newValue) ? e.newValue as string[] : [];
+      patch.location_ids = [...e.data.locationIds.filter((id) => picked.includes(id)), ...picked.filter((id) => !e.data.locationIds.includes(id))];
+    }
     else if ((TIME_FIELDS as readonly string[]).includes(e.column)) { /* parsed below */ }
     else { await load(); return; }
     await run(async () => {
@@ -160,7 +175,7 @@ export function ProjectShootDays() {
     if (!newDate || !confirmDiscard()) return;
     let id = '';
     if (await run(async () => { id = (await api.createShootDay(projectId, { shoot_date: newDate })).id; },
-      `Added ${shortDate(newDate)}. Set its location and times, add scenes and call people in the form below the table.`)) {
+      `Added ${shortDate(newDate)}. Set its locations and times, add scenes and call people in the form below the table.`)) {
       setNewDate('');
       open(id);
     }
@@ -228,20 +243,30 @@ function DayPanel({ day, scenes, run, onChanged, canDelete, onDeleted }: {
 function DayDetails({ day, locations, run }: { day: ShootDay; locations: Location[]; run: Run }) {
   const { projectId } = useProject();
   const initial = useMemo(() => ({
-    shoot_date: day.shoot_date, title: day.title ?? '', location_id: day.location_id ?? '',
+    shoot_date: day.shoot_date, title: day.title ?? '',
     crew_call: clockValue(day.crew_call), shooting_call: clockValue(day.shooting_call), lunch: clockValue(day.lunch), wrap: clockValue(day.wrap),
     weather: day.weather ?? '', sunrise: clockValue(day.sunrise), sunset: clockValue(day.sunset), notes: day.notes ?? '',
   }), [day]);
   type Draft = typeof initial;
   const [draft, setDraft] = useState(initial);
+  // The day's locations, in order, held until Save like the other fields.
+  const [places, setPlaces] = useState<string[]>(day.location_ids);
+  const placesChanged = places.join() !== day.location_ids.join();
   const [looking, setLooking] = useState(false);
   const [weatherNote, setWeatherNote] = useState<string | null>(null);
   const keys = Object.keys(initial) as (keyof Draft)[];
-  const changed = keys.some((k) => draft[k].trim() !== initial[k]);
+  const changed = placesChanged || keys.some((k) => draft[k].trim() !== initial[k]);
   useUnsaved(changed);
   // When the day reloads (after Save, a weather lookup, or a change elsewhere), take in
   // the new saved values for every field the person hasn't changed, and keep their edits.
   const shown = useRef(initial);
+  const shownPlaces = useRef(day.location_ids);
+  useEffect(() => {
+    const before = shownPlaces.current;
+    shownPlaces.current = day.location_ids;
+    if (before === day.location_ids) return;
+    setPlaces((p) => (p.join() === before.join() ? day.location_ids : p));
+  }, [day.location_ids]);
   useEffect(() => {
     const before = shown.current;
     shown.current = initial;
@@ -263,16 +288,17 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
       if (k === 'shoot_date') { if (d.shoot_date) patch.shoot_date = d.shoot_date; }
       else (patch as Record<string, string | null>)[k] = d[k] || null;
     }
+    if (placesChanged) patch.location_ids = places;
     if (await run(() => api.updateShootDay(day.id, patch), `Saved day ${day.day_number}.`)) setDraft(d);
   }
 
   async function lookUp() {
     setLooking(true);
     setWeatherNote(null);
-    if (!draft.location_id) { setWeatherNote('Pick a location first.'); setLooking(false); return; }
+    if (!places.length) { setWeatherNote('Add a location first.'); setLooking(false); return; }
     try {
-      // Looks up the date and location shown in the form; the result waits for Save day.
-      const w = await api.lookUpWeather(day.id, { shoot_date: draft.shoot_date || undefined, location_id: draft.location_id });
+      // Looks up the date and main location shown in the form; the result waits for Save day.
+      const w = await api.lookUpWeather(day.id, { shoot_date: draft.shoot_date || undefined, location_id: places[0] });
       setDraft((d) => ({ ...d, weather: w.weather, sunrise: clockValue(w.sunrise), sunset: clockValue(w.sunset) }));
       setWeatherNote(`Forecast for ${w.place} filled in. Press Save day to keep it.`);
     } catch (e) { setWeatherNote(errorText(e)); }
@@ -294,17 +320,9 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
         <label className="label">Title
           <input className="field" value={draft.title} maxLength={120} placeholder="Diner nights" onChange={set('title')} />
         </label>
-        <label className="label md:col-span-2">Location
-          <select className="field" value={draft.location_id} onChange={set('location_id')}>
-            <option value="">{NONE}</option>
-            {locationChoices(locations, day.location_id).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
-          <span className="hint font-normal">Its address, parking and nearest hospital go on the call sheet; edit them on the Locations page.</span>
-          {(() => {
-            const at = locations.find((l) => l.id === draft.location_id);
-            return at ? <OpenLink to={itemPath.location(projectId, at.id)}>Open {at.name} on the Locations page</OpenLink> : null;
-          })()}
-        </label>
+        <div className="md:col-span-2">
+          <DayLocations projectId={projectId} locations={locations} ids={places} saved={day.location_ids} onChange={setPlaces} />
+        </div>
         {timeInput('crew_call', 'General crew call')}
         {timeInput('shooting_call', 'Shooting call')}
         {timeInput('lunch', 'Lunch')}
@@ -318,7 +336,7 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
           <button type="button" className="btn btn-secondary sm:w-auto sm:self-start" disabled={looking} onClick={lookUp}>
             {looking ? 'Looking up…' : 'Look up weather, sunrise and sunset'}
           </button>
-          <span className="hint">Fills in the weather, sunrise and sunset for this date and location, from the location's address, up to about 16 days ahead.</span>
+          <span className="hint">Fills in the weather, sunrise and sunset for this date at the main (first) location, from its address, up to about 16 days ahead.</span>
           {weatherNote && <span className="hint">{weatherNote}</span>}
         </div>
         <label className="label md:col-span-2">Notes for the call sheet
@@ -326,11 +344,63 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
         </label>
         <div className="flex gap-2 md:col-span-2">
           <button type="submit" className="btn flex-1 whitespace-nowrap md:flex-none" disabled={!changed} data-pin="2">Save day</button>
-          <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => setDraft(initial)}>Undo changes</button>
+          <button type="button" className="btn btn-secondary" disabled={!changed} onClick={() => { setDraft(initial); setPlaces(day.location_ids); }}>Undo changes</button>
         </div>
         {changed && <p className="hint md:col-span-2">Unsaved changes.</p>}
       </form>
     </Section>
+  );
+}
+
+/**
+ * The day's locations in order, in the day's form: the first is the main one (the crew
+ * call is there and the weather is looked up for it). Add from a list, move one up, or
+ * take it off the day. Each location's details are edited on the Locations page.
+ */
+function DayLocations({ projectId, locations, ids, saved, onChange }: {
+  projectId: string; locations: Location[]; ids: string[]; saved: string[]; onChange: (ids: string[]) => void;
+}) {
+  const byId = new Map(locations.map((l) => [l.id, l]));
+  const list = ids.map((id) => byId.get(id)).filter((l): l is Location => !!l);
+  const addable = locationChoices(locations, saved).filter((l) => !ids.includes(l.id));
+  const move = (i: number) => onChange(ids.map((id, j) => (j === i - 1 ? ids[i] : j === i ? ids[i - 1] : id)));
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="label">Locations</span>
+      {list.length > 0 ? (
+        <ol className="flex flex-col divide-y divide-line rounded-md border border-line" aria-label="The day's locations, in order">
+          {list.map((l, i) => (
+            <li key={l.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5">
+              <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                <span className="w-5 shrink-0 text-sm font-semibold text-muted">{i + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{l.name}</span>
+                  {i === 0 && list.length > 1 && <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-accent">Main</span>}
+                  {l.address && <span className="block break-words text-sm text-muted">{l.address}</span>}
+                  <OpenLink to={itemPath.location(projectId, l.id)}>Open {l.name} on the Locations page</OpenLink>
+                </span>
+              </span>
+              <span className="flex shrink-0 gap-1">
+                {i > 0 && <button type="button" className="btn btn-secondary min-h-11 px-3" aria-label={`Move ${l.name} up`} title="Move up" onClick={() => move(i)}>↑</button>}
+                <button type="button" className="btn btn-secondary min-h-11 px-3" aria-label={`Take ${l.name} off this day`} title="Take off this day"
+                  onClick={() => onChange(ids.filter((id) => id !== l.id))}>×</button>
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : <p className="hint">No location yet.</p>}
+      {addable.length > 0 && (
+        <select className="field" aria-label="Add a location to this day" value=""
+          onChange={(e) => { if (e.target.value) onChange([...ids, e.target.value]); }}>
+          <option value="">{list.length ? 'Add another location…' : 'Add a location…'}</option>
+          {addable.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+      )}
+      <span className="hint">
+        {list.length > 1 ? 'In the order the day goes. The first is the main one: the crew call is there and the weather is looked up for it. ' : ''}
+        Each location's address, parking and nearest hospital go on the call sheet; edit them on the Locations page.
+      </span>
+    </div>
   );
 }
 

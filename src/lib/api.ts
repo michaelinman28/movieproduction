@@ -131,7 +131,9 @@ export interface SheetElement {
 
 /** A day of filming. Times are 'HH:MM' or 'HH:MM:SS'. */
 export interface ShootDay {
-  id: string; project_id: string; shoot_date: string; title: string | null; location_id: string | null;
+  id: string; project_id: string; shoot_date: string; title: string | null;
+  /** The day's locations, in order; the first is the main one (the weather lookup uses its address). */
+  location_ids: string[];
   crew_call: string | null; shooting_call: string | null; lunch: string | null; wrap: string | null;
   weather: string | null; sunrise: string | null; sunset: string | null; notes: string | null;
   /** How many times the call sheet has been sent; 0 = not yet. */
@@ -143,7 +145,7 @@ export interface ShootDay {
   created_by: string | null; created_at: string; updated_at: string;
   day_number: number; total_days: number; scene_ids: string[]; pages_eighths: number; called: number; confirmed: number;
 }
-export type ShootDayInput = Partial<Pick<ShootDay, 'shoot_date' | 'title' | 'location_id' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes'>>;
+export type ShootDayInput = Partial<Pick<ShootDay, 'shoot_date' | 'title' | 'location_ids' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes'>>;
 export type ShootItemKind = 'scene' | 'meal' | 'move' | 'note';
 export interface ShootDayItem { id: string; shoot_day_id: string; project_id: string; sort_order: number; kind: ShootItemKind; scene_id: string | null; label: string | null; at_time: string | null; created_at: string }
 export interface ShootDayCall {
@@ -163,7 +165,7 @@ export interface CallCharacter { name: string; cast_number: number | null }
 export interface Dietary { needs: string; allergy: boolean }
 export type ShootDayCallInput = Partial<Pick<ShootDayCall, 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note'>>;
 export interface CallSheet {
-  day: ShootDay; location: Location | null; items: ShootDayItem[]; scenes: Scene[]; calls: ShootDayCall[];
+  day: ShootDay; locations: Location[]; items: ShootDayItem[]; scenes: Scene[]; calls: ShootDayCall[];
   next_day: { day: ShootDay; scenes: Scene[] } | null;
   elements: SheetElement[];
 }
@@ -176,7 +178,8 @@ export interface LinkedCallSheet {
   confirmed: boolean;
   project: { name: string; company_name: string };
   day: Pick<ShootDay, 'id' | 'shoot_date' | 'title' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes' | 'version' | 'sent_at' | 'day_number' | 'total_days'>;
-  location: Pick<Location, 'name' | 'description' | 'address' | 'parking' | 'nearest_hospital' | 'contact_name' | 'contact_phone'> | null;
+  /** The day's locations in order, the main one first. */
+  locations: Pick<Location, 'name' | 'description' | 'address' | 'parking' | 'nearest_hospital' | 'contact_name' | 'contact_phone'>[];
   items: Pick<ShootDayItem, 'id' | 'kind' | 'scene_id' | 'label' | 'at_time'>[];
   scenes: Pick<Scene, 'id' | 'number' | 'set_name' | 'int_ext' | 'time_of_day' | 'pages_eighths' | 'synopsis' | 'characters' | 'needs'>[];
   calls: (Pick<ShootDayCall, 'user_id' | 'call_time' | 'character_name' | 'pickup_time' | 'makeup_time' | 'note' | 'role_ids'> & {

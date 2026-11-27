@@ -22,14 +22,14 @@ function Phone({ phone }: { phone: string | null | undefined }) {
 
 /**
  * Where the call sheet's items link to on the project's call sheet page: each scene,
- * person, the location and the next day open on their own pages. A personal link page
+ * person, each location and the next day open on their own pages. A personal link page
  * (no sign-in, outside the app) passes none, so it shows plain text.
  */
 export interface SheetLinks {
   scene: (id: string) => string;
   person: (userId: string) => string;
-  /** The day's location. */
-  location: string | null;
+  /** Each of the day's locations, in the same order as the sheet's locations. */
+  locations: (string | null)[];
   /** The next shoot day's call sheet. */
   nextDay: string | null;
   element: (id: string) => string;
@@ -80,7 +80,15 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   /** Links from each item to its own page (the project's call sheet page only). */
   links?: SheetLinks;
 }) {
-  const { day, location: loc, project } = sheet;
+  const { day, locations, project } = sheet;
+  // Each distinct nearest hospital, with the locations it's nearest to.
+  const hospitals: { text: string; places: string[] }[] = [];
+  for (const l of locations) {
+    const h = l.nearest_hospital?.trim();
+    if (!h) continue;
+    const at = hospitals.find((x) => x.text === h);
+    if (at) at.places.push(l.name); else hospitals.push({ text: h, places: [l.name] });
+  }
   const roleById = new Map(sheet.roles.map((r) => [r.id, r]));
   const rolesOf = (c: SheetCall) => c.role_ids.map((id) => roleById.get(id)).filter((r): r is NonNullable<typeof r> => Boolean(r))
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -176,7 +184,8 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
             <div className="cs-chips">
               <TimeChip label="Pickup" time={mine.pickup_time} />
               <TimeChip label="Makeup" time={mine.makeup_time} />
-              {loc && <span className="cs-chip"><span>At</span> {loc.name}</span>}
+              {/* The call is at the day's first location. */}
+              {locations[0] && <span className="cs-chip"><span>At</span> {locations[0].name}</span>}
             </div>
             {mine.note && <p className="cs-you-note">{mine.note}</p>}
           </div>
@@ -191,14 +200,21 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
       )}
 
       <div className={`cs-info ${own ? 'cs-info-3' : ''}`}>
-        <Card title="Location">
-          {loc ? (
-            <>
-              <p className="cs-strong"><To to={links?.location} title={`Open ${loc.name} on the Locations page`}>{loc.name}</To></p>
-              {loc.address && <p><a {...mapsLinkProps(loc.address)}>{loc.address}</a></p>}
-              {loc.parking && <p className="cs-small"><span className="cs-muted">Parking:</span> {loc.parking}</p>}
-              {loc.contact_name && <p className="cs-small"><span className="cs-muted">On site:</span> {loc.contact_name} <Phone phone={loc.contact_phone} /></p>}
-            </>
+        <Card title={locations.length > 1 ? `Locations (${locations.length})` : 'Location'}>
+          {locations.length ? (
+            <ul className="cs-places">
+              {locations.map((loc, i) => (
+                <li key={`${loc.name}-${i}`} className="cs-place">
+                  <p className="cs-strong">
+                    {locations.length > 1 && <span className="cs-place-no">{i + 1}</span>}
+                    <To to={links?.locations[i]} title={`Open ${loc.name} on the Locations page`}>{loc.name}</To>
+                  </p>
+                  {loc.address && <p><a {...mapsLinkProps(loc.address)}>{loc.address}</a></p>}
+                  {loc.parking && <p className="cs-small"><span className="cs-muted">Parking:</span> {loc.parking}</p>}
+                  {loc.contact_name && <p className="cs-small"><span className="cs-muted">On site:</span> {loc.contact_name} <Phone phone={loc.contact_phone} /></p>}
+                </li>
+              ))}
+            </ul>
           ) : <p className="cs-muted">To be confirmed</p>}
         </Card>
         <Card title="Weather">
@@ -207,17 +223,17 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         </Card>
         <Card title="Nearest hospital" tone="alert">
           <ul className="cs-keys">
-            {loc?.nearest_hospital ? (() => {
+            {hospitals.length ? hospitals.map((h) => {
               // "WakeMed Cary Hospital, 1900 Kildaire Farm Rd, Cary, NC" -> name, then the address.
-              const [name, ...rest] = loc.nearest_hospital.split(',');
+              const [name, ...rest] = h.text.split(',');
               return (
-                <li>
-                  <span className="cs-muted">Hospital</span>
+                <li key={h.text}>
+                  <span className="cs-muted">{hospitals.length > 1 || locations.length > 1 ? `Near ${h.places.join(', ')}` : 'Hospital'}</span>
                   <span>{rest.length ? name.trim() : ''}</span>
-                  <a className="cs-addr" {...mapsLinkProps(loc.nearest_hospital)}>{rest.length ? rest.join(',').trim() : name}</a>
+                  <a className="cs-addr" {...mapsLinkProps(h.text)}>{rest.length ? rest.join(',').trim() : name}</a>
                 </li>
               );
-            })() : <li><span className="cs-muted">Hospital</span><span>Not set</span></li>}
+            }) : <li><span className="cs-muted">Hospital</span><span>Not set</span></li>}
             <li><span className="cs-muted">Emergency</span><span>Police, fire, ambulance</span><a className="cs-phone" href="tel:911">911</a></li>
           </ul>
         </Card>

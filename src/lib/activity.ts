@@ -13,7 +13,7 @@ export const KIND_LABELS: Record<string, string> = {
   characters: 'Character', scene_characters: 'Character in a scene', character_notes: 'Character note',
   elements: 'Element', scene_elements: 'Element in a scene', element_categories: 'Element category',
   team_notes: 'Team member note', team_note_types: 'Team note type',
-  shoot_days: 'Shoot day', shoot_day_items: 'Day schedule', shoot_day_calls: 'Call',
+  shoot_days: 'Shoot day', shoot_day_locations: 'Day location', shoot_day_items: 'Day schedule', shoot_day_calls: 'Call',
   journal_entries: 'Journal entry', journal_entry_shares: 'Journal share', audit_log: 'Activity log',
 };
 export const kindLabel = (k: string) => KIND_LABELS[k] ?? k.replace(/_/g, ' ');

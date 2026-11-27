@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Section } from '../../components/Section';
 import { TaskTree } from '../../components/TaskTree';
 import { ProjectLocations } from '../../components/ProjectLocations';
-import { api, type Scene, type ShootDay, type Task } from '../../lib/api';
+import { api, type Location, type Scene, type ShootDay, type Task } from '../../lib/api';
 import { PROJECT_STATUSES, clockLabel, dateRange, dueWhen, errorText, isOverdue, minutesLabel, pagesLabel } from '../../lib/format';
 import type { ProjectStatus } from '../../lib/database.types';
 import { useUnsaved } from '../../lib/unsaved';
@@ -170,7 +170,8 @@ export function ProjectOverview() {
       <Section id="project.shootdays" title="Shoot days" summary={days?.length ? `${daysAhead.length} ahead of ${days.length}` : undefined}>
         {days === null ? <p className="hint">Loading…</p> : !days.length ? <p className="hint">No shoot days yet. Plan them on the Shoot days page.</p> : (
           <>
-            {nextDay ? <NextShootDay day={nextDay} today={today} base={base} projectId={projectId} scenes={scenes ?? []} locationName={locations.find((l) => l.id === nextDay.location_id)?.name} />
+            {nextDay ? <NextShootDay day={nextDay} today={today} base={base} projectId={projectId} scenes={scenes ?? []}
+              places={nextDay.location_ids.map((id) => locations.find((l) => l.id === id)).filter((l): l is Location => !!l)} />
               : <p className="hint">All {days.length} shoot days are behind you.</p>}
             {daysAhead.length > 1 && (
               <ul className="flex flex-col">
@@ -273,23 +274,28 @@ function SheetPill({ day }: { day: ShootDay }) {
 }
 
 /** The next shoot day, in more detail. */
-function NextShootDay({ day, today, base, projectId, scenes, locationName }: {
-  day: ShootDay; today: string; base: string; projectId: string; scenes: Scene[]; locationName?: string;
+function NextShootDay({ day, today, base, projectId, scenes, places }: {
+  day: ShootDay; today: string; base: string; projectId: string; scenes: Scene[]; places: Location[];
 }) {
   const byId = new Map(scenes.map((sc) => [sc.id, sc]));
   const dayScenes = day.scene_ids.map((id) => byId.get(id)).filter((sc): sc is Scene => !!sc);
   const times = ([['Crew call', day.crew_call], ['Shooting call', day.shooting_call], ['Lunch', day.lunch], ['Wrap', day.wrap]] as const).filter(([, t]) => t);
   return (
-    // The day opens its call sheet; its location and scenes open on their own pages.
+    // The day opens its call sheet; its locations and scenes open on their own pages.
     <div className="card gap-2">
       <span className="text-sm font-semibold text-muted">{day.shoot_date === today ? 'Shooting today' : 'Next shoot day'}</span>
       <Link to={`${base}/shoot-days/${day.id}`} className="text-xl font-bold text-fg no-underline hover:text-accent">
         {shortDate(day.shoot_date)}: Day {day.day_number} of {day.total_days}
       </Link>
-      {(day.title || locationName) && (
+      {(day.title || places.length > 0) && (
         <span>
-          {day.title}{day.title && locationName ? ' at ' : ''}
-          {locationName && day.location_id && <Link to={itemPath.location(projectId, day.location_id)} title={`Open ${locationName} on the Locations page`}>{locationName}</Link>}
+          {day.title}{day.title && places.length ? ' at ' : ''}
+          {places.map((l, i) => (
+            <span key={l.id}>
+              {i > 0 && (i === places.length - 1 ? ' and ' : ', ')}
+              <Link to={itemPath.location(projectId, l.id)} title={`Open ${l.name} on the Locations page`}>{l.name}</Link>
+            </span>
+          ))}
         </span>
       )}
       {times.length > 0 && (
