@@ -43,8 +43,9 @@ function linkFor(projectId: string, n: ProjectNote) {
 }
 
 /**
- * Every note on the project in one place: task and scene notes, shot notes, shoot day
- * notes, notes in a day's schedule and notes on people's calls. Each links back to
+ * Every note on the project in one place: task and scene notes, shot notes, the note
+ * under a shoot day's title, call sheet notes, notes in a day's schedule and notes on
+ * people's calls. Each links back to
  * where it was taken, which opens with that item's form. Notes are edited there.
  * The journal is a separate thing with its own page.
  */
@@ -115,7 +116,7 @@ export function ProjectNotes() {
     <Section id="project.notes" title="Project notes" summary={summary}>
       {error && <p className="error">{error}</p>}
       <p className="hint mb-2">
-        Every note on the project, newest first: notes on tasks and scenes, shot notes, shoot day notes, notes in a day's schedule and notes on
+        Every note on the project, newest first: notes on tasks and scenes, shot notes, the note under a shoot day's title, call sheet notes, notes in a day's schedule and notes on
         people's calls. Select where a note was taken to open it there, where you can edit it. Filters and search cover every note.
       </p>
       <LatticeGrid stateId="project.notes" options={options} rows={rows} paging={paging} height={Math.min(140 + Math.max(rows.length, 3) * 56, 640)} />

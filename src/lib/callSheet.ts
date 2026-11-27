@@ -30,7 +30,9 @@ export function callSheetBody(sheet: CallSheet, t: SheetText) {
   const d = sheet.day;
   const lines: string[] = [];
   const add = (label: string, v: string | null | undefined) => { if (v) lines.push(`${label}: ${v}`); };
-  lines.push(`${t.projectName}: day ${d.day_number} of ${d.total_days}, ${longDate(d.shoot_date)}${d.title ? ` (${d.title})` : ''}`, '');
+  lines.push(`${t.projectName}: day ${d.day_number} of ${d.total_days}, ${longDate(d.shoot_date)}${d.title ? ` (${d.title})` : ''}`);
+  if (d.note) lines.push(d.note);
+  lines.push('');
   lines.push('Open the call sheet to see your own call time and confirm:', t.url, '');
   add('General crew call', clockLabel(d.crew_call));
   add('Shooting call', clockLabel(d.shooting_call));

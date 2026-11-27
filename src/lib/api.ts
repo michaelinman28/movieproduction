@@ -135,6 +135,8 @@ export interface ShootDay {
   /** The day's locations, in order; the first is the main one (the weather lookup uses its address). */
   location_ids: string[];
   crew_call: string | null; shooting_call: string | null; lunch: string | null; wrap: string | null;
+  /** Shown under the day's title, on the day and on the call sheet. */
+  note: string | null;
   weather: string | null; sunrise: string | null; sunset: string | null; notes: string | null;
   /** How many times the call sheet has been sent; 0 = not yet. */
   version: number; sent_at: string | null; sent_by: string | null;
@@ -145,7 +147,7 @@ export interface ShootDay {
   created_by: string | null; created_at: string; updated_at: string;
   day_number: number; total_days: number; scene_ids: string[]; pages_eighths: number; called: number; confirmed: number;
 }
-export type ShootDayInput = Partial<Pick<ShootDay, 'shoot_date' | 'title' | 'location_ids' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes'>>;
+export type ShootDayInput = Partial<Pick<ShootDay, 'shoot_date' | 'title' | 'note' | 'location_ids' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes'>>;
 export type ShootItemKind = 'scene' | 'meal' | 'move' | 'note';
 export interface ShootDayItem { id: string; shoot_day_id: string; project_id: string; sort_order: number; kind: ShootItemKind; scene_id: string | null; label: string | null; at_time: string | null; created_at: string }
 export interface ShootDayCall {
@@ -180,7 +182,7 @@ export interface LinkedCallSheet {
   /** Whether they have confirmed the version sent. */
   confirmed: boolean;
   project: { name: string; company_name: string };
-  day: Pick<ShootDay, 'id' | 'shoot_date' | 'title' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes' | 'version' | 'sent_at' | 'day_number' | 'total_days'>;
+  day: Pick<ShootDay, 'id' | 'shoot_date' | 'title' | 'note' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes' | 'version' | 'sent_at' | 'day_number' | 'total_days'>;
   /** The day's locations in order, the main one first. */
   locations: Pick<Location, 'name' | 'description' | 'address' | 'parking' | 'nearest_hospital' | 'contact_name' | 'contact_phone'>[];
   items: Pick<ShootDayItem, 'id' | 'kind' | 'scene_id' | 'label' | 'at_time'>[];

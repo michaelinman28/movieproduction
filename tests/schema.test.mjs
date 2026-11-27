@@ -475,6 +475,14 @@ await expect('changing the day note moves it to the new writer', () => as(U.a, `
 await expect('other day edits keep the note writer', () => as(U.b, `update shoot_days set title='Diner' where id=$1 returning note_by`, [day.id]), r => r[0]?.note_by === U.a);
 await expect('note writer cannot be faked', () => as(U.b, `update shoot_days set note_by=$2 where id=$1 returning note_by`, [day.id, U.b]), r => r[0]?.note_by === U.a);
 await expect('clearing the day note clears its writer', () => as(U.b, `update shoot_days set notes='  ' where id=$1 returning note_by, note_at`, [day.id]), r => r[0]?.note_by === null && r[0]?.note_at === null);
+await expect('a note under the title records its writer', () => as(U.b, `update shoot_days set note=' Night shoot ' where id=$1 returning note, title_note_by, title_note_at`, [day.id]), r => r[0]?.note === 'Night shoot' && r[0]?.title_note_by === U.b && r[0]?.title_note_at);
+await expect('changing the note under the title moves it to the new writer', () => as(U.a, `update shoot_days set note='Company move after lunch' where id=$1 returning title_note_by`, [day.id]), r => r[0]?.title_note_by === U.a);
+await expect('other day edits keep the title note writer', () => as(U.b, `update shoot_days set title='Diner night' where id=$1 returning note, title_note_by`, [day.id]), r => r[0]?.note === 'Company move after lunch' && r[0]?.title_note_by === U.a);
+await expect('the title note writer cannot be faked', () => as(U.b, `update shoot_days set title_note_by=$2 where id=$1 returning title_note_by`, [day.id, U.b]), r => r[0]?.title_note_by === U.a);
+await expect('clearing the note under the title clears its writer', () => as(U.b, `update shoot_days set note='  ' where id=$1 returning note, title_note_by, title_note_at`, [day.id]), r => r[0]?.note === null && r[0]?.title_note_by === null && r[0]?.title_note_at === null);
+await expect('a note under the title that is too long is refused', () => as(U.b, `update shoot_days set note=$2 where id=$1`, [day.id, 'x'.repeat(2001)]), isErr);
+await as(U.b, `update shoot_days set note='Night shoot' where id=$1`, [day.id]);
+await expect('the note under the title is logged on the day', () => as(U.a, `select changed, after->>'note' as note from audit_log where table_name='shoot_days' and row_key=$1 and 'note'=any(changed) order by id desc limit 1`, [day.id]), r => r[0]?.note === 'Night shoot' && r[0].changed.includes('note'));
 await expect('schedule note records its writer', () => as(U.b, `insert into shoot_day_items (shoot_day_id,kind,label) values ($1,'note','Quiet on set') returning note_by, note_at`, [day.id]), r => r[0]?.note_by === U.b && r[0]?.note_at);
 await expect('company move is not a note', () => as(U.b, `insert into shoot_day_items (shoot_day_id,kind,label) values ($1,'move','To the park') returning note_by`, [day.id]), r => r[0]?.note_by === null);
 await expect('call note records its writer', () => as(U.a, `update shoot_day_calls set note='Bring boots' where shoot_day_id=$1 returning note_by`, [day.id]), r => r[0]?.note_by === U.a);
@@ -490,7 +498,7 @@ await expect('each call gets a link token', () => Promise.resolve(bCall), r => /
 await expect('link token cannot be changed', () => as(U.b, `update shoot_day_calls set link_token=gen_random_uuid() where shoot_day_id=$1 returning link_token`, [day.id]), r => r[0]?.link_token === bCall.link_token);
 await expect('anon cannot read calls directly', () => asAnon(`select * from shoot_day_calls`), isErr);
 const [sheetRow] = await asAnon(`select call_sheet_for_link($1) s`, [bCall.link_token]);
-await expect('link opens the sheet without signing in', () => Promise.resolve(sheetRow.s), s => s?.me === U.b && s.day.version === 2 && s.calls.length === 1 && s.project.name && Array.isArray(s.items) && s.scenes.length === 1);
+await expect('link opens the sheet without signing in', () => Promise.resolve(sheetRow.s), s => s?.me === U.b && s.day.version === 2 && s.day.note === 'Night shoot' && s.calls.length === 1 && s.project.name && Array.isArray(s.items) && s.scenes.length === 1);
 await expect('link sheet lists every location in order', () => Promise.resolve(sheetRow.s), s => s.locations?.length === 2 && s.locations[0].name === 'Diner' && s.locations[0].nearest_hospital === 'St. Mary ER' && s.locations[1].name === 'Park' && !('location' in s));
 await expect('a scene with no location has none on the sheet', () => Promise.resolve(sheetRow.s), s => s.scenes[0].location_name === null && s.scenes[0].location_id === null);
 await expect('link sheet has no emails', () => Promise.resolve(JSON.stringify(sheetRow.s)), s => !s.includes('@x.com'));
@@ -539,7 +547,7 @@ await expect('the advance schedule names each scene location', () => asAnon(`sel
 const [dayShare] = await as(U.b, `select share_call_sheet($1, true) t`, [day.id]);
 await expect('the shared sheet names the scene location', () => asAnon(`select call_sheet_for_share($1) s`, [dayShare.t]), r => {
   const s = r[0]?.s;
-  return s?.scenes?.find((x) => x.number === '30')?.location_name === 'Beach' && s.next_day?.scenes?.[0]?.location_name === 'Harbor';
+  return s?.day?.note === 'Night shoot' && s?.scenes?.find((x) => x.number === '30')?.location_name === 'Beach' && s.next_day?.scenes?.[0]?.location_name === 'Harbor';
 });
 await as(U.b, `select share_call_sheet($1, false)`, [day.id]);
 await as(U.b, `delete from shoot_day_items where scene_id=$1`, [scB.id]);

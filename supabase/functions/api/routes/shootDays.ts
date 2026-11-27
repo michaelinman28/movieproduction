@@ -24,7 +24,7 @@ const clean = (o: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === '' ? null : v]));
 
 /** Every column of shoot_days but the shared link code, which only crew can read (shoot_day_share_tokens). */
-const DAY_COLS = 'id, project_id, shoot_date, title, crew_call, shooting_call, lunch, wrap, weather, sunrise, sunset, notes, '
+const DAY_COLS = 'id, project_id, shoot_date, title, note, crew_call, shooting_call, lunch, wrap, weather, sunrise, sunset, notes, '
   + 'version, sent_at, sent_by, created_by, created_at, updated_at, note_by, note_at, share_phones';
 
 /** Days of a project with their number, scenes, pages and call counts (for cast only, just their own call). */

@@ -219,6 +219,7 @@
 .cs-date { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 500; }
 .cs-day { border-radius: 999px; padding: 0.125rem 0.625rem; font-size: 0.8125rem; font-weight: 700; background: rgb(255 255 255 / 0.18); }
 .cs-subtitle { margin-top: 0.25rem !important; opacity: 0.9; font-style: italic; }
+.cs-day-note { margin-top: 0.35rem !important; max-width: 40rem; white-space: pre-line; font-size: 0.95rem; line-height: 1.35; }
 .cs-hero-call {
   display: flex; flex-direction: column; align-items: flex-start; border-radius: 0.75rem; padding: 0.75rem 1rem;
   background: rgb(255 255 255 / 0.12); border: 1px solid rgb(255 255 255 / 0.25);

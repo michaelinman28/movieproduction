@@ -167,6 +167,7 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
             <span>{longDate(day.shoot_date)}</span>
           </p>
           {day.title && <p className="cs-subtitle">{day.title}</p>}
+          {day.note && <p className="cs-day-note">{day.note}</p>}
         </div>
         <div className="cs-hero-call">
           <span className="cs-hero-label">Crew call</span>
