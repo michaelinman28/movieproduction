@@ -228,6 +228,25 @@ export function shortDate(d: string) {
   return new Date(y, m - 1, day).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+/** '2027-03-12' (or a timestamp) -> 'Mar 12, 2027': how tables show dates. */
+export function tableDate(d: string) {
+  const [y, m, day] = d.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !day) return d;
+  return new Date(y, m - 1, day).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Two dates as one range: 'Dec 7 – 9, 2026', 'Dec 30, 2026 – Jan 2, 2027', or one date. */
+export function dateRange(from: string, to?: string | null) {
+  if (!to || to === from) return tableDate(from);
+  const [fy, fm] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  const start = new Date(fy, fm - 1, Number(from.split('-')[2]));
+  if (fy !== ty) return `${tableDate(from)} – ${tableDate(to)}`;
+  const s = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const end = fm === tm ? String(td) : new Date(ty, tm - 1, td).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${s} – ${end}, ${ty}`;
+}
+
 export const SHOOT_ITEM_KINDS: { value: 'scene' | 'meal' | 'move' | 'note'; label: string }[] = [
   { value: 'scene', label: 'Scene' },
   { value: 'meal', label: 'Meal break' },

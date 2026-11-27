@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { LatticeGrid, gridDropdown, gridEsc } from './LatticeGrid';
+import { TableHint } from './TableHint';
+import { LatticeGrid, gridDropdown, gridEsc, gridHeight } from './LatticeGrid';
 import { Section } from './Section';
 import { ItemHistory } from './ItemHistory';
 import { TagPicker } from './TagPicker';
@@ -245,9 +246,10 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
   }
 
   const options = useMemo(() => {
-    const overdueText = ({ value, data }: { value: string; data: TaskRow }) => {
+    const overdueText = ({ value, text, data }: { value: string; text?: string; data: TaskRow }) => {
       const t = byIdRef.current.get(data.id);
-      return value ? (t && isOverdue(t) ? `<span class="task-overdue">${value}</span>` : value) : '';
+      const shown = gridEsc(text ?? value);
+      return value ? (t && isOverdue(t) ? `<span class="task-overdue">${shown}</span>` : shown) : '';
     };
     // A pick-list cell whose value is another item gets an open button to that item's page.
     const openTo = (data: TaskRow, key: 'assignee_id' | 'category_id' | 'location_id' | 'parent_id', name: string) => {
@@ -491,14 +493,13 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
 
   return (
     <Section id="project.tasks" title="Tasks" summary={tasks.length ? `${done} of ${tasks.length} done` : undefined}>
-      <p className="hint">
-        {gantt
-          ? 'Each task has a row: a bar runs from its start date to its due date, and a diamond marks a task on one day. Click a task to open its form, and click a day to add new tasks on it. On a computer, drag a bar to move the task.'
+      <TableHint className="" more={gantt
+          ? 'A bar runs from its start date to its due date, and a diamond marks a task on one day. Tap a day to add new tasks on it. On a computer, drag a bar to move the task.'
           : calendar
-          ? 'Tasks show on their due date; a task with a start date too shows as a bar across each day until it is due. Click a day to list its tasks and add new ones on it, and click a task to open its form. On a computer, drag a task to another day to move it.'
-          : 'Click a person, location, category, status, priority, time or parent task to pick from its list, or its arrow to open it on its own page. Double-click a task name, due date, tags or description to type a change.'}
-        {' '}Select a task to edit its description, tags and notes, add sub-tasks, or move it.
-      </p>
+          ? 'A task with a start date too shows as a bar across each day until it is due. Tap a day to list its tasks and add new ones on it. On a computer, drag a task to another day to move it.'
+          : 'Tap a person, location, category, status, priority, time or parent task to pick from its list, or its arrow to open it on its own page. Double-tap (or double-click) a task name, due date, tags or description to type a change. Tick tasks to email or copy a summary of them.'}>
+        {gantt ? 'Each task has a row on the chart; tap one to open its form.' : calendar ? 'Tasks show on their due date; tap one to open its form.' : 'Select a task to edit it, add notes and sub-tasks, or move it.'}
+      </TableHint>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
         <label className="label sm:flex-row sm:items-center sm:gap-2">Show
           <select className="field sm:w-auto" value={view} onChange={(e) => changeView(e.target.value)} aria-label="How to show tasks">
@@ -543,7 +544,7 @@ export function TaskTree({ projectId, projectName = 'Project', companyId, team, 
             stateId="project.tasks"
             options={options}
             rows={shown}
-            height={Math.min(160 + (shown.length + groupCount) * 34 + (flat ? 44 : 0), 640)}
+            height={gridHeight(160 + (flat ? 44 : 0), shown.length + groupCount, 640)}
             on={{ cellValueChanged: onCellChanged, rangeChanged: onRange, selectionChanged: (r: TaskRow[]) => { pickedRef.current = r.map((x) => x.id); setPicked(pickedRef.current); } }}
             reveal={reveal}
             onReady={(g) => {

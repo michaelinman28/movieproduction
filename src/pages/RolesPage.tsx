@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { TableHint } from '../components/TableHint';
 import { Link, useParams } from 'react-router-dom';
-import { LatticeGrid } from '../components/LatticeGrid';
+import { LatticeGrid, gridHeight } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { api, type Company, type RoleWithUsage } from '../lib/api';
 import { errorText } from '../lib/format';
@@ -187,9 +188,12 @@ export function RolesPage() {
             <button type="submit" className="btn" data-pin>Add role</button>
           </form>
         )}
+        {isAdmin && custom.length > 0 && (
+          <TableHint>Double-tap (or double-click) a cell to rename a role or change its department or description. Select a role to delete it.</TableHint>
+        )}
         {/* The form opens under the table, which keeps the full width. */}
         <div className="flex flex-col gap-4">
-          <LatticeGrid stateId="roles.custom" options={customOptions} rows={custom} height={Math.min(100 + custom.length * 34, 400)} reveal={reveal}
+          <LatticeGrid stateId="roles.custom" options={customOptions} rows={custom} height={gridHeight(100, custom.length, 400)} reveal={reveal}
             on={{
               cellValueChanged: saveEdit,
               selectionChanged: (rows: RoleRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
@@ -220,9 +224,6 @@ export function RolesPage() {
             </aside>
           ) : null)}
         </div>
-        {isAdmin && custom.length > 0 && (
-          <p className="hint mt-2">Double-click (or tap twice) a cell to rename a role or change its department or description. Select a role to delete it.</p>
-        )}
       </Section>
 
       <Section id="roles.standard" title="Standard roles" summary={standard.length}>

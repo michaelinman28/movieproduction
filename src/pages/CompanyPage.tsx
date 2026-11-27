@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { TableHint } from '../components/TableHint';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { LatticeGrid, gridDropdown, gridEsc, gridLink } from '../components/LatticeGrid';
+import { LatticeGrid, gridDropdown, gridEsc, gridLink, gridHeight } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { ItemHistory } from '../components/ItemHistory';
 import { PersonContacts } from '../components/PersonContacts';
@@ -202,7 +203,7 @@ export function CompanyPage() {
         tooltip: () => 'Role names separated by commas. Select the person to tick roles from the list.',
       },
       { field: 'email', header: 'Email', width: 220, editable: (r: PersonRow) => r.pending,
-        tooltip: (r: PersonRow) => r.pending ? 'No account yet: double-click to correct the email they\'ll sign up with.' : 'Their sign-in email. Only they can change it.' },
+        tooltip: (r: PersonRow) => r.pending ? 'No account yet: double-tap to correct the email they\'ll sign up with.' : 'Their sign-in email. Only they can change it.' },
       { field: 'account', header: 'Account', width: 100, filter: 'set',
         tooltip: (r: PersonRow) => r.pending ? 'Added before signing up. They join when they sign up with this email.' : 'Signed up' },
       { field: 'phone', header: 'Phone', width: 140, editable: true },
@@ -285,8 +286,8 @@ export function CompanyPage() {
             <button type="submit" className="btn" data-pin>Create project</button>
           </form>
         )}
-        {isAdmin && projectRows.length > 0 && <p className="hint mb-2">Double-click a cell to change it, or click a status to pick one.</p>}
-        <LatticeGrid stateId="company.projects" options={projectOptions} rows={projectRows} height={Math.min(80 + projectRows.length * 34, 320)}
+        {isAdmin && projectRows.length > 0 && <TableHint>Double-tap (or double-click) a cell to change it, or tap a status to pick one.</TableHint>}
+        <LatticeGrid stateId="company.projects" options={projectOptions} rows={projectRows} height={gridHeight(80, projectRows.length, 320)}
           on={{ cellValueChanged: saveProjectCell }} />
         {!isAdmin && <p className="hint mt-2">You see the projects you're assigned to. Company admins see all of them.</p>}
       </Section>
@@ -294,14 +295,22 @@ export function CompanyPage() {
       <Section id="company.people" title="People" summary={peopleRows.length}>
         {isAdmin && (
           <form className="form-row mb-2" onSubmit={addPerson}>
-            <input className="field" type="email" placeholder="Email" aria-label="Email" value={newPerson.email}
-              onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} required />
-            <input className="field" placeholder="Name (if they haven't signed up)" aria-label="Name" value={newPerson.name} maxLength={120}
-              onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })} />
-            <input className="field" type="tel" placeholder="Phone (optional)" aria-label="Phone" value={newPerson.phone} maxLength={40}
-              onChange={(e) => setNewPerson({ ...newPerson, phone: e.target.value })} onBlur={() => setNewPerson((n) => ({ ...n, phone: formatPhone(n.phone) }))} />
-            <input className="field" placeholder="Title (optional)" value={newPerson.title}
-              onChange={(e) => setNewPerson({ ...newPerson, title: e.target.value })} />
+            <label className="label">Email
+              <input className="field" type="email" value={newPerson.email}
+                onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} required />
+            </label>
+            <label className="label">Name (if they haven't signed up)
+              <input className="field" value={newPerson.name} maxLength={120}
+                onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })} />
+            </label>
+            <label className="label">Phone (optional)
+              <input className="field" type="tel" value={newPerson.phone} maxLength={40}
+                onChange={(e) => setNewPerson({ ...newPerson, phone: e.target.value })} onBlur={() => setNewPerson((n) => ({ ...n, phone: formatPhone(n.phone) }))} />
+            </label>
+            <label className="label">Title (optional)
+              <input className="field" value={newPerson.title}
+                onChange={(e) => setNewPerson({ ...newPerson, title: e.target.value })} />
+            </label>
             <label className="check-field">
               <input type="checkbox" checked={newPerson.admin}
                 onChange={(e) => setNewPerson({ ...newPerson, admin: e.target.checked })} />
@@ -311,6 +320,11 @@ export function CompanyPage() {
           </form>
         )}
         {isAdmin && <p className="hint mt-2">Add someone by email. If they haven't signed up yet, add their name too: they're added now, you can give them tasks, and they join automatically when they sign up with that email. Their form has an invite you can send.</p>}
+        {peopleRows.length > 0 && (
+          <TableHint className="mt-2 mb-2" more={isAdmin ? 'Double-tap (or double-click) a title or roles cell to type a change.' : undefined}>
+            Select a person to see their details{isAdmin ? ' and change their roles' : ''}.
+          </TableHint>
+        )}
         {/* The form opens under the table, which keeps the full width. */}
         <div className="flex flex-col gap-4">
           <LatticeGrid
@@ -318,7 +332,7 @@ export function CompanyPage() {
             options={peopleOptions}
             rows={peopleRows}
             reveal={reveal}
-            height={Math.min(80 + peopleRows.length * 34, 420)}
+            height={gridHeight(80, peopleRows.length, 420)}
             on={{ selectionChanged: (rows: PersonRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); }, cellValueChanged: savePersonCell }}
           />
           {selected && (
@@ -335,7 +349,6 @@ export function CompanyPage() {
             />
           )}
         </div>
-        {!selected && peopleRows.length > 0 && <p className="hint mt-2">Select a person to see their details{isAdmin ? ' and change their roles, or double-click a title or roles cell to type a change' : ''}.</p>}
       </Section>
     </section>
   );

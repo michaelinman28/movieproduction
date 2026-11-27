@@ -21,10 +21,16 @@ import type { LinkState } from '../lib/backLink';
  *
  * A page reached by an item link has "‹ Back to …" at its top (BackLink); once that
  * scrolls out of sight, the bar shows a copy of it on the left, beside any pinned button.
+ *
+ * While an open form's Save is pinned but the form itself is out of sight (on a phone or
+ * iPad, tapping a row opens its form below the table, off screen), the bar also shows
+ * "<the form's data-form-label> ↓", which scrolls to the form. A disabled Save reads
+ * "No changes" in grey, so it doesn't look like a button you can press.
  */
 export function PinnedAction() {
-  const [pin, setPin] = useState<{ label: string; disabled: boolean; className: string; top: number } | null>(null);
+  const [pin, setPin] = useState<{ label: string; disabled: boolean; className: string; top: number; save: boolean; goTo: string | null } | null>(null);
   const target = useRef<HTMLButtonElement | null>(null);
+  const form = useRef<HTMLElement | null>(null);
   const location = useLocation();
   const { pathname } = location;
   const back = (location.state as LinkState)?.back;
@@ -80,7 +86,17 @@ export function PinnedAction() {
         if (!best || prio > best.prio || (prio === best.prio && dist < best.dist)) best = { el, prio, dist };
       }
       target.current = best?.el ?? null;
-      const next = best ? { label: best.el.textContent?.trim() ?? '', disabled: best.el.disabled, className: best.el.className, top } : null;
+      // An open form's Save: offer a way to the form while it's out of sight.
+      const save = !!best && best.prio >= 2;
+      const formEl = save ? best!.el.closest<HTMLElement>('[data-form-for]') : null;
+      form.current = formEl;
+      let goTo: string | null = null;
+      if (formEl) {
+        const f = formEl.getBoundingClientRect();
+        const barH = space.current || 60;
+        if (f.top > bottom - 80 || f.bottom < top + barH + 40) goTo = formEl.dataset.formLabel || 'the form';
+      }
+      const next = best ? { label: best.el.textContent?.trim() ?? '', disabled: best.el.disabled, className: best.el.className, top, save, goTo } : null;
       setPin((cur) => (JSON.stringify(cur) === JSON.stringify(next) ? cur : next));
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
@@ -125,9 +141,15 @@ export function PinnedAction() {
     <div ref={bar} className="pinned-action" style={{ top: pin?.top ?? document.querySelector('body header')?.getBoundingClientRect().bottom ?? 0 }}>
       <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-end gap-3 px-4">
         {back && backHidden && <BackTo back={back} className="mr-auto" />}
+        {pin?.goTo && (
+          <button type="button" className="btn-link mr-auto min-w-0 truncate text-sm font-medium"
+            title={`Go to ${pin.goTo}`} onClick={() => form.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <span className="truncate">{pin.goTo}</span><span aria-hidden="true" className="ml-1">↓</span>
+          </button>
+        )}
         {pin && (
-          <button type="button" className={`${pin.className} ${back && backHidden ? 'shrink-0' : 'w-full'} sm:w-auto`} disabled={pin.disabled} onClick={click}>
-            {pin.label}
+          <button type="button" className={`${pin.className} ${(back && backHidden) || pin.goTo ? 'shrink-0' : 'w-full'} sm:w-auto`} disabled={pin.disabled} onClick={click}>
+            {pin.save && pin.disabled ? 'No changes' : pin.label}
           </button>
         )}
       </div>

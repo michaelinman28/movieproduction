@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { LatticeGrid, gridDropdown, gridEsc, gridMapLink } from './LatticeGrid';
+import { TableHint } from './TableHint';
+import { LatticeGrid, gridDropdown, gridEsc, gridMapLink, gridHeight } from './LatticeGrid';
 import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
 import { ItemHistory } from './ItemHistory';
@@ -152,17 +153,17 @@ export function ProjectLocations({ projectId, locations, canManage, onChanged }:
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
       {/* The form opens under the table, which keeps the full width. */}
+      {rows.length > 0 && (
+        <TableHint more="Assign tasks to a location on the Tasks page.">Double-tap (or double-click) a cell to change it, or select a location to edit it in a form.</TableHint>
+      )}
       <div className="flex flex-col gap-4">
-        <LatticeGrid stateId="project.locations" options={options} rows={rows} height={Math.min(80 + rows.length * 34, 360)} reveal={reveal}
+        <LatticeGrid stateId="project.locations" options={options} rows={rows} height={gridHeight(80, rows.length, 360)} reveal={reveal}
           on={{ cellValueChanged: saveCell, selectionChanged: (r: LocationRow[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); } }} />
         {selected && (
           <LocationPanel key={selected.id} location={selected} run={run}
             canDelete={canManage || selected.created_by === me} onDeleted={() => setSelectedId(null)} />
         )}
       </div>
-      {rows.length > 0 && (
-        <p className="hint mt-2">Double-click a cell to change it, or select a location to edit it in a form. Assign tasks to a location on the Tasks page.</p>
-      )}
     </Section>
   );
 }

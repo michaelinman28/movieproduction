@@ -4,7 +4,7 @@ import { Section } from '../../components/Section';
 import { TaskTree } from '../../components/TaskTree';
 import { ProjectLocations } from '../../components/ProjectLocations';
 import { api, type Scene, type ShootDay, type Task } from '../../lib/api';
-import { PROJECT_STATUSES, clockLabel, dueWhen, errorText, isOverdue, minutesLabel, pagesLabel } from '../../lib/format';
+import { PROJECT_STATUSES, clockLabel, dateRange, dueWhen, errorText, isOverdue, minutesLabel, pagesLabel } from '../../lib/format';
 import type { ProjectStatus } from '../../lib/database.types';
 import { useUnsaved } from '../../lib/unsaved';
 import { itemPath } from '../../lib/links';
@@ -112,7 +112,7 @@ export function ProjectOverview() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex flex-col gap-2">
               {project.logline ? <p className="m-0 italic">{project.logline}</p> : <p className="hint m-0">No logline yet.</p>}
-              {project.start_date && <p className="hint m-0">{project.start_date}{project.end_date ? ` to ${project.end_date}` : ''}</p>}
+              {project.start_date && <p className="hint m-0">{dateRange(project.start_date, project.end_date)}</p>}
               {project.description && <p className="m-0">{project.description}</p>}
             </div>
             {isAdmin && <button className="btn btn-secondary sm:w-auto" onClick={startEdit}>Edit project</button>}
@@ -122,7 +122,7 @@ export function ProjectOverview() {
 
       <Section id="project.glance" title="At a glance">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Link to={`${base}/tasks`} className="card gap-1 text-fg no-underline hover:border-accent">
+          <Link to={`${base}/tasks`} className="card card-link gap-1 text-fg no-underline hover:border-accent">
             <span className="text-sm font-semibold text-muted">Tasks</span>
             {tasks === null ? <span className="text-muted">Loading…</span> : (
               <>
@@ -131,7 +131,7 @@ export function ProjectOverview() {
               </>
             )}
           </Link>
-          <Link to={`${base}/scenes`} className="card gap-1 text-fg no-underline hover:border-accent">
+          <Link to={`${base}/scenes`} className="card card-link gap-1 text-fg no-underline hover:border-accent">
             <span className="text-sm font-semibold text-muted">Scenes</span>
             {scenes === null ? <span className="text-muted">Loading…</span> : (
               <>
@@ -140,7 +140,7 @@ export function ProjectOverview() {
               </>
             )}
           </Link>
-          <Link to={nextDay ? `${base}/shoot-days/${nextDay.id}` : `${base}/shoot-days`} className="card gap-1 text-fg no-underline hover:border-accent">
+          <Link to={nextDay ? `${base}/shoot-days/${nextDay.id}` : `${base}/shoot-days`} className="card card-link gap-1 text-fg no-underline hover:border-accent">
             <span className="text-sm font-semibold text-muted">Shoot days</span>
             {days === null ? <span className="text-muted">Loading…</span> : (
               <>
@@ -149,12 +149,12 @@ export function ProjectOverview() {
               </>
             )}
           </Link>
-          <Link to={`${base}/locations`} className="card gap-1 text-fg no-underline hover:border-accent">
+          <Link to={`${base}/locations`} className="card card-link gap-1 text-fg no-underline hover:border-accent">
             <span className="text-sm font-semibold text-muted">Locations</span>
             <span className="text-2xl font-bold">{inUse.length} in use</span>
             <span className="hint">{confirmed} confirmed</span>
           </Link>
-          <Link to={`${base}/team`} className="card gap-1 text-fg no-underline hover:border-accent">
+          <Link to={`${base}/team`} className="card card-link gap-1 text-fg no-underline hover:border-accent">
             <span className="text-sm font-semibold text-muted">Team</span>
             <span className="text-2xl font-bold">{team.length} {team.length === 1 ? 'person' : 'people'}</span>
             <span className="hint">See who's on the project</span>
@@ -246,9 +246,9 @@ function ScenesSummary({ scenes }: { scenes: Scene[] }) {
   const noShots = scenes.filter((sc) => !sc.shots).length;
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-3 gap-2 text-center">
+      <div className="grid grid-cols-3 divide-x divide-line text-center">
         {([['not_scheduled', 'Not scheduled'], ['scheduled', 'Scheduled'], ['shot', 'Shot']] as const).map(([s, label]) => (
-          <div key={s} className="rounded-lg border border-line px-2 py-3">
+          <div key={s} className="px-2 py-1">
             <div className="text-xl font-bold">{count(s)}</div>
             <div className="text-xs text-muted sm:text-sm">{label}</div>
           </div>

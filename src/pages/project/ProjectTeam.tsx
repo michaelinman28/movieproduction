@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { TableHint } from '../../components/TableHint';
 import { Link } from 'react-router-dom';
-import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLinkList } from '../../components/LatticeGrid';
+import { LatticeGrid, type PickMany, gridDropdown, gridEsc, gridLinkList, gridHeight } from '../../components/LatticeGrid';
 import { TagPicker } from '../../components/TagPicker';
 import { characterChoices, characterIdsPlayedBy, characterLabel, setCharactersPlayed } from '../../lib/casting';
 import { OpenLink } from '../../components/OpenLink';
@@ -218,16 +219,28 @@ export function ProjectTeam() {
           <details className="mb-2" open={!available.length}>
             <summary className="flex min-h-11 cursor-pointer items-center text-accent">Add someone who isn't in the company yet</summary>
             <form className="form-row mt-1" onSubmit={addNew}>
-              <input className="field" type="email" placeholder="Email" aria-label="Email" value={newPerson.email} maxLength={254} required
-                onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} />
-              <input className="field" placeholder="Name" aria-label="Name" value={newPerson.name} maxLength={120}
-                onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })} />
-              <input className="field" type="tel" placeholder="Phone (optional)" aria-label="Phone" value={newPerson.phone} maxLength={40}
-                onChange={(e) => setNewPerson({ ...newPerson, phone: e.target.value })} onBlur={() => setNewPerson((n) => ({ ...n, phone: formatPhone(n.phone) }))} />
+              <label className="label">Email
+                <input className="field" type="email" value={newPerson.email} maxLength={254} required
+                  onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} />
+              </label>
+              <label className="label">Name
+                <input className="field" value={newPerson.name} maxLength={120}
+                  onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })} />
+              </label>
+              <label className="label">Phone (optional)
+                <input className="field" type="tel" value={newPerson.phone} maxLength={40}
+                  onChange={(e) => setNewPerson({ ...newPerson, phone: e.target.value })} onBlur={() => setNewPerson((n) => ({ ...n, phone: formatPhone(n.phone) }))} />
+              </label>
               <button type="submit" className="btn btn-secondary">Add to project</button>
             </form>
             <p className="hint mt-1">They're added to {project.company?.name ?? 'the company'} and this project. They don't need an account yet: you can give them tasks now, and they join when they sign up with this email.</p>
           </details>
+        )}
+        {teamRows.length > 0 && (
+          <TableHint>
+            Select a person to see their details{isAdmin ? ', set their project roles and dietary needs, and keep notes about them' : ''}.
+            {!isAdmin && ' Select yourself to set your dietary needs and keep notes about yourself.'}
+          </TableHint>
         )}
         {/* The form opens under the table, which keeps the full width. */}
         <div className="flex flex-col gap-4">
@@ -236,7 +249,7 @@ export function ProjectTeam() {
             options={teamOptions}
             rows={teamRows}
             reveal={reveal}
-            height={Math.min(80 + teamRows.length * 34, 420)}
+            height={gridHeight(80, teamRows.length, 420)}
             on={{ selectionChanged: (rows: TeamRow[]) => { const id = rows[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); }, cellValueChanged: saveTeamCell }}
           />
           {selected && (
@@ -258,12 +271,6 @@ export function ProjectTeam() {
             />
           )}
         </div>
-        {!selected && teamRows.length > 0 && (
-          <p className="hint mt-2">
-            Select a person to see their details{isAdmin ? ', set their project roles and dietary needs, and keep notes about them' : ''}.
-            {!isAdmin && ' Select yourself to set your dietary needs and keep notes about yourself.'}
-          </p>
-        )}
       </Section>
 
       {isAdmin && <NoteTypes companyId={project.company_id} types={types} reload={loadTypes} />}
@@ -433,13 +440,13 @@ function NoteTypes({ companyId, types, reload }: { companyId: string; types: Tea
 
   return (
     <Section id="project.team.noteTypes" title="Team note types" summary={types.length} bodyClassName="flex flex-col gap-2">
-      <p className="hint">The kinds of notes you can keep about people, shared by every project in the company. Double-click a type to rename it, or select it to rename or delete it below.</p>
+      <p className="hint">The kinds of notes you can keep about people, shared by every project in the company. Double-tap (or double-click) a type to rename it, or select it to rename or delete it below.</p>
       <form className="form-row" onSubmit={add}>
         <input className="field" placeholder="New note type, e.g. Pets" aria-label="New note type" value={newName} maxLength={40} required onChange={(e) => setNewName(e.target.value)} />
         <button type="submit" className="btn btn-secondary">Add note type</button>
       </form>
       {error && <p className="error">{error}</p>}
-      <LatticeGrid stateId="project.team.noteTypes" options={options} rows={rows} reveal={reveal} height={Math.min(80 + rows.length * 34, 320)}
+      <LatticeGrid stateId="project.team.noteTypes" options={options} rows={rows} reveal={reveal} height={gridHeight(80, rows.length, 320)}
         on={{
           selectionChanged: (r: { id: string }[]) => { const id = r[0]?.id ?? null; if (id !== selectedId && confirmDiscard()) setSelectedId(id); },
           cellValueChanged: (e: { data: { id: string }; newValue: unknown }) => {

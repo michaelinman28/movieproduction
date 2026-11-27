@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { TableHint } from '../components/TableHint';
 import { Link, useNavigate } from 'react-router-dom';
-import { LatticeGrid, gridLink } from '../components/LatticeGrid';
+import { LatticeGrid, gridLink, gridHeight } from '../components/LatticeGrid';
 import { api } from '../lib/api';
 import { errorText } from '../lib/format';
 
@@ -70,8 +71,8 @@ export function Home() {
         <button type="submit" className="btn shrink-0" disabled={busy}>Create company</button>
       </form>
       {error && <p className="error">{error}</p>}
-      {companies.some(isAdminRow) && <p className="hint">Double-click the name or description of a company you're an admin of to change it.</p>}
-      <LatticeGrid stateId="home.companies" options={options} rows={companies} height={Math.min(80 + companies.length * 34, 400)}
+      {companies.some(isAdminRow) && <TableHint className="">Double-tap (or double-click) the name or description of a company you're an admin of to change it.</TableHint>}
+      <LatticeGrid stateId="home.companies" options={options} rows={companies} height={gridHeight(80, companies.length, 400)}
         on={{ cellValueChanged: saveCell }} />
       <p className="hint">
         Waiting to be added to a company? Ask its admin to add you with the email you signed up with.

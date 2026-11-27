@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { TableHint } from '../components/TableHint';
 import { Link, useParams } from 'react-router-dom';
 import { RenameForm } from '../components/RenameForm';
 import { confirmDiscard } from '../lib/unsaved';
 import { scrollToForm, useOpenFromLink } from '../lib/reveal';
-import { LatticeGrid } from '../components/LatticeGrid';
+import { LatticeGrid, gridHeight } from '../components/LatticeGrid';
 import { Section } from '../components/Section';
 import { api, type Company, type TaskCategory, type TaskTag } from '../lib/api';
 import { errorText } from '../lib/format';
@@ -146,11 +147,9 @@ export function TaskSettingsPage() {
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <Section id="settings.categories" title="Categories" summary={categories.length} bodyClassName="flex flex-col gap-2">
-          <p className="hint">
-            {isAdmin
-              ? 'Double-click a name to rename it, or select it to edit it below. Drag the handle on the left to change the order people see.'
-              : 'Only admins can change the categories.'}
-          </p>
+          {isAdmin
+            ? <TableHint className="" more="Drag the handle on the left to change the order people see.">Double-tap (or double-click) a name to rename it, or select it to edit it below.</TableHint>
+            : <p className="hint">Only admins can change the categories.</p>}
           {isAdmin && (
             <form className="form-row" onSubmit={addCategory}>
               <input className="field" placeholder="New category, e.g. Stunts" value={newCategory} maxLength={60}
@@ -158,7 +157,7 @@ export function TaskSettingsPage() {
               <button type="submit" className="btn" data-pin>Add category</button>
             </form>
           )}
-          <LatticeGrid stateId="taskSettings.categories" options={catOptions} rows={catRows} height={Math.min(80 + catRows.length * 34, 480)} reveal={revealCat}
+          <LatticeGrid stateId="taskSettings.categories" options={catOptions} rows={catRows} height={gridHeight(80, catRows.length, 480)} reveal={revealCat}
             on={{
               cellValueChanged: (e: { data: LabelRow; newValue: unknown }) =>
                 run(() => api.updateTaskCategory(e.data.id, { name: String(e.newValue ?? '').trim() })),
@@ -176,16 +175,15 @@ export function TaskSettingsPage() {
         </Section>
 
         <Section id="settings.tags" title="Tags" summary={tags.length} bodyClassName="flex flex-col gap-2">
-          <p className="hint">
+          <TableHint className="" more={isAdmin ? 'Double-tap (or double-click) a tag to rename it, or select it to rename or delete it below.' : undefined}>
             Anyone in the company can add tags while editing a task.
-            {isAdmin ? ' Double-click a tag to rename it, or select it to rename or delete it below.' : ''}
-          </p>
+          </TableHint>
           <form className="form-row" onSubmit={addTag}>
             <input className="field" placeholder="New tag, e.g. night shoot" value={newTag} maxLength={40}
               onChange={(e) => setNewTag(e.target.value)} required />
             <button type="submit" className="btn btn-secondary" data-pin>Add tag</button>
           </form>
-          <LatticeGrid stateId="taskSettings.tags" options={tagOptions} rows={tagRows} height={Math.min(80 + tagRows.length * 34, 480)} reveal={revealTag}
+          <LatticeGrid stateId="taskSettings.tags" options={tagOptions} rows={tagRows} height={gridHeight(80, tagRows.length, 480)} reveal={revealTag}
             on={{
               cellValueChanged: (e: { data: LabelRow; newValue: unknown }) =>
                 run(() => api.updateTaskTag(e.data.id, String(e.newValue ?? '').trim())),
