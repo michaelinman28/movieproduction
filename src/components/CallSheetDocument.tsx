@@ -99,8 +99,14 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   const crewCall = clockLabel(day.crew_call);
   const callOf = (c: SheetCall) => clockLabel(c.call_time) || crewCall;
   const byName = (a: SheetCall, b: SheetCall) => nameOf(a).localeCompare(nameOf(b));
+  // The Cast list follows cast number (1, then 2, then 11). Someone who plays more
+  // than one character is listed at their lowest number; a name with no number is last.
+  const castRank = (c: SheetCall) => {
+    const numbers = (c.characters ?? []).flatMap((ch) => (ch.cast_number == null ? [] : [ch.cast_number]));
+    return numbers.length ? Math.min(...numbers) : Number.POSITIVE_INFINITY;
+  };
 
-  const cast = sheet.calls.filter((c) => castLabel(c)).sort((a, b) => (a.call_time ?? '').localeCompare(b.call_time ?? '') || byName(a, b));
+  const cast = sheet.calls.filter((c) => castLabel(c)).sort((a, b) => castRank(a) - castRank(b) || byName(a, b));
   const depts = new Map<string, SheetCall[]>();
   for (const c of sheet.calls.filter((x) => !castLabel(x))) depts.set(department(c), [...(depts.get(department(c)) ?? []), c]);
   const rank = (d: string) => (DEPARTMENTS.includes(d) ? DEPARTMENTS.indexOf(d) : DEPARTMENTS.length);

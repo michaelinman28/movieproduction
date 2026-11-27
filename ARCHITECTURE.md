@@ -195,14 +195,14 @@ day to day.
   parking and on-site contact, the nearest hospital of each (one line per distinct
   hospital, saying which locations it's near), weather, key contacts
   (producer, director, ADs, location manager and others found by role), scenes with
-  their location, breaks and page total, cast, crew grouped by department, notes, and
+  their location, breaks and page total, cast in cast-number order, crew grouped by department, notes, and
   the next day's advance schedule (that day's locations, and each scene with its
   location). On the project's own sheet a location name links to the Locations page;
   personal and shared links stay plain text. People called see their own call at the top and **Confirm I got it**; opening
   the sheet marks it viewed. The sheet itself is one designed, read-only component
   (`src/components/CallSheetDocument.tsx`, styles under `.cs` in `src/styles.css`):
   a green header band with the day's title, the note under it and the crew call, the reader's own call, time tiles, location,
-  weather, hospital and key-contact cards, then schedule, cast, crew, notes and the next
+  weather, hospital and key-contact cards, then schedule, cast in cast-number order, crew, notes and the next
   day. **Print or save as PDF** lays the same design out on US Letter paper (light
   colors always; the printer's own "your call" box is left out).
 - **Personal links:** everyone called has a private, unguessable link
