@@ -12,7 +12,7 @@ import { callStatus } from './ProjectShootDays';
 import { useProject } from './ProjectLayout';
 
 /**
- * A shoot day's call sheet, built from the day: times, weather, location, the day's
+ * A shoot day's call sheet, built from the day: times, weather, locations, the day's
  * scenes and breaks, cast and crew with their own calls, notes, and the next day.
  * Crew send it (a new version); everyone called sees their own call at the top and
  * confirms. Each person also has a private, view-only link to the sheet (Personal
@@ -74,7 +74,7 @@ export function CallSheetPage() {
 
   const data = useMemo<SheetData | null>(() => sheet && {
     project: { name: project.name, company_name: project.company.name },
-    day: sheet.day, location: sheet.location, items: sheet.items, scenes: sheet.scenes, calls: sheet.calls,
+    day: sheet.day, locations: sheet.locations, items: sheet.items, scenes: sheet.scenes, calls: sheet.calls,
     roles: roles.map((r) => ({ id: r.id, name: r.name, department: r.department, sort_order: r.sort_order })),
     next_day: sheet.next_day, elements: sheet.elements ?? [],
   }, [sheet, project, roles]);
@@ -101,7 +101,7 @@ export function CallSheetPage() {
   const links: SheetLinks | undefined = sheet ? {
     scene: (id) => itemPath.scene(projectId, id),
     person: (userId) => itemPath.teamMember(projectId, userId),
-    location: sheet.day.location_id ? itemPath.location(projectId, sheet.day.location_id) : null,
+    locations: sheet.day.location_ids.map((id) => itemPath.location(projectId, id)),
     nextDay: sheet.next_day ? itemPath.callSheet(projectId, sheet.next_day.day.id) : null,
     element: (id) => itemPath.element(projectId, id),
   } : undefined;
@@ -176,7 +176,7 @@ export function CallSheetPage() {
                 <label className="flex min-h-11 items-center gap-2">
                   <input type="checkbox" checked={day.share_phones} disabled={sharing}
                     onChange={(e) => share({ enabled: true, phones: e.target.checked }, e.target.checked ? 'Phone numbers now show on the shared page.' : 'Phone numbers are now hidden on the shared page.')} />
-                  <span>Show phone numbers (cast, crew and the location's on-site contact)</span>
+                  <span>Show phone numbers (cast, crew and each location's on-site contact)</span>
                 </label>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   <button type="button" className="btn btn-secondary sm:w-auto" disabled={sharing}

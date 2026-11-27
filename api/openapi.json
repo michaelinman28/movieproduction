@@ -3528,13 +3528,14 @@
             ],
             "example": "Diner nights"
           },
-          "location_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid",
-            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          "location_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "description": "The day's locations, in order; the first is the main one (the weather lookup uses its address)"
           },
           "crew_call": {
             "type": [
@@ -3676,7 +3677,7 @@
           "project_id",
           "shoot_date",
           "title",
-          "location_id",
+          "location_ids",
           "crew_call",
           "shooting_call",
           "lunch",
@@ -3716,13 +3717,15 @@
             ],
             "maxLength": 120
           },
-          "location_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid",
-            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          "location_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "maxItems": 20,
+            "description": "The day's locations, in order (replaces the list); the first is the main one"
           },
           "crew_call": {
             "type": [
@@ -3806,13 +3809,15 @@
             ],
             "maxLength": 120
           },
-          "location_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid",
-            "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+          "location_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+            },
+            "maxItems": 20,
+            "description": "The day's locations, in order (replaces the list); the first is the main one"
           },
           "crew_call": {
             "type": [
@@ -4214,8 +4219,10 @@
           "day": {
             "$ref": "#/components/schemas/ShootDay"
           },
-          "location": {
-            "description": "The day's location (see Location)"
+          "locations": {
+            "type": "array",
+            "items": {},
+            "description": "The day's locations in order, the main one first (see Location)"
           },
           "items": {
             "type": "array",
@@ -4262,6 +4269,7 @@
         },
         "required": [
           "day",
+          "locations",
           "items",
           "scenes",
           "calls",
@@ -4310,8 +4318,10 @@
           "day": {
             "description": "The day: date, title, times, weather, notes, version, sent_at, day_number, total_days"
           },
-          "location": {
-            "description": "Name, description, address, parking, nearest hospital and on-site contact"
+          "locations": {
+            "type": "array",
+            "items": {},
+            "description": "The day's locations in order, the main one first: name, description, address, parking, nearest hospital and on-site contact"
           },
           "items": {
             "type": "array",
@@ -4374,6 +4384,7 @@
           "confirmed",
           "view",
           "project",
+          "locations",
           "items",
           "scenes",
           "calls",
@@ -4442,8 +4453,10 @@
           "day": {
             "description": "The day: date, title, times, weather, notes, version, sent_at, day_number, total_days"
           },
-          "location": {
-            "description": "Name, description, address, parking, nearest hospital and on-site contact"
+          "locations": {
+            "type": "array",
+            "items": {},
+            "description": "The day's locations in order, the main one first: name, description, address, parking, nearest hospital and on-site contact"
           },
           "items": {
             "type": "array",
@@ -4507,6 +4520,7 @@
         },
         "required": [
           "project",
+          "locations",
           "items",
           "scenes",
           "calls",
@@ -4557,7 +4571,7 @@
             "type": "string",
             "format": "uuid",
             "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b",
-            "description": "The location to look up; defaults to the day's saved location"
+            "description": "The location to look up; defaults to the day's main (first) location"
           }
         }
       },
@@ -12031,7 +12045,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Everything on a day's call sheet: the day, location, schedule, scenes, cast and crew, and a look at the next day",
+        "summary": "Everything on a day's call sheet: the day, its locations, schedule, scenes, cast and crew, and a look at the next day",
         "parameters": [
           {
             "schema": {
@@ -12455,7 +12469,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Look up the forecast, sunrise and sunset for the day's location and date",
+        "summary": "Look up the forecast, sunrise and sunset for the day's main location and date",
         "description": "Uses Open-Meteo. Nothing is saved: the app puts the result in the day's form, and Save day stores it. Pass shoot_date and location_id to look up what the form shows before it is saved. Forecasts reach about 16 days ahead; for later dates, type the weather in.",
         "parameters": [
           {

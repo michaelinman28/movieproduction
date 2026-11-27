@@ -479,7 +479,7 @@ export const ShootDay = z.object({
   project_id: Uuid,
   shoot_date: date,
   title: nullableText.openapi({ example: 'Diner nights' }),
-  location_id: Uuid.nullable(),
+  location_ids: z.array(Uuid).openapi({ description: 'The day\'s locations, in order; the first is the main one (the weather lookup uses its address)' }),
   crew_call: clock.nullable(),
   shooting_call: clock.nullable(),
   lunch: clock.nullable(),
@@ -507,7 +507,7 @@ export const ShootDay = z.object({
 export const ShootDayInput = z.object({
   shoot_date: date,
   title: optText(120),
-  location_id: Uuid.nullable().optional(),
+  location_ids: z.array(Uuid).max(20).optional().openapi({ description: 'The day\'s locations, in order (replaces the list); the first is the main one' }),
   crew_call: optTime, shooting_call: optTime, lunch: optTime, wrap: optTime,
   weather: optText(200),
   sunrise: optTime, sunset: optTime,
@@ -567,7 +567,7 @@ export const ShootDayCallInput = z.object({
 
 export const CallSheet = z.object({
   day: ShootDay,
-  location: z.any().nullable().openapi({ description: 'The day\'s location (see Location)' }),
+  locations: z.array(z.any()).openapi({ description: 'The day\'s locations in order, the main one first (see Location)' }),
   items: z.array(ShootDayItem),
   scenes: z.array(z.any()).openapi({ description: 'The scenes on the day (see Scene)' }),
   calls: z.array(ShootDayCall),
@@ -583,7 +583,7 @@ export const LinkedCallSheet = z.object({
   view: ProjectView.openapi({ description: 'The link\'s person on the project. For cast only, calls holds just their own call' }),
   project: z.object({ name: z.string(), company_name: z.string() }),
   day: z.any().openapi({ description: 'The day: date, title, times, weather, notes, version, sent_at, day_number, total_days' }),
-  location: z.any().nullable().openapi({ description: 'Name, description, address, parking, nearest hospital and on-site contact' }),
+  locations: z.array(z.any()).openapi({ description: 'The day\'s locations in order, the main one first: name, description, address, parking, nearest hospital and on-site contact' }),
   items: z.array(z.any()).openapi({ description: 'The schedule in order: id, kind, scene_id, label, at_time' }),
   scenes: z.array(z.any()).openapi({ description: 'The scenes on the day, in order' }),
   calls: z.array(z.any()).openapi({ description: 'Everyone called: their call, character, the characters they play, pickup, makeup, note, name, nickname, phone and role ids (no emails). On a personal link, the reader\'s own call also has their dietary needs.' }),
@@ -609,7 +609,7 @@ export const UserParams = z.object({
 });
 export const WeatherLookup = z.object({
   shoot_date: date.optional().openapi({ description: 'The date to look up; defaults to the day\'s saved date' }),
-  location_id: Uuid.optional().openapi({ description: 'The location to look up; defaults to the day\'s saved location' }),
+  location_id: Uuid.optional().openapi({ description: 'The location to look up; defaults to the day\'s main (first) location' }),
 }).openapi('WeatherLookup');
 export const WeatherResult = z.object({
   weather: z.string().openapi({ example: 'Light rain, 48°F to 55°F, 60% chance of rain' }),

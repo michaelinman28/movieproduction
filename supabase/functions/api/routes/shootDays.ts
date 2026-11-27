@@ -24,7 +24,7 @@ const clean = (o: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === '' ? null : v]));
 
 /** Every column of shoot_days but the shared link code, which only crew can read (shoot_day_share_tokens). */
-const DAY_COLS = 'id, project_id, shoot_date, title, location_id, crew_call, shooting_call, lunch, wrap, weather, sunrise, sunset, notes, '
+const DAY_COLS = 'id, project_id, shoot_date, title, crew_call, shooting_call, lunch, wrap, weather, sunrise, sunset, notes, '
   + 'version, sent_at, sent_by, created_by, created_at, updated_at, note_by, note_at, share_phones';
 
 /** Days of a project with their number, scenes, pages and call counts (for cast only, just their own call). */
@@ -37,19 +37,22 @@ async function describeDays(db: Db, projectId: string, rows?: Row[]) {
   const all = must<Row[]>(days).map((d) => ({ ...d, share_token: shared.get(d.id) ?? null }));
   const list = rows ? all.filter((d) => rows.some((r) => r.id === d.id)) : all;
   const ids = list.map((d) => d.id);
-  const [items, calls] = ids.length
+  const [items, calls, places] = ids.length
     ? await Promise.all([
       db.from('shoot_day_items').select('shoot_day_id, scene_id, sort_order, scenes(pages_eighths)').in('shoot_day_id', ids).eq('kind', 'scene').order('sort_order'),
       db.from('shoot_day_calls').select('shoot_day_id, confirmed_version').in('shoot_day_id', ids),
+      db.from('shoot_day_locations').select('shoot_day_id, location_id').in('shoot_day_id', ids).order('sort_order'),
     ])
-    : [{ data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }];
   const itemRows = must<Row[]>(items);
   const callRows = must<Row[]>(calls);
+  const placeRows = must<Row[]>(places);
   return list.map((d) => {
     const mine = itemRows.filter((i) => i.shoot_day_id === d.id);
     const called = callRows.filter((c) => c.shoot_day_id === d.id);
     return {
       ...d,
+      location_ids: placeRows.filter((p) => p.shoot_day_id === d.id).map((p) => p.location_id),
       day_number: all.findIndex((x) => x.id === d.id) + 1,
       total_days: all.length,
       scene_ids: mine.map((i) => i.scene_id),
@@ -58,6 +61,19 @@ async function describeDays(db: Db, projectId: string, rows?: Row[]) {
       confirmed: d.version ? called.filter((c) => c.confirmed_version === d.version).length : 0,
     };
   });
+}
+
+/** Makes a day's locations exactly `ids`, in that order (the first is the main one). */
+async function setDayLocations(db: Db, dayId: string, ids: string[]) {
+  const want = [...new Set(ids)];
+  const have = must<Row[]>(await db.from('shoot_day_locations').select('location_id, sort_order').eq('shoot_day_id', dayId));
+  const remove = have.filter((h) => !want.includes(h.location_id)).map((h) => h.location_id);
+  if (remove.length) must(await db.from('shoot_day_locations').delete().eq('shoot_day_id', dayId).in('location_id', remove));
+  for (const [i, locationId] of want.entries()) {
+    const at = have.find((h) => h.location_id === locationId);
+    if (!at) must(await db.from('shoot_day_locations').insert({ shoot_day_id: dayId, location_id: locationId, project_id: null, sort_order: i + 1 }));
+    else if (at.sort_order !== i + 1) must(await db.from('shoot_day_locations').update({ sort_order: i + 1 }).eq('shoot_day_id', dayId).eq('location_id', locationId));
+  }
 }
 
 async function oneDay(db: Db, id: string) {
@@ -104,7 +120,9 @@ shootDays.openapi(createRoute({
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  const row = must<Row>(await db.from('shoot_days').insert({ ...clean(c.req.valid('json')), project_id: id }).select('id').single());
+  const { location_ids, ...fields } = c.req.valid('json');
+  const row = must<Row>(await db.from('shoot_days').insert({ ...clean(fields), project_id: id }).select('id').single());
+  if (location_ids?.length) await setDayLocations(db, row.id, location_ids);
   return send(c, await oneDay(db, row.id), 201);
 });
 
@@ -116,7 +134,10 @@ shootDays.openapi(createRoute({
 }), async (c) => {
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
-  found(must<Row[]>(await db.from('shoot_days').update(clean(c.req.valid('json'))).eq('id', id).select('id')));
+  const { location_ids, ...fields } = c.req.valid('json');
+  if (Object.keys(fields).length) found(must<Row[]>(await db.from('shoot_days').update(clean(fields)).eq('id', id).select('id')));
+  else found(must<Row[]>(await db.from('shoot_days').select('id').eq('id', id)));
+  if (location_ids) await setDayLocations(db, id, location_ids);
   return send(c, await oneDay(db, id), 200);
 });
 
@@ -246,7 +267,7 @@ shootDays.openapi(createRoute({
 
 shootDays.openapi(createRoute({
   method: 'get', path: '/shoot-days/{id}/call-sheet', tags: sheetTags, security: secured,
-  summary: 'Everything on a day\'s call sheet: the day, location, schedule, scenes, cast and crew, and a look at the next day',
+  summary: 'Everything on a day\'s call sheet: the day, its locations, schedule, scenes, cast and crew, and a look at the next day',
   request: { params: IdParam },
   responses: { 200: ok(CallSheet), 401: errors[401], 404: errors[404] },
 }), async (c) => {
@@ -256,7 +277,7 @@ shootDays.openapi(createRoute({
   const next = all[day.day_number] ?? null; // day_number is 1-based, so this is the following day
   const sceneIds = [...new Set([...day.scene_ids, ...(next?.scene_ids ?? [])])];
   const [loc, items, scenes, calls, elems] = await Promise.all([
-    day.location_id ? db.from('project_locations').select('*').eq('id', day.location_id) : { data: [], error: null },
+    day.location_ids.length ? db.from('project_locations').select('*').in('id', day.location_ids) : { data: [], error: null },
     db.from('shoot_day_items').select('*').eq('shoot_day_id', day.id).order('sort_order'),
     sceneIds.length ? db.from('scenes').select('*').in('id', sceneIds) : { data: [], error: null },
     callsFor(db, day),
@@ -266,7 +287,7 @@ shootDays.openapi(createRoute({
   const pick = (ids: string[]) => ids.map((id) => sceneRows.find((s) => s.id === id)).filter(Boolean);
   return send(c, {
     day,
-    location: must<Row[]>(loc)[0] ?? null,
+    locations: day.location_ids.map((lid: string) => must<Row[]>(loc).find((l) => l.id === lid)).filter(Boolean),
     items: must<Row[]>(items),
     scenes: pick(day.scene_ids),
     calls,
@@ -403,7 +424,7 @@ async function getJson(url: string) {
 
 shootDays.openapi(createRoute({
   method: 'post', path: '/shoot-days/{id}/weather', tags, security: secured,
-  summary: 'Look up the forecast, sunrise and sunset for the day\'s location and date',
+  summary: 'Look up the forecast, sunrise and sunset for the day\'s main location and date',
   description: 'Uses Open-Meteo. Nothing is saved: the app puts the result in the day\'s form, and Save day stores it. '
     + 'Pass shoot_date and location_id to look up what the form shows before it is saved. Forecasts reach about 16 days ahead; for later dates, type the weather in.',
   request: { params: IdParam, body: { required: false, content: { 'application/json': { schema: WeatherLookup } } } },
@@ -412,8 +433,9 @@ shootDays.openapi(createRoute({
   const { db } = await authed(c);
   const { id } = c.req.valid('param');
   const ask = c.req.valid('json') ?? {};
-  const saved = found(must<Row[]>(await db.from('shoot_days').select('id, project_id, shoot_date, location_id').eq('id', id)));
-  const day = { shoot_date: ask.shoot_date ?? saved.shoot_date, location_id: ask.location_id ?? saved.location_id };
+  const saved = found(must<Row[]>(await db.from('shoot_days').select('id, project_id, shoot_date').eq('id', id)));
+  const main = must<Row[]>(await db.from('shoot_day_locations').select('location_id').eq('shoot_day_id', id).order('sort_order').limit(1))[0];
+  const day = { shoot_date: ask.shoot_date ?? saved.shoot_date, location_id: ask.location_id ?? main?.location_id ?? null };
   const loc = day.location_id
     ? must<Row[]>(await db.from('project_locations').select('address').eq('id', day.location_id).eq('project_id', saved.project_id))[0] : null;
   if (!loc?.address) return c.json({ error: 'Give the day a location with an address first.' }, 400);

@@ -21,7 +21,7 @@ day to day.
 | Locations | Each project's locations, with a status (Considering, Confirmed, Not using; Not using ones are hidden unless you ask, and aren't offered for tasks), a description, an address (the Map column, the panel and the task panel open it in the device's own maps app: Apple Maps on iPhone, iPad and Mac, the default maps app on Android, Google Maps in the browser elsewhere; `src/lib/maps.ts`) an on-site contact name, email and phone, and parking and the nearest hospital for call sheets. Anyone on the project adds and edits them; whoever added one or an admin deletes it. A task can be assigned to a location | Done |
 | Scenes and shot lists | Each project's scenes on its Scenes page, in script order (drag to reorder): number, set, INT/EXT, day or night, pages in eighths, synopsis, characters, elements, other needs, location and status (Not scheduled, Scheduled, Shot). Each scene has a shot list in its form: shots in shooting order with size, angle, movement, lens, equipment, estimated minutes and notes, ticked Done on set with one tap. Anyone on the project adds, edits and reorders them; whoever added a scene, or an admin, deletes it (with its shots). See [Scenes](#scenes-and-shot-lists) below | Done |
 | Elements | Each project's breakdown elements on its Elements page: props, wardrobe, vehicles, animals, effects and the rest, each stored once and linked to the scenes that use it (edited from the scene too), with a category (12 starter ones per company, admins manage them), status (Needed, Sourced, Ready), owner, quantity, description, notes, and optionally the one character it belongs to and the one location it stays at. Call sheets list the day's elements. See [Elements](#elements) below | Done |
-| Shoot days and call sheets | Each project's shoot days on its Shoot days page: date, location, crew call, shooting call, lunch, wrap, weather (looked up from the location's address), sunrise and sunset, notes, an ordered schedule of scenes, meal breaks, company moves and notes, and who is called (each person's call time; cast with character, pickup and makeup). Each day's call sheet is built from all that, sent as a new version (by email from your own app, or copied), and confirmed by each person; it prints cleanly. See [Shoot days](#shoot-days-and-call-sheets) below | Done |
+| Shoot days and call sheets | Each project's shoot days on its Shoot days page: date, one or more locations in order, crew call, shooting call, lunch, wrap, weather (looked up from the main location's address), sunrise and sunset, notes, an ordered schedule of scenes, meal breaks, company moves and notes, and who is called (each person's call time; cast with character, pickup and makeup). Each day's call sheet is built from all that, sent as a new version (by email from your own app, or copied), and confirmed by each person; it prints cleanly. See [Shoot days](#shoot-days-and-call-sheets) below | Done |
 | Scene notes | Any number of notes on a scene, in their own Notes section of the scene form (apart from Details and the Shot list, so those can be folded away). Like task notes: anyone on the project adds them, the author edits their own, and the author or an admin deletes one | Done |
 | Project notes | The Project notes page lists every note on a project, newest first: task notes, scene notes, shot notes, shoot day notes, notes in a day's schedule and notes on people's calls. Each links back to where it was taken (opening that item's form), where it's edited, and shows who wrote it: notes kept in a field (shot, shoot day, schedule, call) record who last set or changed them and when (`note_by`, `note_at`, stamped by a database trigger). Separate from the journal | Done |
 | Journal | A project journal. Entries are **private** (only the author, unless the author shares them with chosen people) or **public** (everyone on the project) | Database ready; screens next |
@@ -170,21 +170,26 @@ day to day.
   `src/pages/project/ProjectShootDays.tsx`) and each day's call sheet
   (`/projects/:id/shoot-days/:dayId`, `src/pages/project/CallSheetPage.tsx`).
 - **Days table:** one row per date, numbered by date ("Day 1 of 12"). Date, title,
-  location and the four times are editable in place; scenes, pages, sent version and
+  locations (a dropdown of tick boxes; newly ticked ones go at the end) and the four
+  times are editable in place; scenes, pages, sent version and
   confirmations are read from the day. Add a day by picking its date.
 - **Day form** (select a day; under the table) has three parts:
-  - **Details** (held until **Save day**): date, title, location, crew call, shooting
-    call, lunch, estimated wrap, weather, sunrise, sunset and notes. **Look up weather,
-    sunrise and sunset** asks Open-Meteo (free, no key) for the location's address, for
-    dates up to about 16 days ahead, and saves the result.
+  - **Details** (held until **Save day**): date, title, locations, crew call, shooting
+    call, lunch, estimated wrap, weather, sunrise, sunset and notes. **Locations** is an
+    ordered list (add from a dropdown, move up, take off); the first is the main one,
+    where the crew call is and whose address the weather uses. **Look up weather,
+    sunrise and sunset** asks Open-Meteo (free, no key) for the main location's address, for
+    dates up to about 16 days ahead, and fills the form (Save day stores it).
   - **Schedule:** the day's run in order (drag to reorder, `PUT /shoot-days/{id}/item-order`):
     scenes from the Scenes page, meal breaks, company moves and notes, each with an
     optional time. A scene can be on a day once; putting it on a day marks it Scheduled.
   - **Who's called:** people on the project's team. Call, pickup, makeup, character and
     note are edited in place or in the call's form. A blank call means the crew call; a
     character makes someone cast. **Call everyone** adds the whole team.
-- **Call sheet:** header (project, day N of M, date, times), location with address
-  (opens maps), parking and on-site contact, nearest hospital, weather, key contacts
+- **Call sheet:** header (project, day N of M, date, times), each of the day's
+  locations in order (numbered when there's more than one) with address (opens maps),
+  parking and on-site contact, the nearest hospital of each (one line per distinct
+  hospital, saying which locations it's near), weather, key contacts
   (producer, director, ADs, location manager and others found by role), scenes with
   breaks and page total, cast, crew grouped by department, notes, and the next day's
   scenes. People called see their own call at the top and **Confirm I got it**; opening
@@ -224,11 +229,18 @@ day to day.
   everyone called in Bcc and the sheet as text (`src/lib/callSheet.ts`), or **Copy
   message** copies it. Each call shows Waiting, Viewed, Confirmed or "Confirmed an old
   version".
-- **Rules:** a day's location and scenes must be on the same project; only people on
+- **Rules:** a day's locations and scenes must be on the same project; only people on
   the project can be called, and leaving the project takes them off its days. Versions
   change only through `publish_call_sheet()`, and viewed/confirmed only through
   `mark_call_sheet()` for the signed-in person, so neither can be faked with a direct
   update. Migration `20261125010000_shoot_days.sql`.
+- **Locations of a day:** `shoot_day_locations` (day, location, `sort_order`; one row
+  per location per day) replaced `shoot_days.location_id` in migration
+  `20261127000000_shoot_day_locations.sql`. The API returns them as `location_ids` on
+  each day (in order) and takes `location_ids` to replace the list; the call sheet and
+  both link functions return `locations` (an array, main first). Crew change them;
+  everyone on the project sees them. Deleting a location takes it off its days; each
+  change is logged on the day's History.
 - **Cast and crew:** on each project a person is crew (a company admin, or a role
   outside the Cast department), cast (plays a character or has a Cast role; people
   with no roles count as cast) or both (`project_view_of`, `my_project_view`; the API
@@ -416,7 +428,8 @@ There are three layers, and each one can be run and tested by itself.
 | `task_categories`, `task_tags`, `task_tag_links` | Each company's task categories and tags, and which tags each task has |
 | `scenes` | A project's scenes in order: number, set, INT/EXT, time of day, pages in eighths, synopsis, characters, other needs, location, status |
 | `shots` | Each scene's shots in order: size, angle, movement, lens, equipment, estimated minutes, done, notes |
-| `shoot_days` | A project's shoot days: date, title, location, crew call, shooting call, lunch, wrap, weather, sunrise, sunset, notes, call sheet version and when and by whom it was sent |
+| `shoot_days` | A project's shoot days: date, title, crew call, shooting call, lunch, wrap, weather, sunrise, sunset, notes, call sheet version and when and by whom it was sent |
+| `shoot_day_locations` | Each day's locations in order (the first is the main one) |
 | `shoot_day_items` | Each day's schedule in order: a scene, meal break, company move or note, with an optional time |
 | `shoot_day_calls` | Who is called on each day: call, pickup and makeup times, character, note, which version they viewed and confirmed, and their personal link token |
 | `characters` | A project's characters: cast number, type, description, age range, gender, traits, casting status, actor / stand-in / stunt double, wardrobe, hair and makeup, props, continuity |

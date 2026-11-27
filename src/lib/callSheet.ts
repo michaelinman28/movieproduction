@@ -6,6 +6,12 @@
 import type { CallSheet, ShootDayCall } from './api';
 import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, clockLabel, labelOf, longDate, pagesLabel } from './format';
 
+/** " at Diner" or " at Diner, then Park" (the day's locations in order), or nothing. */
+function placeNames(sheet: CallSheet) {
+  const names = sheet.locations.map((l) => l.name);
+  return names.length ? ` at ${names.join(', then ')}` : '';
+}
+
 export interface SheetText { projectName: string; url: string }
 
 export function callSheetSubject(sheet: CallSheet, t: SheetText) {
@@ -15,7 +21,6 @@ export function callSheetSubject(sheet: CallSheet, t: SheetText) {
 
 export function callSheetBody(sheet: CallSheet, t: SheetText) {
   const d = sheet.day;
-  const loc = sheet.location;
   const lines: string[] = [];
   const add = (label: string, v: string | null | undefined) => { if (v) lines.push(`${label}: ${v}`); };
   lines.push(`${t.projectName}: day ${d.day_number} of ${d.total_days}, ${longDate(d.shoot_date)}${d.title ? ` (${d.title})` : ''}`, '');
@@ -26,13 +31,14 @@ export function callSheetBody(sheet: CallSheet, t: SheetText) {
   add('Estimated wrap', clockLabel(d.wrap));
   add('Weather', d.weather);
   if (d.sunrise || d.sunset) add('Sunrise / sunset', `${clockLabel(d.sunrise) || '?'} / ${clockLabel(d.sunset) || '?'}`);
-  if (loc) {
+  const many = sheet.locations.length > 1;
+  sheet.locations.forEach((loc, i) => {
     lines.push('');
-    add('Location', loc.name);
+    add(many ? `Location ${i + 1}` : 'Location', loc.name);
     add('Address', loc.address);
     add('Parking', loc.parking);
     add('Nearest hospital', loc.nearest_hospital);
-  }
+  });
   if (sheet.items.length) {
     lines.push('', 'Schedule:');
     for (const i of sheet.items) {
@@ -81,7 +87,7 @@ function personalText(sheet: CallSheet, c: ShootDayCall, t: SheetText) {
   const call = clockLabel(c.call_time) || clockLabel(d.crew_call);
   return [
     `${first ? `Hi ${first}, here` : 'Here'}'s your call sheet for ${t.projectName}, day ${d.day_number} of ${d.total_days} (${longDate(d.shoot_date)}).`,
-    call ? `Your call: ${call}${sheet.location ? ` at ${sheet.location.name}` : ''}.` : '',
+    call ? `Your call: ${call}${placeNames(sheet)}.` : '',
     '',
     'Everything for the day is on your personal call sheet:',
     personalLink(c.link_token),
@@ -110,7 +116,7 @@ function sharedText(sheet: CallSheet, token: string, t: SheetText) {
   const call = clockLabel(d.crew_call);
   return [
     `Here's the call sheet for ${t.projectName}, day ${d.day_number} of ${d.total_days} (${longDate(d.shoot_date)}).`,
-    call ? `Crew call: ${call}${sheet.location ? ` at ${sheet.location.name}` : ''}.` : '',
+    call ? `Crew call: ${call}${placeNames(sheet)}.` : '',
     '',
     'The whole call sheet:',
     sharedLink(token),
