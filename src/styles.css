@@ -451,9 +451,12 @@
 /* Over several pages: keep a department's heading with its first person, and a section's heading with its table. */
 .cs1-dept, .cs1-bar { break-after: avoid; page-break-after: avoid; }
 .cs1-bottom { break-inside: avoid; }
-/* Modern: notes on their own row, then elements and the advance schedule side by side. */
-.cs1-modern .cs1-bottom { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.cs1-modern .cs1-notes { grid-column: 1 / -1; order: -1; }
+/* Notes take a row of their own; elements and the advance schedule split the row below. */
+.cs1 .cs1-bottom { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.cs1 .cs1-notes { grid-column: 1 / -1; order: -1; }
+/* A one-page sheet that won't fit that way: notes, elements and advance schedule in one row, notes on the left. */
+.cs1-one.cs1-tight .cs1-bottom { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+.cs1-one.cs1-tight .cs1-notes { grid-column: auto; }
 .cs1-body { display: flex; flex-direction: column; gap: 5pt; }
 .cs1-foot { display: flex; justify-content: space-between; gap: 8pt; padding-top: 2pt; border-top: 0.75pt solid var(--c1-line); font-size: 6.5pt; color: var(--c1-muted); }
 

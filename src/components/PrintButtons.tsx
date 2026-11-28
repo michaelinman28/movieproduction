@@ -36,12 +36,16 @@ export function printSheet(which: Which) {
   window.print();
 }
 
-/** Shrink the one-page sheet when a long day would run onto a second page (or undo it for the modern layout). */
+/** Fit a long day on one page: first the bottom sections go into one row, then the sheet shrinks (undone for the modern layout). */
 function fitOnePage() {
   const one = document.querySelector<HTMLElement>('.cs1-one');
   if (!one) return;
   one.style.removeProperty('zoom');
+  one.classList.remove('cs1-tight');
   if (document.documentElement.dataset.print !== 'one_page') return;
+  // Too long with notes on a row of their own: put notes, elements and the advance
+  // schedule side by side (notes first) before shrinking anything.
+  if (one.scrollHeight > PAGE_HEIGHT) one.classList.add('cs1-tight');
   const h = one.scrollHeight;
   if (h > PAGE_HEIGHT) one.style.setProperty('zoom', String(Math.max(0.6, Math.floor((PAGE_HEIGHT / h) * 1000) / 1000)));
 }
