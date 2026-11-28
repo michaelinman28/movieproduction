@@ -4,7 +4,7 @@ import type { CallSheetLayout } from '../lib/api';
 type Which = 'modern' | 'one_page';
 
 // A Letter page at 96px per inch, less the print margins (@page in styles.css), with a little to spare.
-const PAGE_HEIGHT = (11 - 0.9) * 96 * 0.98;
+const PAGE_HEIGHT = (11 - 0.9) * 96 * 0.97;
 
 /** Which layouts a project prints (missing means modern). */
 export const layoutsOf = (layout: CallSheetLayout | null | undefined): Which[] =>
