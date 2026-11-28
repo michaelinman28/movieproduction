@@ -24,6 +24,7 @@ Only company admins create projects.
 | Start and end dates | When the project runs |
 | Logline | The story in one sentence |
 | Description | Anything else worth knowing |
+| Call sheet print | How call sheets print: **Modern**, **One page** or **Both**. See [Call sheets](/help/project/call-sheets) |
 
 Admins change them with **Edit project** on the Overview, or in the Projects table on the company page (tap a status to pick one).
 

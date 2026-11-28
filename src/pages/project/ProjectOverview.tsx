@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Section } from '../../components/Section';
 import { TaskTree } from '../../components/TaskTree';
 import { ProjectLocations } from '../../components/ProjectLocations';
-import { api, type Location, type Scene, type ShootDay, type Task } from '../../lib/api';
-import { PROJECT_STATUSES, clockLabel, dateRange, dueWhen, errorText, isOverdue, minutesLabel, pagesLabel } from '../../lib/format';
+import { api, type CallSheetLayout, type Location, type Scene, type ShootDay, type Task } from '../../lib/api';
+import { CALL_SHEET_LAYOUTS, PROJECT_STATUSES, clockLabel, dateRange, dueWhen, errorText, isOverdue, minutesLabel, pagesLabel } from '../../lib/format';
 import type { ProjectStatus } from '../../lib/database.types';
 import { useUnsaved } from '../../lib/unsaved';
 import { itemPath } from '../../lib/links';
@@ -33,6 +33,7 @@ export function ProjectOverview() {
   const initial = useMemo(() => ({
     name: project.name, logline: project.logline ?? '', description: project.description ?? '',
     status: project.status as ProjectStatus, start_date: project.start_date ?? '', end_date: project.end_date ?? '',
+    call_sheet_layout: (project.call_sheet_layout ?? 'modern') as CallSheetLayout,
   }), [project]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(initial);
@@ -55,6 +56,7 @@ export function ProjectOverview() {
       await api.updateProject(projectId, {
         name: draft.name.trim(), logline: draft.logline.trim() || null, description: draft.description.trim() || null,
         status: draft.status, start_date: draft.start_date || null, end_date: draft.end_date || null,
+        call_sheet_layout: draft.call_sheet_layout,
       });
     } catch (err) { setError(errorText(err)); return; }
     setEditing(false);
@@ -101,6 +103,12 @@ export function ProjectOverview() {
               <label className="label">Start date<input className="field" type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} /></label>
               <label className="label">End date<input className="field" type="date" value={draft.end_date} min={draft.start_date || undefined} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} /></label>
             </div>
+            <label className="label">Call sheet print
+              <select className="field" value={draft.call_sheet_layout} onChange={(e) => setDraft({ ...draft, call_sheet_layout: e.target.value as CallSheetLayout })}>
+                {CALL_SHEET_LAYOUTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+              <span className="hint">Modern has the full header and cards (usually two pages). One page fits the whole day on one sheet. Both gives a print button for each.</span>
+            </label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <button type="submit" className="btn" disabled={!changed} data-pin="2">Save</button>
               <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>

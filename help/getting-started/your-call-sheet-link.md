@@ -18,6 +18,8 @@ A call sheet is the plan for one shoot day. From the top:
 - **Cast and crew**: who's called, and when. If you're only in the cast, a personal link shows just your own call.
 - **Notes**, and an **advance schedule** of the next shoot day.
 
+Times, locations, weather, the hospital and key contacts are grouped under **Day details**. Tap any heading, **Day details** or **Schedule** for example, to fold that part away; a short summary stays beside the heading. Your phone remembers what you folded.
+
 ## Confirm you got it
 
 On a personal link, tap **Confirm I got it** near the top. The production then sees you've confirmed this version.
@@ -35,7 +37,7 @@ Neither link shows anyone's email address. Phone numbers show on a shared link o
 
 ## Print it or save it as a PDF
 
-Tap **Print or PDF** at the top. The sheet is laid out on US Letter paper in light colors. To keep a copy on your phone, choose **Save as PDF** (or **Save to Files** on an iPhone) in the print screen.
+Tap **Print or PDF** at the top. If the production prints call sheets two ways, there are two buttons: **Print modern** for the full design, and **Print 1 page** for the whole day on one page. The sheet is laid out on US Letter paper in light colors, with every part printed, even ones you folded. To keep a copy on your phone, choose **Save as PDF** (or **Save to Files** on an iPhone) in the print screen.
 
 ## If the link doesn't work
 

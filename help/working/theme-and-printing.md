@@ -9,7 +9,7 @@ Tap the moon or sun at the top right of any page to switch between light and dar
 
 ## Print a call sheet
 
-On a call sheet, tap **Print or save as PDF** (or **Print or PDF** on a link). The sheet is laid out on US Letter paper, always in light colors, without the app's buttons and menus.
+On a call sheet, tap **Print or save as PDF** (or **Print or PDF** on a link). The sheet is laid out on US Letter paper, always in light colors, without the app's buttons and menus. A project can print the modern layout, a one-page layout, or both: see [Call sheets](/help/project/call-sheets).
 
 ## Save as a PDF
 

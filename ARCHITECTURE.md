@@ -204,7 +204,19 @@ day to day.
   a green header band with the day's title, the note under it and the crew call, the reader's own call, time tiles, location,
   weather, hospital and key-contact cards, then schedule, cast in cast-number order, crew, notes and the next
   day. **Print or save as PDF** lays the same design out on US Letter paper (light
-  colors always; the printer's own "your call" box is left out).
+  colors always; the printer's own "your call" box is left out). Each project picks its
+  printed layout (`projects.call_sheet_layout`: `modern`, `one_page` or `both`, on its
+  details): the one-page sheet (`src/components/CallSheetOnePage.tsx`, styles under
+  `.cs1`) is a compact, print-only US Letter page built from the same worked-out data.
+  The printed modern layout uses the screen sheet's header band, times and cards, then the
+  same tables at a larger size, over as many pages as needed (`CallSheetOnePage` with
+  `variant="modern"`; a table's repeating header and footer rows keep each page's top and
+  bottom space). Both printed sheets render through a portal straight under `<body>`
+  (`.cs-print`); printing hides `#root`, sets `@page { margin: 0 }` (so the browser adds
+  no header or footer) and shows the chosen sheet at exactly Letter width. The footer is
+  fixed to the bottom of every page. The one-page sheet sits off screen so `PrintButtons` (`src/components/PrintButtons.tsx`) can measure it
+  and shrink a long day to fit (CSS `zoom`, down to 60%); `html[data-print]` picks which
+  layout goes to paper, and with both there's a print button for each.
 - **Personal links:** everyone called has a private, unguessable link
   (`shoot_day_calls.link_token`, made by the database and never changed) to their own
   view-only page at `/sheet/{token}` (`src/pages/SheetLinkPage.tsx`). It needs no

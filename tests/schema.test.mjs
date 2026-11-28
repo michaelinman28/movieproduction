@@ -512,6 +512,12 @@ await expect('a personal link shows the reader\'s characters and own dietary nee
   r => { const me = r[0]?.s?.calls?.find((c) => c.user_id === U.b); return me?.characters?.[0]?.name === 'Maya' && me.characters[0].cast_number === 1 && me.dietary?.needs === 'Shellfish allergy' && me.dietary.allergy === true; });
 await expect('unknown link cannot confirm', () => asAnon(`select confirm_call_sheet_link(gen_random_uuid())`), isErr);
 await expect('unknown link shows nothing', () => asAnon(`select call_sheet_for_link(gen_random_uuid()) s`), r => r[0]?.s === null);
+// Call sheet print layout: modern by default, one of three values, and on the links.
+await expect('a project prints the modern call sheet by default', () => as(U.a, `select call_sheet_layout from projects where id=(select project_id from shoot_days where id=$1)`, [day.id]), r => r[0]?.call_sheet_layout === 'modern');
+await expect('the layout must be modern, one_page or both', () => as(U.a, `update projects set call_sheet_layout='poster' where id=(select project_id from shoot_days where id=$1)`, [day.id]), isErr);
+await expect('a non-admin cannot change the layout', () => as(U.b, `update projects set call_sheet_layout='both' where id=(select project_id from shoot_days where id=$1) returning id`, [day.id]), len(0));
+await expect('an admin turns on both layouts', () => as(U.a, `update projects set call_sheet_layout='both' where id=(select project_id from shoot_days where id=$1) returning id`, [day.id]), len(1));
+await expect('a personal link carries the layout', () => asAnon(`select call_sheet_for_link($1) s`, [bCall.link_token]), r => r[0]?.s?.project?.call_sheet_layout === 'both');
 const [sdLoc3] = await as(U.b, `insert into project_locations (project_id,name) values ($1,'Warehouse') returning id`, [lp.id]);
 const [scB] = await as(U.b, `insert into scenes (project_id,number,location_id) values ($1,'31',$2) returning id`, [lp.id, sdLoc3.id]);
 await expect('a scene location missing from the day is added at the end', async () => {

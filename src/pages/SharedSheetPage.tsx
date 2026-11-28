@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PrintButtons } from '../components/PrintButtons';
 import { CallSheetDocument } from '../components/CallSheetDocument';
 import { ThemeSwitch } from '../components/ThemeSwitch';
 import { helpUrl } from '../components/HelpLink';
@@ -28,7 +29,7 @@ export function SharedSheetPage({ token }: { token: string }) {
     <div className="flex-1">
       <div className="sheet-link-bar">
         <a href={home} className="mr-auto inline-flex min-h-11 items-center font-bold text-fg no-underline">Movie Production</a>
-        {sheet && <button type="button" className="btn btn-secondary w-auto min-h-10 px-3 text-sm" onClick={() => window.print()}>Print or PDF</button>}
+        {sheet && <PrintButtons short layout={sheet.project.call_sheet_layout} className="btn btn-secondary w-auto min-h-10 shrink-0 px-3 text-sm" />}
         <a href={helpUrl('getting-started/your-call-sheet-link')} target="_blank" rel="noopener" className="btn-link shrink-0 whitespace-nowrap text-sm">What is this?</a>
         <ThemeSwitch />
       </div>

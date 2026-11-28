@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import type { LinkedCallSheet, SheetElement } from '../lib/api';
+import type { CallSheetLayout, LinkedCallSheet, SheetElement } from '../lib/api';
 import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, castNumberValue, castNumbersByName, clockLabel, compareCastNumbers, labelOf, longDate, orderCastNames, pagesLabel, shortDate } from '../lib/format';
 import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
+import { CallSheetOnePage } from './CallSheetOnePage';
+import { layoutsOf } from './PrintButtons';
 
 /** What the call sheet shows. A personal link gets exactly this; the project's call sheet page maps its data to it. */
 export type SheetData = Omit<LinkedCallSheet, 'me' | 'confirmed' | 'view'>;
@@ -65,7 +68,7 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
  * call sheet page and by each person's private link.
  */
-export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links, roster }: {
+export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links, roster, layout, printYou = true }: {
   sheet: SheetData;
   /** The person reading it, on My call only: their call is shown at the top and their rows are marked. The full sheet passes none. */
   me?: string | null;
@@ -83,6 +86,10 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   links?: SheetLinks;
   /** The project's characters, so a scene's cast is ordered by cast number even when someone isn't called. */
   roster?: { name: string; cast_number: number | null }[];
+  /** The project's print layouts; with one_page (or both) the one-page sheet is on the page too, for printing. */
+  layout?: CallSheetLayout | null;
+  /** Whether the one-page sheet shows the reader's own call. The project's page prints for everyone, so it passes false. */
+  printYou?: boolean;
 }) {
   const { day, locations, project } = sheet;
   // Each distinct nearest hospital, with the locations it's nearest to.
@@ -161,6 +168,12 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
     ['Shooting call', day.shooting_call], ['Lunch', day.lunch], ['Est. wrap', day.wrap], ['Sunrise', day.sunrise], ['Sunset', day.sunset],
   ] as const).filter(([, t]) => t);
 
+  // Shown beside "Day details": the shooting call and how many locations.
+  const topSummary = [
+    day.shooting_call && `Shooting ${clockLabel(day.shooting_call)}`,
+    `${locations.length} ${locations.length === 1 ? 'location' : 'locations'}`,
+  ].filter(Boolean).join(' · ');
+
   const person = (c: SheetCall, sub: ReactNode, times: ReactNode) => (
     <li key={c.user_id} className={`cs-person ${isMe(c) ? 'cs-me' : ''}`}>
       <div className="cs-person-who">
@@ -178,8 +191,8 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
     </li>
   );
 
-  return (
-    <article className="cs">
+  const hero = (
+    <>
       <header className="cs-hero">
         <div className="cs-hero-main">
           <p className="cs-eyebrow">{project.company_name} · Call sheet</p>
@@ -198,6 +211,10 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         </div>
       </header>
 
+    </>
+  );
+  const you = (
+    <>
       {own && !mine && <p className="cs-you cs-muted">You're not called on this day.</p>}
 
       {mine && (
@@ -220,63 +237,99 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         </section>
       )}
 
-      {times.length > 0 && (
-        <dl className="cs-times">
-          {times.map(([label, t]) => <div key={label} className="cs-time"><dt>{label}</dt><dd>{clockLabel(t)}</dd></div>)}
-        </dl>
-      )}
+    </>
+  );
+  const details = (
+    <>
+        {times.length > 0 && (
+          <dl className="cs-times">
+            {times.map(([label, t]) => <div key={label} className="cs-time"><dt>{label}</dt><dd>{clockLabel(t)}</dd></div>)}
+          </dl>
+        )}
 
-      <div className={`cs-info ${own ? 'cs-info-3' : ''}`}>
-        <Card title={locations.length > 1 ? `Locations (${locations.length})` : 'Location'}>
-          {locations.length ? (
-            <ul className="cs-places">
-              {locations.map((loc, i) => (
-                <li key={`${loc.name}-${i}`} className="cs-place">
-                  <p className="cs-strong">
-                    {locations.length > 1 && <span className="cs-place-no">{i + 1}</span>}
-                    <To to={links?.locations[i]} title={`Open ${loc.name} on the Locations page`}>{loc.name}</To>
-                  </p>
-                  {loc.address && <p><a {...mapsLinkProps(loc.address)}>{loc.address}</a></p>}
-                  {loc.parking && <p className="cs-small"><span className="cs-muted">Parking:</span> {loc.parking}</p>}
-                  {loc.contact_name && <p className="cs-small"><span className="cs-muted">On site:</span> {loc.contact_name} <Phone phone={loc.contact_phone} /></p>}
-                </li>
-              ))}
-            </ul>
-          ) : <p className="cs-muted">To be confirmed</p>}
-        </Card>
-        <Card title="Weather">
-          <p>{day.weather || <span className="cs-muted">Not set</span>}</p>
-          {(day.sunrise || day.sunset) && <p className="cs-small cs-muted">Sunrise {clockLabel(day.sunrise) || '—'} · Sunset {clockLabel(day.sunset) || '—'}</p>}
-        </Card>
-        <Card title="Nearest hospital" tone="alert">
-          <ul className="cs-keys">
-            {hospitals.length ? hospitals.map((h) => {
-              // "WakeMed Cary Hospital, 1900 Kildaire Farm Rd, Cary, NC" -> name, then the address.
-              const [name, ...rest] = h.text.split(',');
-              return (
-                <li key={h.text}>
-                  <span className="cs-muted">{hospitals.length > 1 || locations.length > 1 ? `Near ${h.places.join(', ')}` : 'Hospital'}</span>
-                  <span>{rest.length ? name.trim() : ''}</span>
-                  <a className="cs-addr" {...mapsLinkProps(h.text)}>{rest.length ? rest.join(',').trim() : name}</a>
-                </li>
-              );
-            }) : <li><span className="cs-muted">Hospital</span><span>Not set</span></li>}
-            <li><span className="cs-muted">Emergency</span><span>Police, fire, ambulance</span><a className="cs-phone" href="tel:911">911</a></li>
-          </ul>
-        </Card>
-        {!own && <Card title="Key contacts">
-          {keys.length ? (
+        <div className={`cs-info ${own ? 'cs-info-3' : ''}`}>
+          <Card title={locations.length > 1 ? `Locations (${locations.length})` : 'Location'}>
+            {locations.length ? (
+              <ul className="cs-places">
+                {locations.map((loc, i) => (
+                  <li key={`${loc.name}-${i}`} className="cs-place">
+                    <p className="cs-strong">
+                      {locations.length > 1 && <span className="cs-place-no">{i + 1}</span>}
+                      <To to={links?.locations[i]} title={`Open ${loc.name} on the Locations page`}>{loc.name}</To>
+                    </p>
+                    {loc.address && <p><a {...mapsLinkProps(loc.address)}>{loc.address}</a></p>}
+                    {loc.parking && <p className="cs-small"><span className="cs-muted">Parking:</span> {loc.parking}</p>}
+                    {loc.contact_name && <p className="cs-small"><span className="cs-muted">On site:</span> {loc.contact_name} <Phone phone={loc.contact_phone} /></p>}
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="cs-muted">To be confirmed</p>}
+          </Card>
+          <Card title="Weather">
+            <p>{day.weather || <span className="cs-muted">Not set</span>}</p>
+            {(day.sunrise || day.sunset) && <p className="cs-small cs-muted">Sunrise {clockLabel(day.sunrise) || '—'} · Sunset {clockLabel(day.sunset) || '—'}</p>}
+          </Card>
+          <Card title="Nearest hospital" tone="alert">
             <ul className="cs-keys">
-              {keys.map(({ role, c }) => (
-                <li key={c.user_id}><span className="cs-muted">{role}</span><span><To to={links?.person(c.user_id)} title={`Open ${nameOf(c)} on the Team page`}>{nameOf(c)}</To></span><Phone phone={c.profile.phone} /></li>
-              ))}
+              {hospitals.length ? hospitals.map((h) => {
+                // "WakeMed Cary Hospital, 1900 Kildaire Farm Rd, Cary, NC" -> name, then the address.
+                const [name, ...rest] = h.text.split(',');
+                return (
+                  <li key={h.text}>
+                    <span className="cs-muted">{hospitals.length > 1 || locations.length > 1 ? `Near ${h.places.join(', ')}` : 'Hospital'}</span>
+                    <span>{rest.length ? name.trim() : ''}</span>
+                    <a className="cs-addr" {...mapsLinkProps(h.text)}>{rest.length ? rest.join(',').trim() : name}</a>
+                  </li>
+                );
+              }) : <li><span className="cs-muted">Hospital</span><span>Not set</span></li>}
+              <li><span className="cs-muted">Emergency</span><span>Police, fire, ambulance</span><a className="cs-phone" href="tel:911">911</a></li>
             </ul>
-          ) : <p className="cs-muted cs-small">None listed</p>}
-        </Card>}
-      </div>
+          </Card>
+          {!own && <Card title="Key contacts">
+            {keys.length ? (
+              <ul className="cs-keys">
+                {keys.map(({ role, c }) => (
+                  <li key={c.user_id}><span className="cs-muted">{role}</span><span><To to={links?.person(c.user_id)} title={`Open ${nameOf(c)} on the Team page`}>{nameOf(c)}</To></span><Phone phone={c.profile.phone} /></li>
+                ))}
+              </ul>
+            ) : <p className="cs-muted cs-small">None listed</p>}
+          </Card>}
+        </div>
+    </>
+  );
+
+  // The printed sheets live straight under <body>, outside the app, so they print on their own
+  // (the app is hidden then) at the paper's size, whatever the screen around them looks like.
+  // Modern: this sheet's top, then the one-page tables at a larger size; One page: everything on one page.
+  const layouts = layoutsOf(layout ?? sheet.project.call_sheet_layout);
+  const parts = {
+    sheet, own, mine: printYou ? mine : null, versionNote, hospitals, keys, cast, crew, food, elementGroups, totalPages,
+    nameOf, callOf, roleNames, castRank, castLabel, sceneChars, numberOf, sceneLine, placeOf,
+  };
+  const printed = createPortal(
+    <div className="cs-print">
+      {layouts.includes('modern') && (
+        <CallSheetOnePage variant="modern" parts={parts} modernTop={<>{hero}{printYou && you}<div className="cs-top-body">{details}</div></>} />
+      )}
+      {layouts.includes('one_page') && <CallSheetOnePage parts={parts} />}
+    </div>,
+    document.body,
+  );
+
+  return (
+    <>
+    {printed}
+    <article className="cs">
+      {hero}
+
+      {you}
+
+      <Section printOpen className="cs-top" bodyClassName="cs-top-body" id={`${sectionPrefix}.top`} title="Day details" summary={topSummary}>
+        {details}
+      </Section>
 
       <div className="cs-body">
-        <Section id={`${sectionPrefix}.schedule`} title="Schedule" summary={sheet.scenes.length ? `${sheet.scenes.length} scenes · ${pagesLabel(totalPages)} pages` : undefined}>
+        <Section printOpen id={`${sectionPrefix}.schedule`} title="Schedule" summary={sheet.scenes.length ? `${sheet.scenes.length} scenes · ${pagesLabel(totalPages)} pages` : undefined}>
           {sheet.items.length ? (
             <ol className="cs-schedule">
               {sheet.items.map((i) => {
@@ -322,7 +375,7 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         </Section>
 
         {elements.length > 0 && (
-          <Section id={`${sectionPrefix}.elements`} title="Elements" summary={`${elements.length} for today's scenes`}>
+          <Section printOpen id={`${sectionPrefix}.elements`} title="Elements" summary={`${elements.length} for today's scenes`}>
             <div className="cs-depts">
               {elementGroups.map(([cat, list]) => (
                 <div key={cat} className="cs-dept">
@@ -348,7 +401,7 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
           </Section>
         )}
 
-        {!own && <Section id={`${sectionPrefix}.cast`} title="Cast" summary={cast.length ? String(cast.length) : undefined}>
+        {!own && <Section printOpen id={`${sectionPrefix}.cast`} title="Cast" summary={cast.length ? String(cast.length) : undefined}>
           {cast.length ? (
             <ul className="cs-people">
               {cast.map((c) => person(c,
@@ -358,7 +411,7 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
           ) : <p className="cs-muted">No cast called</p>}
         </Section>}
 
-        {!own && <Section id={`${sectionPrefix}.crew`} title="Crew" summary={String(sheet.calls.length - cast.length)}>
+        {!own && <Section printOpen id={`${sectionPrefix}.crew`} title="Crew" summary={String(sheet.calls.length - cast.length)}>
           {crew.length ? (
             <div className="cs-depts">
               {crew.map(([dept, list]) => (
@@ -376,7 +429,7 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         </Section>}
 
         {food.length > 0 && (
-          <Section id={`${sectionPrefix}.dietary`} title={own ? 'Your dietary needs' : 'Dietary needs'}
+          <Section printOpen id={`${sectionPrefix}.dietary`} title={own ? 'Your dietary needs' : 'Dietary needs'}
             summary={`${food.length} ${food.length === 1 ? 'person' : 'people'}${allergies ? `, ${allergies} ${allergies === 1 ? 'allergy' : 'allergies'}` : ''}`}>
             <ul className="cs-food">
               {food.map((c) => (
@@ -390,12 +443,12 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         )}
 
         {day.notes && (
-          <Section id={`${sectionPrefix}.notes`} title="Notes">
+          <Section printOpen id={`${sectionPrefix}.notes`} title="Notes">
             <p className="cs-notes">{day.notes}</p>
           </Section>
         )}
 
-        <Section id={`${sectionPrefix}.next`} title="Advance schedule" summary={sheet.next_day ? shortDate(sheet.next_day.day.shoot_date) : 'Last day'}>
+        <Section printOpen id={`${sectionPrefix}.next`} title="Advance schedule" summary={sheet.next_day ? shortDate(sheet.next_day.day.shoot_date) : 'Last day'}>
           {sheet.next_day ? (
             <div className="cs-next">
               <p className="cs-strong">
@@ -431,5 +484,6 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         <span>Confidential: for cast and crew only</span>
       </footer>
     </article>
+    </>
   );
 }

@@ -4,6 +4,7 @@ import { CallSheetDocument, type SheetData, type SheetLinks } from '../../compon
 import { SheetViewSwitch, ownSheet, useSheetMode } from '../../components/SheetViewSwitch';
 import { itemPath } from '../../lib/links';
 import { Section } from '../../components/Section';
+import { PrintButtons } from '../../components/PrintButtons';
 import { api, type CallSheet } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { callSheetMailto, copyCallSheet, personalLink, personalMailto, personalSms, sharedLink, sharedMailto, sharedSms } from '../../lib/callSheet';
@@ -135,7 +136,7 @@ export function CallSheetPage() {
       {project.view === 'both' && <SheetViewSwitch mode={mode} onChange={setMode} />}
       {mode === 'mine' && (
         <div className="no-print flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button type="button" className="btn btn-secondary sm:w-auto" onClick={() => window.print()}>Print or save as PDF</button>
+          <PrintButtons layout={project.call_sheet_layout} />
           {project.view === 'both' && <p className="hint m-0">Showing only your own call. Choose Full sheet to see everyone and to send or share the sheet.</p>}
         </div>
       )}
@@ -152,7 +153,7 @@ export function CallSheetPage() {
             <button className="btn" data-pin disabled={busy || !sheet.calls.length} onClick={send}>Send version {day.version + 1}</button>
             {day.version > 0 && <a className={`btn no-underline ${justSent ? '' : 'btn-secondary'}`} href={callSheetMailto(sheet, text)}>Email everyone</a>}
             {day.version > 0 && <button type="button" className="btn btn-secondary" onClick={async () => setCopied(await copyCallSheet(sheet, text))}>Copy message</button>}
-            <button type="button" className="btn btn-secondary" onClick={() => window.print()}>Print or save as PDF</button>
+            <PrintButtons layout={project.call_sheet_layout} className="btn btn-secondary" />
           </div>
           {!sheet.calls.length && <p className="hint m-0">Call people on the day first (Shoot days page).</p>}
           {copied === true && <p className="hint m-0">Copied. Paste it into a text, chat or email.</p>}
@@ -221,7 +222,7 @@ export function CallSheetPage() {
       </Section>
       </div>}
 
-      {shown && <CallSheetDocument sheet={shown} me={mode === 'mine' ? me : null} own={mode === 'mine'} sectionPrefix="callSheet" status={(id) => { const c = sheet.calls.find((x) => x.user_id === id); return c ? callStatus(day, c) : ''; }}
+      {shown && <CallSheetDocument sheet={shown} me={mode === 'mine' ? me : null} own={mode === 'mine'} sectionPrefix="callSheet" layout={project.call_sheet_layout} printYou={false} status={(id) => { const c = sheet.calls.find((x) => x.user_id === id); return c ? callStatus(day, c) : ''; }}
         versionNote={day.version ? `Version ${day.version}` : 'Draft, not sent'} links={links} roster={roster} />}
     </div>
   );

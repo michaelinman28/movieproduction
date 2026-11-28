@@ -12,13 +12,13 @@ import { scrollToForm, useOpenFromLink } from '../lib/reveal';
 import { api, type Company, type CompanyMember, type Project } from '../lib/api';
 import { emailOrThrow, emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
 import { InviteButtons } from '../components/InviteButtons';
-import { PROJECT_STATUSES, displayName, errorText, roleIdsFor, roleNames, statusLabel, statusValue } from '../lib/format';
+import { CALL_SHEET_LAYOUTS, PROJECT_STATUSES, displayName, layoutLabel, layoutValue, errorText, roleIdsFor, roleNames, statusLabel, statusValue } from '../lib/format';
 import type { Role } from '../lib/database.types';
 
 interface PersonRow {
   id: string; name: string; nickname: string; email: string; phone: string; title: string; roles: string; admin: boolean; account: string; pending: boolean;
 }
-interface ProjectRow { id: string; name: string; status: string; start_date: string; end_date: string; logline: string; description: string }
+interface ProjectRow { id: string; name: string; status: string; layout: string; start_date: string; end_date: string; logline: string; description: string }
 
 export type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
 
@@ -105,7 +105,7 @@ export function CompanyPage() {
     } catch (err) { setError(errorText(err)); }
   }
   const projectRows = useMemo<ProjectRow[]>(() => projects.map((p) => ({
-    id: p.id, name: p.name, status: statusLabel(p.status), logline: p.logline ?? '',
+    id: p.id, name: p.name, status: statusLabel(p.status), layout: layoutLabel(p.call_sheet_layout), logline: p.logline ?? '',
     start_date: p.start_date ?? '', end_date: p.end_date ?? '', description: p.description ?? '',
   })), [projects]);
   const projectOptions = useMemo(() => ({
@@ -128,6 +128,11 @@ export function CompanyPage() {
       { field: 'start_date', header: 'Start', type: 'date', width: 120, editable: true },
       { field: 'end_date', header: 'End', type: 'date', width: 120, editable: true },
       { field: 'logline', header: 'Logline', width: 320, editable: true, editor: 'textarea' },
+      {
+        field: 'layout', header: 'Call sheet print', width: 160, editable: true, editor: 'select',
+        editorOptions: CALL_SHEET_LAYOUTS.map((x) => x.label),
+        render: ({ value }: { value: string }) => (isAdmin ? gridDropdown(gridEsc(value)) : gridEsc(value)),
+      },
       { field: 'description', header: 'Description', width: 320, editable: true, editor: 'textarea' },
     ],
   }), [isAdmin]);
@@ -136,6 +141,7 @@ export function CompanyPage() {
     const v = e.newValue == null ? '' : String(e.newValue).trim();
     const b = e.column === 'name' ? (v ? { name: v } : null)
       : e.column === 'status' ? (statusValue(v) ? { status: statusValue(v) } : null)
+      : e.column === 'layout' ? (layoutValue(v) ? { call_sheet_layout: layoutValue(v) } : null)
       : e.column === 'start_date' || e.column === 'end_date' || e.column === 'logline' || e.column === 'description'
         ? { [e.column]: v || null }
       : null;

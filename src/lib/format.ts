@@ -10,6 +10,15 @@ export const PROJECT_STATUSES: { value: ProjectStatus; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+/** How a project's call sheet prints (Project details). */
+export const CALL_SHEET_LAYOUTS: { value: 'modern' | 'one_page' | 'both'; label: string }[] = [
+  { value: 'modern', label: 'Modern' },
+  { value: 'one_page', label: 'One page' },
+  { value: 'both', label: 'Both' },
+];
+export const layoutLabel = (v: string | null | undefined) => CALL_SHEET_LAYOUTS.find((x) => x.value === (v || 'modern'))?.label ?? 'Modern';
+export const layoutValue = (label: string) => CALL_SHEET_LAYOUTS.find((x) => x.label === label || x.value === label)?.value;
+
 export const statusLabel = (s: ProjectStatus) => PROJECT_STATUSES.find((x) => x.value === s)?.label ?? s;
 export const statusValue = (label: string) =>
   PROJECT_STATUSES.find((x) => x.label === label || x.value === label)?.value;
