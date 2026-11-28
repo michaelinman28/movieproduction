@@ -228,7 +228,7 @@ export function CallSheetOnePage({ parts, variant = 'one_page', modernTop }: {
 
       <div className="cs1-bottom">
         {elementGroups.length > 0 && (
-          <section>
+          <section className="cs1-elements">
             <h2 className="cs1-bar">Elements</h2>
             {elementGroups.map(([cat, list]) => (
               <p key={cat} className="cs1-line"><b>{cat}:</b> {list.map((e) => `${e.name}${e.quantity != null && e.quantity > 1 ? ` ×${e.quantity}` : ''} (Sc ${e.scenes.map((s) => s.number).join(', ')})`).join('; ')}</p>
@@ -236,7 +236,7 @@ export function CallSheetOnePage({ parts, variant = 'one_page', modernTop }: {
           </section>
         )}
         {(day.notes || food.length > 0) && (
-          <section>
+          <section className="cs1-notes">
             <h2 className="cs1-bar">Notes</h2>
             {day.notes && <p className="cs1-line cs1-pre">{day.notes}</p>}
             {food.length > 0 && (
@@ -244,7 +244,7 @@ export function CallSheetOnePage({ parts, variant = 'one_page', modernTop }: {
             )}
           </section>
         )}
-        <section>
+        <section className="cs1-next">
           <h2 className="cs1-bar">Advance schedule{sheet.next_day && <span>{shortDate(sheet.next_day.day.shoot_date)}</span>}</h2>
           {sheet.next_day ? (
             <>
