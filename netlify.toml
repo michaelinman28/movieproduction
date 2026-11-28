@@ -3,8 +3,8 @@
 # (https://deploy-preview-<number>--movie-prod.netlify.app/).
 
 [build]
-  # The same checks CI ran before: security rules, type check, then the build.
-  command = "npm run test:db && npm run typecheck && npm run build"
+  # The same checks CI ran before: security rules, Help links and screenshots, type check, then the build.
+  command = "npm run test:db && npm run test:help && npm run typecheck && npm run build"
   publish = "dist"
 
 [build.environment]

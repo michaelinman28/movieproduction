@@ -7,10 +7,33 @@ import { PreviewBanner } from '../components/PreviewBanner';
 import { findPage, helpSections, readingOrder, searchHelp, type HelpPage } from './content';
 import { BigPicture } from './BigPicture';
 
-/** Blocks a help page can place with a line that is only `{{name}}`. */
-const BLOCKS: Record<string, () => ReactNode> = {
+/**
+ * Blocks a help page can place with a line that is only `{{name}}` or `{{name arg}}`:
+ * `{{big-picture}}` draws how the features connect; `{{shots tasks}}` shows the iPad and
+ * phone screenshots public/help/img/tasks-ipad.jpg and tasks-phone.jpg.
+ */
+const BLOCKS: Record<string, (arg: string) => ReactNode> = {
   'big-picture': () => <BigPicture />,
+  shots: (arg) => <Shots name={arg} />,
 };
+
+/** An iPad and a phone screenshot side by side (stacked on a phone). */
+function Shots({ name }: { name: string }) {
+  const src = (d: string) => `${import.meta.env.BASE_URL}help/img/${name}-${d}.jpg`;
+  return (
+    <div className="help-shots">
+      {(['ipad', 'phone'] as const).map((d) => (
+        <figure key={d} className="m-0">
+          {/* Tap a screenshot to see it full size. */}
+          <a href={src(d)} target="_blank" rel="noopener">
+            <img src={src(d)} alt={`The ${name.replace(/-/g, ' ')} screen on ${d === 'ipad' ? 'an iPad' : 'a phone'}`} loading="lazy" width={d === 'ipad' ? 820 : 390} height={d === 'ipad' ? 1000 : 844} />
+          </a>
+          <figcaption>{d === 'ipad' ? 'iPad' : 'Phone'}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
 
 const appHome = import.meta.env.BASE_URL;
 
@@ -228,7 +251,8 @@ function PageLink({ page, label, alignEnd = false }: { page: HelpPage; label: st
 function Markdown({ source }: { source: string }) {
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
-  const chunks = useMemo(() => source.split(/^\{\{([\w-]+)\}\}$/m), [source]);
+  // split() with two groups gives [text, name, arg, text, name, arg, …].
+  const chunks = useMemo(() => source.split(/^\{\{([\w-]+)(?: ([\w-]+))?\}\}$/m), [source]);
   useEffect(() => {
     ref.current?.querySelectorAll<HTMLAnchorElement>('a[href^="http"]').forEach((a) => {
       if (a.origin !== window.location.origin) { a.target = '_blank'; a.rel = 'noopener'; }
@@ -243,8 +267,9 @@ function Markdown({ source }: { source: string }) {
   return (
     <div ref={ref} className="help-prose" onClick={onClick}>
       {chunks.map((c, i) => {
-        if (i % 2 === 1) return BLOCKS[c] ? <div key={i} className="my-4">{BLOCKS[c]()}</div> : null;
-        return c.trim() ? <div key={i} dangerouslySetInnerHTML={{ __html: marked.parse(c, { async: false }) as string }} /> : null;
+        if (i % 3 === 1) return BLOCKS[c] ? <div key={i} className="my-4">{BLOCKS[c](chunks[i + 1] ?? '')}</div> : null;
+        if (i % 3 === 2) return null;
+        return c?.trim() ? <div key={i} dangerouslySetInnerHTML={{ __html: marked.parse(c, { async: false }) as string }} /> : null;
       })}
     </div>
   );

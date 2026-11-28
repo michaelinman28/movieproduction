@@ -10,7 +10,8 @@
     "typecheck": "tsc -b && tsc -p tsconfig.api.json",
     "test:db": "node tests/schema.test.mjs",
     "api": "tsx api/server.ts",
-    "api:spec": "tsx api/export-spec.ts"
+    "api:spec": "tsx api/export-spec.ts",
+    "test:help": "node tests/help.test.mjs"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.6.2",

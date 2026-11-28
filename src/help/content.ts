@@ -9,7 +9,7 @@
  *   ---
  *
  * Its `## ` headings become collapsible sections. A line that is only `{{name}}` puts the
- * matching React block there (see BLOCKS in HelpPage.tsx), e.g. `{{big-picture}}`.
+ * matching React block there (see BLOCKS in HelpApp.tsx), e.g. `{{big-picture}}`.
  */
 
 export type HelpPart = { id: string; title: string; markdown: string; text: string };
@@ -39,7 +39,7 @@ export const slugify = (s: string) =>
 /** Markdown to plain words, for search and snippets. */
 export const plainText = (md: string) =>
   md
-    .replace(/^\{\{[\w-]+\}\}$/gm, ' ')
+    .replace(/^\{\{[\w -]+\}\}$/gm, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/^\s*\|?[\s:|-]+\|[\s:|-]*$/gm, ' ')

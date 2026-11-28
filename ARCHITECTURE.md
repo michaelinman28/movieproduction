@@ -335,7 +335,8 @@ cascade, a personal call sheet link, or a fix made straight in the database). Mi
 - **Content:** one Markdown file per page in `help/<section>/<page>.md`, with a header giving its `title`, `summary` and `order`. `src/help/content.ts` reads them at build time, splits each page at its `## ` headings into collapsible sections, and lists the sections in its `SECTIONS` order (a section shows once it has a page). A line that is only `{{big-picture}}` places a React block (`BLOCKS` in `HelpApp.tsx`).
 - **Search:** in the browser, over every page and section (`searchHelp`); results link to the section, which opens even if it was closed.
 - **Ways in:** the ? Help link in the app header (`src/components/HelpLink.tsx`, opens a new tab), Help in the footer, "See how Movie Production works" on sign-in, and "What is this?" on personal and shared call sheet links.
-- **Plan:** the full page list and phases are in the docs plan (Claude Doc). Phase 1 has Getting started and How it all fits together.
+- **Screenshots:** a line that is only `{{shots <name>}}` shows `public/help/img/<name>-ipad.jpg` and `<name>-phone.jpg`, taken from mocked sample data (Movie #1) at 820x1000 and 390x844 by the screenshot harness kept with the project files (`tools/ui-mock/help-shots.mjs`).
+- **Plan:** the full page list and phases are in the docs plan (Claude Doc). Phase 1: Getting started and How it all fits together. Phase 2: a page for every feature (Your company, Your project, Working in the app, Who can see and change what).
 
 ## Architecture
 
