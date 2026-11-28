@@ -3528,6 +3528,14 @@
             ],
             "example": "Diner nights"
           },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Title note, shown under the day's title on the day and on the call sheet",
+            "example": "Night shoot; company move after lunch"
+          },
           "location_ids": {
             "type": "array",
             "items": {
@@ -3677,6 +3685,7 @@
           "project_id",
           "shoot_date",
           "title",
+          "note",
           "location_ids",
           "crew_call",
           "shooting_call",
@@ -3716,6 +3725,13 @@
               "null"
             ],
             "maxLength": 120
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
           },
           "location_ids": {
             "type": "array",
@@ -3808,6 +3824,13 @@
               "null"
             ],
             "maxLength": 120
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
           },
           "location_ids": {
             "type": "array",
@@ -4233,7 +4256,7 @@
           "scenes": {
             "type": "array",
             "items": {},
-            "description": "The scenes on the day (see Scene)"
+            "description": "The scenes on the day, in schedule order. Each has location_name when the scene has a location (see Scene)"
           },
           "calls": {
             "type": "array",
@@ -4250,13 +4273,36 @@
               "day": {
                 "$ref": "#/components/schemas/ShootDay"
               },
+              "locations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "3f1c2b8e-5a7d-4c1e-9b2a-6d8f0e4a1c3b"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "description": "The following day's locations, in order, including any added from its scenes"
+              },
               "scenes": {
                 "type": "array",
-                "items": {}
+                "items": {},
+                "description": "The following day's scenes, each with location_name"
               }
             },
             "required": [
               "day",
+              "locations",
               "scenes"
             ],
             "description": "A look ahead at the following shoot day"
@@ -4316,7 +4362,7 @@
             ]
           },
           "day": {
-            "description": "The day: date, title, times, weather, notes, version, sent_at, day_number, total_days"
+            "description": "The day: date, title, title note, times, weather, notes, version, sent_at, day_number, total_days"
           },
           "locations": {
             "type": "array",
@@ -4451,7 +4497,7 @@
             ]
           },
           "day": {
-            "description": "The day: date, title, times, weather, notes, version, sent_at, day_number, total_days"
+            "description": "The day: date, title, title note, times, weather, notes, version, sent_at, day_number, total_days"
           },
           "locations": {
             "type": "array",
@@ -4637,7 +4683,7 @@
               "character",
               "team"
             ],
-            "description": "Where the note was taken: a task's, scene's or character's notes, a shot's Notes field, a shoot day's Notes, a note in a day's schedule, or the note on someone's call."
+            "description": "Where the note was taken: a task's, scene's or character's notes, a shot's Notes field, a shoot day's title note, a shoot day's call sheet notes, a note in a day's schedule, or the note on someone's call."
           },
           "note_id": {
             "type": [
@@ -12799,7 +12845,7 @@
           }
         ],
         "summary": "Every note on the project, newest first",
-        "description": "Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, shoot day notes, notes in a day's schedule and notes on people's calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.",
+        "description": "Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, a shoot day's title note, a shoot day's call sheet notes, notes in a day's schedule and notes on people's calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.",
         "parameters": [
           {
             "schema": {

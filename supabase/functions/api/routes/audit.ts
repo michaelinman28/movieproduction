@@ -18,7 +18,7 @@ type Entry = z.infer<typeof AuditEntry>;
 // ---- Turning stored rows into readable changes -------------------------------------
 
 /** Fields that aren't worth showing: ids, stamps and things the entry already says. */
-const HIDDEN = new Set(['id', 'created_at', 'updated_at', 'project_id', 'company_id', 'note_at', 'note_by', 'task_id', 'entry_id',
+const HIDDEN = new Set(['id', 'created_at', 'updated_at', 'project_id', 'company_id', 'note_at', 'note_by', 'title_note_at', 'title_note_by', 'task_id', 'entry_id',
   'shoot_day_id', 'link_token', 'share_token', 'share_phones', 'viewed_version', 'viewed_at', 'shared_at', 'joined_at']);
 const HIDDEN_ON_ADD = new Set(['created_by', 'author_id', 'sort_order', 'version', 'has_account', 'confirmed_version']);
 

@@ -47,7 +47,7 @@ const TIME_FIELDS = ['crew_call', 'shooting_call', 'lunch', 'wrap'] as const;
 // ---- Days ---------------------------------------------------------------------
 
 interface DayRow {
-  id: string; day: string; date: string; title: string; locations: string;
+  id: string; day: string; date: string; title: string; note: string; locations: string;
   crew_call: string; shooting_call: string; lunch: string; wrap: string;
   scenes: string; pages: string; sent: string; confirmed: string; open: string;
   locationIds: string[]; sceneIds: string[];
@@ -101,7 +101,7 @@ export function ProjectShootDays() {
   // A link from elsewhere (?open=<day>) opens that day's form.
   useOpenFromLink((id) => days.some((d) => d.id === id), open);
   const rows = useMemo(() => days.map((d): DayRow => ({
-    id: d.id, day: `${d.day_number} of ${d.total_days}`, date: d.shoot_date, title: d.title ?? '',
+    id: d.id, day: `${d.day_number} of ${d.total_days}`, date: d.shoot_date, title: d.title ?? '', note: d.note ?? '',
     locations: d.location_ids.map((id) => locations.find((l) => l.id === id)?.name).filter(Boolean).join(', '),
     crew_call: clockLabel(d.crew_call), shooting_call: clockLabel(d.shooting_call), lunch: clockLabel(d.lunch), wrap: clockLabel(d.wrap),
     scenes: d.scene_ids.map(sceneNumber).join(', '), pages: pagesLabel(d.pages_eighths || null),
@@ -120,6 +120,7 @@ export function ProjectShootDays() {
       { field: 'date', header: 'Date', type: 'date', width: 130, editable: true, render: ({ value }: { value: string }) => gridEsc(value ? shortDate(value) : '') },
       { field: 'open', header: '', width: 110, sortable: false, filter: false, render: ({ data }: { data: DayRow }) => gridLink('Call sheet', `/projects/${projectId}/shoot-days/${data.id}`) },
       { field: 'title', header: 'Title', width: 160, editable: true },
+      { field: 'note', header: 'Title note', width: 220, editable: true, editor: 'textarea', wrap: true },
       {
         // The same list as the Locations box in the day's form; the first is the main one.
         field: 'locations', header: 'Locations', width: 220,
@@ -157,6 +158,7 @@ export function ProjectShootDays() {
     const patch: ShootDayInput = {};
     if (e.column === 'date') { if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { await load(); return; } patch.shoot_date = v; }
     else if (e.column === 'title') patch.title = v || null;
+    else if (e.column === 'note') patch.note = v || null;
     else if (e.column === 'locations') {
       // Keep the order the day already has; newly ticked locations go at the end.
       const picked = Array.isArray(e.newValue) ? e.newValue as string[] : [];
@@ -243,7 +245,7 @@ function DayPanel({ day, scenes, run, onChanged, canDelete, onDeleted }: {
 function DayDetails({ day, locations, run }: { day: ShootDay; locations: Location[]; run: Run }) {
   const { projectId } = useProject();
   const initial = useMemo(() => ({
-    shoot_date: day.shoot_date, title: day.title ?? '',
+    shoot_date: day.shoot_date, title: day.title ?? '', note: day.note ?? '',
     crew_call: clockValue(day.crew_call), shooting_call: clockValue(day.shooting_call), lunch: clockValue(day.lunch), wrap: clockValue(day.wrap),
     weather: day.weather ?? '', sunrise: clockValue(day.sunrise), sunset: clockValue(day.sunset), notes: day.notes ?? '',
   }), [day]);
@@ -319,6 +321,9 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
         </label>
         <label className="label">Title
           <input className="field" value={draft.title} maxLength={120} placeholder="Diner nights" onChange={set('title')} />
+        </label>
+        <label className="label md:col-span-2">Title note
+          <textarea className="field" rows={3} value={draft.note} maxLength={2000} placeholder="Night shoot; company move after lunch" onChange={set('note')} />
         </label>
         <div className="md:col-span-2">
           <DayLocations projectId={projectId} locations={locations} ids={places} saved={day.location_ids} onChange={setPlaces} />

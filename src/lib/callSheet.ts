@@ -4,12 +4,19 @@
  * There's no email server, the same way invites and task summaries work.
  */
 import type { CallSheet, ShootDayCall } from './api';
-import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, clockLabel, labelOf, longDate, pagesLabel } from './format';
+import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castNumbersByName, clockLabel, labelOf, longDate, orderCastNames, pagesLabel } from './format';
 
 /** " at Diner" or " at Diner, then Park" (the day's locations in order), or nothing. */
 function placeNames(sheet: CallSheet) {
   const names = sheet.locations.map((l) => l.name);
   return names.length ? ` at ${names.join(', then ')}` : '';
+}
+
+/** The scene's location, when it has one. */
+function scenePlace(sheet: CallSheet, s: { location_id: string | null; location_name?: string | null }) {
+  const named = s.location_name?.trim();
+  if (named) return named;
+  return (s.location_id && sheet.locations.find((l) => l.id === s.location_id)?.name) || '';
 }
 
 export interface SheetText { projectName: string; url: string }
@@ -23,7 +30,9 @@ export function callSheetBody(sheet: CallSheet, t: SheetText) {
   const d = sheet.day;
   const lines: string[] = [];
   const add = (label: string, v: string | null | undefined) => { if (v) lines.push(`${label}: ${v}`); };
-  lines.push(`${t.projectName}: day ${d.day_number} of ${d.total_days}, ${longDate(d.shoot_date)}${d.title ? ` (${d.title})` : ''}`, '');
+  lines.push(`${t.projectName}: day ${d.day_number} of ${d.total_days}, ${longDate(d.shoot_date)}${d.title ? ` (${d.title})` : ''}`);
+  if (d.note) lines.push(d.note);
+  lines.push('');
   lines.push('Open the call sheet to see your own call time and confirm:', t.url, '');
   add('General crew call', clockLabel(d.crew_call));
   add('Shooting call', clockLabel(d.shooting_call));
@@ -47,7 +56,11 @@ export function callSheetBody(sheet: CallSheet, t: SheetText) {
         const s = sheet.scenes.find((x) => x.id === i.scene_id);
         if (!s) continue;
         const ie = [s.int_ext && labelOf(SCENE_INT_EXT, s.int_ext), s.time_of_day && labelOf(SCENE_TIMES, s.time_of_day)].filter(Boolean).join(' ');
-        lines.push(`- ${time}Scene ${s.number}${s.set_name ? ` ${s.set_name}` : ''}${ie ? ` (${ie})` : ''}${s.pages_eighths != null ? `, ${pagesLabel(s.pages_eighths)} pg` : ''}${s.characters ? `, ${s.characters}` : ''}`);
+        const place = scenePlace(sheet, s);
+        const cast = s.characters
+          ? orderCastNames(s.characters.split(',').map((n) => n.trim()).filter(Boolean), castNumbersByName(sheet.calls.flatMap((c) => c.characters ?? []))).join(', ')
+          : '';
+        lines.push(`- ${time}Scene ${s.number}${s.set_name ? ` ${s.set_name}` : ''}${place ? ` at ${place}` : ''}${ie ? ` (${ie})` : ''}${s.pages_eighths != null ? `, ${pagesLabel(s.pages_eighths)} pg` : ''}${cast ? `, ${cast}` : ''}`);
       } else {
         lines.push(`- ${time}${labelOf(SHOOT_ITEM_KINDS, i.kind)}${i.label ? `: ${i.label}` : ''}`);
       }

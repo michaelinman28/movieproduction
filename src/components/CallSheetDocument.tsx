@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { LinkedCallSheet, SheetElement } from '../lib/api';
-import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, clockLabel, labelOf, longDate, pagesLabel, shortDate } from '../lib/format';
+import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, castNumberValue, castNumbersByName, clockLabel, compareCastNumbers, labelOf, longDate, orderCastNames, pagesLabel, shortDate } from '../lib/format';
 import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
 
@@ -30,6 +30,8 @@ export interface SheetLinks {
   person: (userId: string) => string;
   /** Each of the day's locations, in the same order as the sheet's locations. */
   locations: (string | null)[];
+  /** A location's own page, for a scene's location and the next day's places. */
+  location: (id: string) => string;
   /** The next shoot day's call sheet. */
   nextDay: string | null;
   element: (id: string) => string;
@@ -63,7 +65,7 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
  * call sheet page and by each person's private link.
  */
-export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links }: {
+export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links, roster }: {
   sheet: SheetData;
   /** The person reading it, on My call only: their call is shown at the top and their rows are marked. The full sheet passes none. */
   me?: string | null;
@@ -79,6 +81,8 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   youAction?: ReactNode;
   /** Links from each item to its own page (the project's call sheet page only). */
   links?: SheetLinks;
+  /** The project's characters, so a scene's cast is ordered by cast number even when someone isn't called. */
+  roster?: { name: string; cast_number: number | null }[];
 }) {
   const { day, locations, project } = sheet;
   // Each distinct nearest hospital, with the locations it's nearest to.
@@ -97,8 +101,28 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   const crewCall = clockLabel(day.crew_call);
   const callOf = (c: SheetCall) => clockLabel(c.call_time) || crewCall;
   const byName = (a: SheetCall, b: SheetCall) => nameOf(a).localeCompare(nameOf(b));
+  // Cast number by character name: the project's roster, then whoever is called.
+  const numberOf = castNumbersByName([
+    ...(roster ?? []),
+    ...sheet.calls.flatMap((c) => c.characters ?? []),
+  ]);
+  // The Cast list follows cast number (1, then 3, then 11). Someone who plays more
+  // than one character is listed at their lowest number; a name with no number is last.
+  const castRank = (c: SheetCall): number | null => {
+    const numbers = (c.characters ?? []).flatMap((ch) => {
+      const n = castNumberValue(ch.cast_number);
+      return n == null ? [] : [n];
+    });
+    if (!numbers.length && c.character_name) {
+      for (const part of c.character_name.split(',')) {
+        const n = numberOf.get(part.trim().toLowerCase());
+        if (n != null) numbers.push(n);
+      }
+    }
+    return numbers.length ? Math.min(...numbers) : null;
+  };
 
-  const cast = sheet.calls.filter((c) => castLabel(c)).sort((a, b) => (a.call_time ?? '').localeCompare(b.call_time ?? '') || byName(a, b));
+  const cast = sheet.calls.filter((c) => castLabel(c)).sort((a, b) => compareCastNumbers(castRank(a), castRank(b)) || byName(a, b));
   const depts = new Map<string, SheetCall[]>();
   for (const c of sheet.calls.filter((x) => !castLabel(x))) depts.set(department(c), [...(depts.get(department(c)) ?? []), c]);
   const rank = (d: string) => (DEPARTMENTS.includes(d) ? DEPARTMENTS.indexOf(d) : DEPARTMENTS.length);
@@ -114,10 +138,12 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   const totalPages = sheet.scenes.reduce((n, s) => n + (s.pages_eighths ?? 0), 0);
   const sceneLine = (s: { int_ext: SheetData['scenes'][number]['int_ext']; time_of_day: SheetData['scenes'][number]['time_of_day'] }) =>
     [s.int_ext && labelOf(SCENE_INT_EXT, s.int_ext), s.time_of_day && labelOf(SCENE_TIMES, s.time_of_day)].filter(Boolean) as string[];
+  const placeOf = (s: { location_name?: string | null }) => s.location_name?.trim() || null;
+  const placeTo = (s: { location_id?: string | null }) => (s.location_id && links ? links.location(s.location_id) : null);
   const isMe = (c: SheetCall) => c.user_id === me;
   // On My call, the characters the reader plays are highlighted in each scene they're in.
   const myChars = new Set(own && mine ? (mine.characters ?? []).map((ch) => ch.name.trim().toLowerCase()) : []);
-  const sceneChars = (text: string | null) => (text ?? '').split(',').map((n) => n.trim()).filter(Boolean);
+  const sceneChars = (text: string | null) => orderCastNames((text ?? '').split(',').map((n) => n.trim()).filter(Boolean), numberOf);
   const playsIn = (text: string | null) => sceneChars(text).filter((n) => myChars.has(n.toLowerCase()));
   // The day's elements by category (in the company's order, as sent); the reader's own character's first in each.
   const elements = sheet.elements ?? [];
@@ -163,6 +189,7 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
             <span>{longDate(day.shoot_date)}</span>
           </p>
           {day.title && <p className="cs-subtitle">{day.title}</p>}
+          {day.note && <p className="cs-day-note">{day.note}</p>}
         </div>
         <div className="cs-hero-call">
           <span className="cs-hero-label">Crew call</span>
@@ -272,6 +299,7 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
                       <div className="cs-row-head">
                         <To to={links?.scene(s.id)} title={`Open scene ${s.number} on the Scenes page`}><span className="cs-scene-no">Sc {s.number}</span></To>
                         <span className="cs-row-set"><To to={links?.scene(s.id)} title={`Open scene ${s.number} on the Scenes page`}>{s.set_name || 'Scene'}</To></span>
+                        {placeOf(s) && <span className="cs-row-place"><span className="cs-muted">at </span><To to={placeTo(s)} title={`Open ${placeOf(s)} on the Locations page`}>{placeOf(s)}</To></span>}
                         {sceneLine(s).map((t) => <span key={t} className="cs-pill">{t}</span>)}
                         {s.pages_eighths != null && <span className="cs-pages">{pagesLabel(s.pages_eighths)} pg</span>}
                         {mineHere.length > 0 && <span className="cs-in-scene">You: {mineHere.join(', ')}</span>}
@@ -374,11 +402,19 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
                 <To to={links?.nextDay} title="Open the next day's call sheet">Day {sheet.next_day.day.day_number} · {longDate(sheet.next_day.day.shoot_date)}</To>
                 {sheet.next_day.day.crew_call && <span className="cs-muted"> · crew call {clockLabel(sheet.next_day.day.crew_call)}</span>}
               </p>
+              {sheet.next_day.locations.length > 0 && (
+                <p className="cs-small">
+                  At {sheet.next_day.locations.map((l, i) => (
+                    <span key={l.id}>{i > 0 && <span className="cs-muted">, then </span>}<To to={links?.location(l.id)} title={`Open ${l.name} on the Locations page`}>{l.name}</To></span>
+                  ))}
+                </p>
+              )}
               {sheet.next_day.scenes.length ? (
                 <ul className="cs-next-list">
                   {sheet.next_day.scenes.map((s) => (
                     <li key={s.id}>
                       <To to={links?.scene(s.id)} title={`Open scene ${s.number} on the Scenes page`}><span className="cs-scene-no">Sc {s.number}</span> {s.set_name}</To>
+                      {placeOf(s) && <> <span className="cs-muted">at </span><To to={placeTo(s)} title={`Open ${placeOf(s)} on the Locations page`}>{placeOf(s)}</To></>}
                       {sceneLine(s).length > 0 && <span className="cs-muted"> · {sceneLine(s).join(' ')}</span>}
                       {s.pages_eighths != null && <span className="cs-muted"> · {pagesLabel(s.pages_eighths)} pg</span>}
                     </li>

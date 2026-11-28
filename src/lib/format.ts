@@ -150,13 +150,57 @@ export const ELEMENT_STATUSES: { value: ElementStatus; label: string }[] = [
   { value: 'ready', label: 'Ready' },
 ];
 
+/** A cast number from the database or a form, or null when there isn't one. */
+export function castNumberValue(value: number | string | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Lowest cast number first. A name with no number sorts after every number. */
+export function compareCastNumbers(a: number | null, b: number | null): number {
+  if (a != null && b != null) return a - b;
+  if (a != null) return -1;
+  if (b != null) return 1;
+  return 0;
+}
+
+/** Character name (any case) to its cast number. The lowest number wins if a name repeats. */
+export function castNumbersByName(list: { name: string; cast_number: number | string | null }[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const ch of list) {
+    const n = castNumberValue(ch.cast_number);
+    if (n == null) continue;
+    const key = ch.name.trim().toLowerCase();
+    const prev = map.get(key);
+    if (prev == null || n < prev) map.set(key, n);
+  }
+  return map;
+}
+
+/**
+ * Names in cast-number order (1, then 3, then 11). Names with no known number keep
+ * their incoming order and sit after the numbered ones.
+ */
+export function orderCastNames(names: string[], numberOf: Map<string, number>): string[] {
+  return [...names].sort((a, b) => {
+    const an = numberOf.get(a.trim().toLowerCase()) ?? null;
+    const bn = numberOf.get(b.trim().toLowerCase()) ?? null;
+    if (an == null && bn == null) return 0;
+    return compareCastNumbers(an, bn) || a.localeCompare(b);
+  });
+}
+
 /**
  * Who someone plays on a call sheet: the character typed on their call, or else the
- * characters they're cast as on the Characters page, e.g. "Ellie (#1)".
+ * characters they're cast as on the Characters page, e.g. "Ellie (#1)". Several
+ * characters are listed by cast number.
  */
 export function castLabel(c: { character_name: string | null; characters?: { name: string; cast_number: number | null }[] }) {
   if (c.character_name) return c.character_name;
-  return (c.characters ?? []).map((ch) => (ch.cast_number != null ? `${ch.name} (#${ch.cast_number})` : ch.name)).join(', ');
+  return [...(c.characters ?? [])]
+    .sort((a, b) => compareCastNumbers(castNumberValue(a.cast_number), castNumberValue(b.cast_number)) || a.name.localeCompare(b.name))
+    .map((ch) => (ch.cast_number != null ? `${ch.name} (#${ch.cast_number})` : ch.name)).join(', ');
 }
 
 /** Shown in a pick-list for "nothing picked". */

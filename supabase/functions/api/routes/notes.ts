@@ -75,7 +75,7 @@ async function projectNotes(db: Db, id: string): Promise<Note[]> {
     db.from('tasks').select('id, title').eq('project_id', id),
     db.from('scenes').select('id, number, set_name').eq('project_id', id),
     db.from('shots').select('id, scene_id, sort_order, notes, note_by, note_at, updated_at').eq('project_id', id).order('sort_order'),
-    db.from('shoot_days').select('id, shoot_date, title, notes, note_by, note_at, updated_at').eq('project_id', id),
+    db.from('shoot_days').select('id, shoot_date, title, notes, note_by, note_at, note, title_note_by, title_note_at, updated_at').eq('project_id', id),
     db.from('shoot_day_items').select('id, shoot_day_id, label, at_time, note_by, note_at, created_at').eq('project_id', id).eq('kind', 'note'),
     db.from('shoot_day_calls').select(`shoot_day_id, user_id, note, note_by, note_at, created_at, profile:profiles!shoot_day_calls_user_id_fkey(${profileFields})`).eq('project_id', id).not('note', 'is', null),
   ]).then((rs) => rs.map((r) => must<Row[]>(r)));
@@ -98,9 +98,10 @@ async function projectNotes(db: Db, id: string): Promise<Note[]> {
   ]).then((rs) => rs.map((r) => must<Row[]>(r)));
   const [taskAuthored, sceneAuthored, charAuthored] = await Promise.all([withAuthors(db, taskNotes), withAuthors(db, sceneNotes), withAuthors(db, charNotes)]);
   // Notes kept in a field record who last wrote them (note_by) and when (note_at).
-  const writerIds = [...new Set([...shots, ...days, ...items, ...calls].map((r: Row) => r.note_by).filter(Boolean))];
+  const writerIds = [...new Set([...shots, ...days, ...items, ...calls].flatMap((r: Row) => [r.note_by, r.title_note_by]).filter(Boolean))];
   const writers = new Map((await withAuthors(db, writerIds.map((author_id) => ({ author_id })))).map((w) => [w.author_id, w.author]));
   const writer = (r: Row) => (r.note_by ? writers.get(r.note_by) ?? null : null);
+  const titleWriter = (r: Row) => (r.title_note_by ? writers.get(r.title_note_by) ?? null : null);
 
   const out: z.infer<typeof ProjectNote>[] = [];
   for (const n of taskAuthored) {
@@ -135,6 +136,10 @@ async function projectNotes(db: Db, id: string): Promise<Note[]> {
     out.push({ key: `shot:${sh.id}`, source: 'shot', note_id: null, body: sh.notes, author: writer(sh), at: sh.note_at ?? sh.updated_at, edited: false,
       item: { kind: 'scene', id: sh.scene_id, label: s ? sceneLabel(s) : 'Scene', detail: `Shot ${shotNumber.get(sh.id)}` } });
   }
+  for (const d of days.filter((x: Row) => x.note)) {
+    out.push({ key: `shoot_day_title:${d.id}`, source: 'shoot_day', note_id: null, body: d.note, author: titleWriter(d), at: d.title_note_at ?? d.updated_at, edited: false,
+      item: { kind: 'shoot_day', id: d.id, label: dayLabel(d), detail: 'Title note' } });
+  }
   for (const d of days.filter((x: Row) => x.notes)) {
     out.push({ key: `shoot_day:${d.id}`, source: 'shoot_day', note_id: null, body: d.notes, author: writer(d), at: d.note_at ?? d.updated_at, edited: false,
       item: { kind: 'shoot_day', id: d.id, label: dayLabel(d), detail: 'Day notes' } });
@@ -156,7 +161,7 @@ async function projectNotes(db: Db, id: string): Promise<Note[]> {
 notes.openapi(createRoute({
   method: 'get', path: '/projects/{id}/notes', tags: ['Project notes'], security: secured,
   summary: 'Every note on the project, newest first',
-  description: 'Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, shoot day notes, notes in a day\'s schedule and notes on people\'s calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.',
+  description: 'Task notes, scene notes, character notes, team member notes (only for company admins and the person they are about), shot notes, a shoot day\'s title note, a shoot day\'s call sheet notes, notes in a day\'s schedule and notes on people\'s calls, each with the item it was taken on so the app can link back to it. Journal entries are not included.',
   request: { params: IdParam },
   responses: { 200: ok(z.array(ProjectNote)), 401: errors[401] },
 }), async (c) => {

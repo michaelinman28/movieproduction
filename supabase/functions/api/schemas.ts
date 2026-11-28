@@ -289,7 +289,7 @@ export const SceneNote = z.object({
 export const ProjectNote = z.object({
   key: z.string().openapi({ description: 'Unique across every kind of note, e.g. task_note:<id>', example: 'task_note:6f1c…' }),
   source: z.enum(['task', 'scene', 'shot', 'shoot_day', 'schedule', 'call', 'character', 'team']).openapi({
-    description: 'Where the note was taken: a task\'s, scene\'s or character\'s notes, a shot\'s Notes field, a shoot day\'s Notes, a note in a day\'s schedule, or the note on someone\'s call.',
+    description: 'Where the note was taken: a task\'s, scene\'s or character\'s notes, a shot\'s Notes field, a shoot day\'s title note, a shoot day\'s call sheet notes, a note in a day\'s schedule, or the note on someone\'s call.',
   }),
   note_id: Uuid.nullable().openapi({ description: 'The task, scene or character note\'s id; null for notes kept in a field of another item.' }),
   body: z.string(),
@@ -479,6 +479,7 @@ export const ShootDay = z.object({
   project_id: Uuid,
   shoot_date: date,
   title: nullableText.openapi({ example: 'Diner nights' }),
+  note: nullableText.openapi({ description: 'Title note, shown under the day\'s title on the day and on the call sheet', example: 'Night shoot; company move after lunch' }),
   location_ids: z.array(Uuid).openapi({ description: 'The day\'s locations, in order; the first is the main one (the weather lookup uses its address)' }),
   crew_call: clock.nullable(),
   shooting_call: clock.nullable(),
@@ -507,6 +508,7 @@ export const ShootDay = z.object({
 export const ShootDayInput = z.object({
   shoot_date: date,
   title: optText(120),
+  note: optText(2000),
   location_ids: z.array(Uuid).max(20).optional().openapi({ description: 'The day\'s locations, in order (replaces the list); the first is the main one' }),
   crew_call: optTime, shooting_call: optTime, lunch: optTime, wrap: optTime,
   weather: optText(200),
@@ -569,9 +571,13 @@ export const CallSheet = z.object({
   day: ShootDay,
   locations: z.array(z.any()).openapi({ description: 'The day\'s locations in order, the main one first (see Location)' }),
   items: z.array(ShootDayItem),
-  scenes: z.array(z.any()).openapi({ description: 'The scenes on the day (see Scene)' }),
+  scenes: z.array(z.any()).openapi({ description: 'The scenes on the day, in schedule order. Each has location_name when the scene has a location (see Scene)' }),
   calls: z.array(ShootDayCall),
-  next_day: z.object({ day: ShootDay, scenes: z.array(z.any()) }).nullable().openapi({ description: 'A look ahead at the following shoot day' }),
+  next_day: z.object({
+    day: ShootDay,
+    locations: z.array(z.object({ id: Uuid, name: z.string() })).openapi({ description: 'The following day\'s locations, in order, including any added from its scenes' }),
+    scenes: z.array(z.any()).openapi({ description: 'The following day\'s scenes, each with location_name' }),
+  }).nullable().openapi({ description: 'A look ahead at the following shoot day' }),
   elements: z.array(z.any()).openapi({ description: 'The elements of the day\'s scenes (see SheetElement)' }),
 }).openapi('CallSheet');
 
@@ -582,7 +588,7 @@ export const LinkedCallSheet = z.object({
   confirmed: z.boolean().openapi({ description: 'Whether they have confirmed the version sent' }),
   view: ProjectView.openapi({ description: 'The link\'s person on the project. For cast only, calls holds just their own call' }),
   project: z.object({ name: z.string(), company_name: z.string() }),
-  day: z.any().openapi({ description: 'The day: date, title, times, weather, notes, version, sent_at, day_number, total_days' }),
+  day: z.any().openapi({ description: 'The day: date, title, title note, times, weather, notes, version, sent_at, day_number, total_days' }),
   locations: z.array(z.any()).openapi({ description: 'The day\'s locations in order, the main one first: name, description, address, parking, nearest hospital and on-site contact' }),
   items: z.array(z.any()).openapi({ description: 'The schedule in order: id, kind, scene_id, label, at_time' }),
   scenes: z.array(z.any()).openapi({ description: 'The scenes on the day, in order' }),
