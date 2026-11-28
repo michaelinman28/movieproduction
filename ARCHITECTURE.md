@@ -329,6 +329,14 @@ cascade, a personal call sheet link, or a fix made straight in the database). Mi
   History reloads after every change the API accepts: `src/lib/api.ts` fires
   `DATA_CHANGED` on window after each successful non-GET call.
 
+### Help
+
+- **Where:** `/help` and `/help/<section>/<page>`, public: it opens with or without signing in (`App.tsx` sends any `/help` path to `src/help/HelpApp.tsx`, loaded only when opened).
+- **Content:** one Markdown file per page in `help/<section>/<page>.md`, with a header giving its `title`, `summary` and `order`. `src/help/content.ts` reads them at build time, splits each page at its `## ` headings into collapsible sections, and lists the sections in its `SECTIONS` order (a section shows once it has a page). A line that is only `{{big-picture}}` places a React block (`BLOCKS` in `HelpApp.tsx`).
+- **Search:** in the browser, over every page and section (`searchHelp`); results link to the section, which opens even if it was closed.
+- **Ways in:** the ? Help link in the app header (`src/components/HelpLink.tsx`, opens a new tab), Help in the footer, "See how Movie Production works" on sign-in, and "What is this?" on personal and shared call sheet links.
+- **Plan:** the full page list and phases are in the docs plan (Claude Doc). Phase 1 has Getting started and How it all fits together.
+
 ## Architecture
 
 ```
@@ -626,8 +634,10 @@ src/                         React app
   lib/api.ts                 API client used by every page
   lib/supabase.ts, auth.tsx  Sign-in session only
   pages/                     Companies, Company, Roles, Task settings, Project, Profile, Sign in
+  help/                      The Help pages at /help (HelpApp, content.ts reads help/*.md, BigPicture)
   styles.css                 Tailwind entry and theme tokens
   vendor/lattice-grid/       Michael's grid library
+help/<section>/<page>.md      Help page text (Markdown with a small title/summary/order header)
 supabase/
   migrations/                Database schema and security rules, one file per change:
                              initial schema, add people, profile phone, custom roles,

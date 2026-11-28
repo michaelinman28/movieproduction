@@ -23,6 +23,9 @@ Read ARCHITECTURE.md first. These are the standards every change follows.
 - **Phones and emails** use `src/lib/contact.ts`: `phoneOrThrow`/`formatPhone` (stored as ###-###-####, or + and digits) and `emailOrThrow`/`emailProblem`; any new phone or email field uses them and the database's `format_phone`/`check_email`.
 - **Never ask for the same information twice.** Each fact or link between items is stored once, and every page that shows it shows and changes that same record. For example, who plays a character is the character's actor: the Characters page, a shoot day's calls and the Team page all show it and can change it (helpers in `src/lib/casting.ts`). Don't add a second field for something another record already holds.
 
+## Help pages
+- **Every feature has a help page, kept current in the same PR.** Adding or changing a feature updates its page in `help/<section>/<page>.md` (see Help in ARCHITECTURE.md): plain words, the same names as the buttons on screen, numbered steps, no code or table names. Write for an iPad ("Tap"). Each fact lives on one help page; others link to it with `/help/...` links.
+
 ## Data and API
 - The app reads and writes data only through the API client in `src/lib/api.ts`.
 - API routes live in `supabase/functions/api/routes/`, with zod schemas in `schemas.ts`; run `npm run api:spec` after changing them.

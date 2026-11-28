@@ -108,6 +108,7 @@ Sign-up emails sent from a Deploy Preview link back to that preview.
 | Project notes | `/projects/:id/notes` | Every note on the project, linking back to where each was taken |
 | Project journal | `/projects/:id/journal` | Coming next |
 | Profile | `/profile` | Your name and phone number |
+| Help | `/help` | How every feature works, for everyone (no sign-in). Markdown files in `help/` |
 
 ## Who can see and change what
 

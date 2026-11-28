@@ -446,3 +446,29 @@
 .card-link { position: relative; padding-right: 2.5rem; }
 .card-link::after { content: '›'; position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); font-size: 1.75rem; line-height: 1; color: var(--color-muted); }
 .card-link:hover::after { color: var(--color-accent); }
+
+/* Help pages (/help): sidebar links, search results and the Markdown text. */
+.help-nav-link { display: flex; min-height: 44px; align-items: center; border-radius: 0.375rem; padding: 0.25rem 0.5rem; color: var(--color-fg); text-decoration: none; }
+.help-nav-link:hover { background: var(--color-accent-soft); }
+.help-nav-active { background: var(--color-accent-soft); color: var(--color-accent-strong); font-weight: 600; }
+@media (min-width: 768px) { .help-nav-link { min-height: 36px; } }
+@media (pointer: coarse) { .help-nav-link { min-height: 44px; } }
+.help-results { position: absolute; left: 0; right: 0; z-index: 20; margin-top: 0.25rem; max-height: 70vh; overflow: auto; border: 1px solid var(--color-line); border-radius: 0.5rem; background: var(--color-surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.12); }
+.help-result { display: flex; flex-direction: column; gap: 0.125rem; border-radius: 0.375rem; padding: 0.625rem 0.75rem; text-decoration: none; }
+.help-result-active { background: var(--color-accent-soft); }
+.help-prose { line-height: 1.6; max-width: 46rem; overflow-wrap: anywhere; }
+.help-prose > div > :first-child { margin-top: 0; }
+.help-prose p, .help-prose ul, .help-prose ol, .help-prose table, .help-prose blockquote { margin: 0 0 0.875rem; }
+.help-prose ul { list-style: disc; padding-left: 1.5rem; }
+.help-prose ol { list-style: decimal; padding-left: 1.5rem; }
+.help-prose li { margin: 0.25rem 0; }
+.help-prose li > ul, .help-prose li > ol { margin: 0.25rem 0; }
+.help-prose h3 { margin: 1.25rem 0 0.5rem; }
+.help-prose strong { font-weight: 600; }
+.help-prose code { border-radius: 0.25rem; background: var(--color-accent-soft); padding: 0 0.25rem; font-size: 0.9em; }
+.help-prose blockquote { border-left: 4px solid var(--color-accent); background: var(--color-surface); border-radius: 0 0.5rem 0.5rem 0; padding: 0.625rem 0.875rem; }
+.help-prose blockquote p:last-child { margin-bottom: 0; }
+.help-prose table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.9375rem; }
+.help-prose th, .help-prose td { border: 1px solid var(--color-line); padding: 0.375rem 0.625rem; text-align: left; vertical-align: top; overflow-wrap: normal; min-width: 7rem; }
+.help-prose th { background: var(--color-surface); font-weight: 600; }
+.help-prose img { max-width: 100%; height: auto; border: 1px solid var(--color-line); border-radius: 0.5rem; }
