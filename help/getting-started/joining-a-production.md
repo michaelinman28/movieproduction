@@ -33,3 +33,5 @@ Company admins can also correct your name and phone, and add other emails and ph
 - Every company you belong to, and the people in it.
 - Every project you're on. Company admins see all of the company's projects.
 - The Activity log is for company admins only.
+
+The full list is in [Who can see and change what](/help/permissions/who-can-see-and-change-what).
