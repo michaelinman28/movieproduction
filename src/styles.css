@@ -397,6 +397,12 @@
   .cs-row { grid-template-columns: 4.5rem 1fr; padding: 0.35rem 0; break-inside: avoid; }
   .cs-row-break { padding: 0.3rem 0.6rem; }
   .cs-row-mine { padding: 0.35rem 0.6rem; }
+  /* A scene's cast and elements sit in a column on the right of its row, lined up from row to row;
+     the scene number, set, location and pages are on the left with the synopsis underneath. */
+  .cs-row:not(.cs-row-break) .cs-row-body { display: grid; grid-template-columns: minmax(0, 1fr) 12.5rem; column-gap: 1rem; row-gap: 0.15rem; align-items: start; }
+  .cs-row:not(.cs-row-break) .cs-row-body > * { grid-column: 1; }
+  .cs-row:not(.cs-row-break) .cs-row-body > .cs-row-meta { grid-column: 2; grid-row: 1 / span 2; flex-direction: column; gap: 0.1rem; }
+  .cs-row:not(.cs-row-break) .cs-pages { margin-left: 0; }
   .cs-person { padding: 0.2rem 0.3rem; break-inside: avoid; }
   .cs-people { gap: 0; }
   .cs-depts { grid-template-columns: repeat(3, 1fr); gap: 0.4rem 1rem; }
