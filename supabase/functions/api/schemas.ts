@@ -144,6 +144,10 @@ export const ProjectStatus = z.enum([
   'development', 'pre_production', 'production', 'post_production', 'released', 'on_hold', 'cancelled',
 ]).openapi('ProjectStatus');
 
+export const CallSheetLayout = z.enum(['modern', 'one_page', 'both']).openapi('CallSheetLayout', {
+  description: 'How the call sheet prints: the modern design, a compact one-page sheet, or both (each prints on its own)',
+});
+
 export const Project = z.object({
   id: Uuid,
   company_id: Uuid,
@@ -153,6 +157,7 @@ export const Project = z.object({
   status: ProjectStatus,
   start_date: date.nullable(),
   end_date: date.nullable(),
+  call_sheet_layout: CallSheetLayout,
   created_by: Uuid,
   created_at: z.string(),
 }).openapi('Project');
@@ -175,6 +180,7 @@ export const ProjectCreate = z.object({
   status: ProjectStatus.optional(),
   start_date: date.nullable().optional(),
   end_date: date.nullable().optional(),
+  call_sheet_layout: CallSheetLayout.optional().openapi({ description: 'Defaults to modern' }),
 }).openapi('ProjectCreate');
 
 export const ProjectUpdate = ProjectCreate.partial().openapi('ProjectUpdate');
@@ -587,7 +593,7 @@ export const LinkedCallSheet = z.object({
   me: Uuid.openapi({ description: 'The person the link belongs to' }),
   confirmed: z.boolean().openapi({ description: 'Whether they have confirmed the version sent' }),
   view: ProjectView.openapi({ description: 'The link\'s person on the project. For cast only, calls holds just their own call' }),
-  project: z.object({ name: z.string(), company_name: z.string() }),
+  project: z.object({ name: z.string(), company_name: z.string(), call_sheet_layout: CallSheetLayout.optional() }),
   day: z.any().openapi({ description: 'The day: date, title, title note, times, weather, notes, version, sent_at, day_number, total_days' }),
   locations: z.array(z.any()).openapi({ description: 'The day\'s locations in order, the main one first: name, description, address, parking, nearest hospital and on-site contact' }),
   items: z.array(z.any()).openapi({ description: 'The schedule in order: id, kind, scene_id, label, at_time' }),

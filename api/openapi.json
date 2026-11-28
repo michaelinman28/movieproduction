@@ -685,6 +685,9 @@
             "format": "date",
             "example": "2027-01-10"
           },
+          "call_sheet_layout": {
+            "$ref": "#/components/schemas/CallSheetLayout"
+          },
           "created_by": {
             "type": "string",
             "format": "uuid",
@@ -703,6 +706,7 @@
           "status",
           "start_date",
           "end_date",
+          "call_sheet_layout",
           "created_by",
           "created_at"
         ]
@@ -718,6 +722,15 @@
           "on_hold",
           "cancelled"
         ]
+      },
+      "CallSheetLayout": {
+        "type": "string",
+        "enum": [
+          "modern",
+          "one_page",
+          "both"
+        ],
+        "description": "How the call sheet prints: the modern design, a compact one-page sheet, or both (each prints on its own)"
       },
       "ProjectCreate": {
         "type": "object",
@@ -757,6 +770,16 @@
             ],
             "format": "date",
             "example": "2027-01-10"
+          },
+          "call_sheet_layout": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CallSheetLayout"
+              },
+              {
+                "description": "Defaults to modern"
+              }
+            ]
           }
         },
         "required": [
@@ -851,6 +874,16 @@
             ],
             "format": "date",
             "example": "2027-01-10"
+          },
+          "call_sheet_layout": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CallSheetLayout"
+              },
+              {
+                "description": "Defaults to modern"
+              }
+            ]
           }
         }
       },
@@ -4354,6 +4387,9 @@
               },
               "company_name": {
                 "type": "string"
+              },
+              "call_sheet_layout": {
+                "$ref": "#/components/schemas/CallSheetLayout"
               }
             },
             "required": [
@@ -4489,6 +4525,9 @@
               },
               "company_name": {
                 "type": "string"
+              },
+              "call_sheet_layout": {
+                "$ref": "#/components/schemas/CallSheetLayout"
               }
             },
             "required": [

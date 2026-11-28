@@ -54,3 +54,13 @@ Who counts as cast is explained in [Roles](/help/company/roles).
 ## Print or save as PDF
 
 Tap **Print or save as PDF**. The sheet is laid out on US Letter paper in light colors, always with every part open, even ones folded on screen.
+
+### Choose the printed layout
+
+Each project picks how its call sheets print, under **Call sheet print** in **Edit project** on the Overview (or in the Projects table on the company page):
+
+- **Modern**: the full design you see on screen, usually two pages.
+- **One page**: the whole day on a single page: times, locations, hospital and key contacts across the top, then the schedule, cast and crew as compact tables, and elements, notes and the next day at the bottom. A very long day is shrunk to fit.
+- **Both**: you get two buttons, **Print modern layout** and **Print one page**, and each prints only its own layout.
+
+The same choice applies to personal and shared links.

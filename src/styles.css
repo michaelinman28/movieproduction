@@ -362,7 +362,85 @@
 }
 
 /* The personal link page around the sheet (src/pages/SheetLinkPage.tsx). */
-.sheet-link-bar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 1rem; border-bottom: 1px solid var(--color-line); background: color-mix(in srgb, var(--color-surface) 92%, transparent); backdrop-filter: blur(6px); }
+.sheet-link-bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.25rem 1rem; border-bottom: 1px solid var(--color-line); background: color-mix(in srgb, var(--color-surface) 92%, transparent); backdrop-filter: blur(6px); }
+.sheet-link-print { display: flex; gap: 0.5rem; }
+@media (max-width: 639px) { .sheet-link-print-2 { order: 10; width: 100%; padding-bottom: 0.375rem; } .sheet-link-print-2 > * { flex: 1; } }
+
+/* The one-page call sheet (src/components/CallSheetOnePage.tsx): print only, always light, sized in points
+   for US Letter. On screen it sits off the page (measured before printing, to shrink a long day to fit). */
+.cs1 { position: absolute; left: -10000px; top: 0; width: 7.5in; visibility: hidden; pointer-events: none;
+  --c1-ink: #18201a; --c1-muted: #5f6b62; --c1-line: #dce4dd; --c1-soft: #f1f6f2; --c1-accent: #15803d; --c1-deep: #14532d; --c1-alert: #b42318;
+  display: flex; flex-direction: column; gap: 5pt; color: var(--c1-ink); background: #fff; font-size: 7.5pt; line-height: 1.3; }
+.cs1 p, .cs1 h1, .cs1 h2, .cs1 dl, .cs1 dd { margin: 0; }
+.cs1 b { font-weight: 700; }
+.cs1-muted { color: var(--c1-muted); }
+.cs1-num { white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right !important; }
+.cs1-h { display: block; margin-bottom: 2pt; font-size: 6.5pt; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c1-accent); }
+
+.cs1-head { display: grid; grid-template-columns: minmax(0, 1.5fr) auto auto minmax(0, 1fr); gap: 0 10pt; align-items: stretch;
+  border-bottom: 2pt solid var(--c1-accent); padding-bottom: 5pt; }
+.cs1-eyebrow { font-size: 6.5pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c1-muted); }
+.cs1-title h1 { font-size: 17pt; font-weight: 800; line-height: 1.05; letter-spacing: -0.01em; }
+.cs1-date { margin-top: 2pt !important; font-size: 8.5pt; }
+.cs1-sub { font-style: italic; }
+.cs1-note { font-weight: 600; }
+.cs1-call { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 4pt 10pt; border-radius: 5pt;
+  background: var(--c1-deep); color: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cs1-call span { font-size: 6.5pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.85; }
+.cs1-call strong { font-size: 20pt; font-weight: 800; line-height: 1.1; white-space: nowrap; }
+.cs1-call em { font-size: 6.5pt; font-style: normal; opacity: 0.85; }
+.cs1-times { display: flex; flex-direction: column; justify-content: center; gap: 1pt; }
+.cs1-times div { display: flex; justify-content: space-between; gap: 8pt; }
+.cs1-times dt { font-size: 6.5pt; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c1-muted); align-self: center; }
+.cs1-times dd { font-size: 9pt; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cs1-weather { align-self: center; }
+
+.cs1-you { padding: 3pt 6pt; border-left: 3pt solid var(--c1-accent); background: var(--c1-soft); }
+.cs1-you > span { font-size: 6.5pt; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c1-accent); }
+
+.cs1-info { display: grid; grid-template-columns: 1.2fr 1fr 1.1fr; gap: 10pt; }
+.cs1-info-2 { grid-template-columns: 1.2fr 1fr; }
+.cs1-info > div { min-width: 0; border-top: 1pt solid var(--c1-line); padding-top: 3pt; overflow-wrap: anywhere; }
+.cs1-place + .cs1-place { margin-top: 3pt; }
+.cs1-no { display: inline-block; min-width: 9pt; margin-right: 3pt; border-radius: 9pt; background: var(--c1-accent); color: #fff; text-align: center; font-size: 6pt; font-weight: 700; }
+.cs1-alert .cs1-h { color: var(--c1-alert); }
+.cs1-alert { border-top-color: var(--c1-alert) !important; }
+.cs1-keys { width: 100%; border-collapse: collapse; }
+.cs1-keys td { padding: 0 4pt 0.5pt 0; vertical-align: top; }
+.cs1-keys td:first-child { font-size: 6.5pt; }
+
+.cs1-bar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1pt; padding-bottom: 1pt; border-bottom: 1.25pt solid var(--c1-accent);
+  font-size: 7pt; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c1-deep); }
+.cs1-bar span { font-size: 7pt; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--c1-muted); }
+.cs1-table { width: 100%; border-collapse: collapse; }
+.cs1-table th { padding: 1.5pt 4pt 1.5pt 0; text-align: left; white-space: nowrap; font-size: 6pt; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c1-muted); border-bottom: 0.75pt solid var(--c1-line); }
+.cs1-table td { padding: 1.75pt 4pt 1.75pt 0; vertical-align: top; border-bottom: 0.5pt solid var(--c1-line); }
+.cs1-table tr { break-inside: avoid; }
+.cs1-table td:first-child, .cs1-table th:first-child { white-space: nowrap; }
+.cs1-schedule td:first-child { width: 0; padding-right: 6pt; font-weight: 600; }
+.cs1-schedule td:nth-child(2) { width: 0; white-space: nowrap; }
+.cs1-schedule td:nth-child(4) { white-space: nowrap; }
+.cs1-schedule td:nth-child(5) { max-width: 1in; }
+.cs1-schedule td:last-child { max-width: 1.1in; }
+.cs1-syn { display: block; font-size: 6.75pt; }
+.cs1-break td { background: var(--c1-soft); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cs1-break-meal td { background: #fdf6e7; }
+
+.cs1-people { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10pt; align-items: start; }
+.cs1-crew td:first-child { white-space: normal; color: var(--c1-muted); }
+.cs1-dept td { padding-top: 3pt; font-size: 6pt; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c1-accent); border-bottom-color: var(--c1-accent) !important; }
+
+.cs1-bottom { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10pt; align-items: start; }
+.cs1-line + .cs1-line { margin-top: 1.5pt; }
+.cs1-pre { white-space: pre-line; }
+.cs1-foot { display: flex; justify-content: space-between; gap: 8pt; padding-top: 2pt; border-top: 0.75pt solid var(--c1-line); font-size: 6.5pt; color: var(--c1-muted); }
+
+@media print {
+  html[data-print='one_page'] .cs { display: none !important; }
+  html[data-print='one_page'] .cs1 { position: static; left: auto; width: auto; visibility: visible; }
+  /* The project's own sheet prints for everyone: no "your call" for whoever printed it. */
+  .cs-shared .cs1-you { display: none; }
+}
 
 /* Printing (or saving as PDF): the call sheet on white paper, US Letter, in the same design. */
 @media print {

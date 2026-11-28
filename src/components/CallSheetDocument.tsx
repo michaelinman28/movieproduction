@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { LinkedCallSheet, SheetElement } from '../lib/api';
+import type { CallSheetLayout, LinkedCallSheet, SheetElement } from '../lib/api';
 import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, castNumberValue, castNumbersByName, clockLabel, compareCastNumbers, labelOf, longDate, orderCastNames, pagesLabel, shortDate } from '../lib/format';
 import { mapsLinkProps } from '../lib/maps';
 import { Section } from './Section';
+import { CallSheetOnePage } from './CallSheetOnePage';
+import { layoutsOf } from './PrintButtons';
 
 /** What the call sheet shows. A personal link gets exactly this; the project's call sheet page maps its data to it. */
 export type SheetData = Omit<LinkedCallSheet, 'me' | 'confirmed' | 'view'>;
@@ -65,7 +67,7 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
  * call sheet page and by each person's private link.
  */
-export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links, roster }: {
+export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links, roster, layout }: {
   sheet: SheetData;
   /** The person reading it, on My call only: their call is shown at the top and their rows are marked. The full sheet passes none. */
   me?: string | null;
@@ -83,6 +85,8 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   links?: SheetLinks;
   /** The project's characters, so a scene's cast is ordered by cast number even when someone isn't called. */
   roster?: { name: string; cast_number: number | null }[];
+  /** The project's print layouts; with one_page (or both) the one-page sheet is on the page too, for printing. */
+  layout?: CallSheetLayout | null;
 }) {
   const { day, locations, project } = sheet;
   // Each distinct nearest hospital, with the locations it's nearest to.
@@ -184,7 +188,16 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
     </li>
   );
 
+  const onePage = layoutsOf(layout ?? sheet.project.call_sheet_layout).includes('one_page') && (
+    <CallSheetOnePage parts={{
+      sheet, own, mine, versionNote, hospitals, keys, cast, crew, food, elementGroups, totalPages,
+      nameOf, callOf, roleNames, castRank, castLabel, sceneChars, numberOf, sceneLine, placeOf,
+    }} />
+  );
+
   return (
+    <>
+    {onePage}
     <article className="cs">
       <header className="cs-hero">
         <div className="cs-hero-main">
@@ -439,5 +452,6 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         <span>Confidential: for cast and crew only</span>
       </footer>
     </article>
+    </>
   );
 }

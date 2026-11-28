@@ -37,7 +37,7 @@ Neither link shows anyone's email address. Phone numbers show on a shared link o
 
 ## Print it or save it as a PDF
 
-Tap **Print or PDF** at the top. The sheet is laid out on US Letter paper in light colors, with every part printed, even ones you folded. To keep a copy on your phone, choose **Save as PDF** (or **Save to Files** on an iPhone) in the print screen.
+Tap **Print or PDF** at the top. If the production prints call sheets two ways, there are two buttons: **Print modern** for the full design, and **Print 1 page** for the whole day on one page. The sheet is laid out on US Letter paper in light colors, with every part printed, even ones you folded. To keep a copy on your phone, choose **Save as PDF** (or **Save to Files** on an iPhone) in the print screen.
 
 ## If the link doesn't work
 

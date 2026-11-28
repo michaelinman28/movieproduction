@@ -44,9 +44,14 @@ export interface Company { id: string; name: string; description: string | null;
 export interface RoleWithUsage extends Role { is_custom: boolean; people: number }
 export type RoleInput = { name?: string; department?: string | null; description?: string | null };
 export interface CompanyMember { user_id: string; is_admin: boolean; title: string | null; joined_at: string; profile: Profile; role_ids: string[] }
+/** How the call sheet prints: the modern design, a compact one-page sheet, or both (each prints on its own). */
+export type CallSheetLayout = 'modern' | 'one_page' | 'both';
 export interface Project {
   id: string; company_id: string; name: string; logline: string | null; description: string | null;
-  status: ProjectStatus; start_date: string | null; end_date: string | null; created_by: string; created_at: string;
+  status: ProjectStatus; start_date: string | null; end_date: string | null;
+  /** Missing until the database has it: treat as modern. */
+  call_sheet_layout?: CallSheetLayout;
+  created_by: string; created_at: string;
 }
 /** The caller on a project: crew (an admin, or a role outside Cast), cast (plays a character, has a Cast role, or no roles), or both. Cast only see their own call. */
 export type ProjectView = 'crew' | 'cast' | 'both';
@@ -56,7 +61,7 @@ export interface ProjectMember {
   /** Dietary needs on this project (for catering and the call sheet); dietary_allergy shows it as an allergy. */
   dietary: string | null; dietary_allergy: boolean;
 }
-export type ProjectInput = Partial<Pick<Project, 'name' | 'logline' | 'description' | 'status' | 'start_date' | 'end_date'>>;
+export type ProjectInput = Partial<Pick<Project, 'name' | 'logline' | 'description' | 'status' | 'start_date' | 'end_date' | 'call_sheet_layout'>>;
 
 export type { DayPart, TaskPriority, TaskStatus };
 export interface Task extends TaskRow { tag_ids: string[] }
@@ -181,7 +186,7 @@ export interface LinkedCallSheet {
   view: ProjectView;
   /** Whether they have confirmed the version sent. */
   confirmed: boolean;
-  project: { name: string; company_name: string };
+  project: { name: string; company_name: string; call_sheet_layout?: CallSheetLayout };
   day: Pick<ShootDay, 'id' | 'shoot_date' | 'title' | 'note' | 'crew_call' | 'shooting_call' | 'lunch' | 'wrap' | 'weather' | 'sunrise' | 'sunset' | 'notes' | 'version' | 'sent_at' | 'day_number' | 'total_days'>;
   /** The day's locations in order, the main one first. */
   locations: Pick<Location, 'name' | 'description' | 'address' | 'parking' | 'nearest_hospital' | 'contact_name' | 'contact_phone'>[];
