@@ -22,6 +22,8 @@ On **Shoot days**, select a day and tap **Open call sheet**. The Overview's next
 - Dietary needs for catering, allergies first.
 - Notes, and the next day's advance schedule.
 
+The times, locations, weather, hospital and key contacts sit together under **Day details**. Like every other part of the sheet, tap its heading to fold it; it then shows the shooting call, the location and the weather in one line. Each device remembers what's folded.
+
 ## Send it
 
 1. Check the sheet.
@@ -51,4 +53,4 @@ Who counts as cast is explained in [Roles](/help/company/roles).
 
 ## Print or save as PDF
 
-Tap **Print or save as PDF**. The sheet is laid out on US Letter paper in light colors.
+Tap **Print or save as PDF**. The sheet is laid out on US Letter paper in light colors, always with every part open, even ones folded on screen.

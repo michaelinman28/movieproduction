@@ -15,13 +15,16 @@ const write = (key: string, collapsed: boolean, byDefault: boolean) => {
  * A page section whose heading opens and closes it. Whether it's closed is
  * remembered on this device, per `id` (e.g. "project.tasks").
  */
-export function Section({ id, title, summary, children, level = 'h2', bodyClassName = '', defaultCollapsed = false }: {
+export function Section({ id, title, summary, children, level = 'h2', bodyClassName = '', className = '', defaultCollapsed = false, printOpen = false }: {
   id: string; title: string; summary?: ReactNode; children: ReactNode;
   /** Start closed until the person opens it (e.g. long lists in a form). */
   defaultCollapsed?: boolean;
   /** h2 for page sections, h4 for smaller sections such as those in a side panel. */
   level?: 'h2' | 'h4';
   bodyClassName?: string;
+  className?: string;
+  /** Print (and save as PDF) with the section open even when it's closed on screen, e.g. on a call sheet. */
+  printOpen?: boolean;
 }) {
   const Heading = level;
   const key = `mp-collapsed:${id}`;
@@ -30,7 +33,7 @@ export function Section({ id, title, summary, children, level = 'h2', bodyClassN
   const toggle = () => { setCollapsed(!collapsed); write(key, !collapsed, defaultCollapsed); };
 
   return (
-    <section className="flex flex-col" data-pin-scope>
+    <section className={`flex flex-col ${className}`} data-pin-scope>
       <Heading className="m-0">
         <button type="button" className={`section-toggle ${level === 'h4' ? 'section-toggle-sm' : ''}`} aria-expanded={!collapsed} aria-controls={bodyId} onClick={toggle}>
           <span className={`section-chevron ${collapsed ? '' : 'section-chevron-open'}`} aria-hidden="true">▸</span>
@@ -39,6 +42,8 @@ export function Section({ id, title, summary, children, level = 'h2', bodyClassN
         </button>
       </Heading>
       {!collapsed && <div id={bodyId} className={`mt-2 ${bodyClassName}`}>{children}</div>}
+      {/* Closed on screen, but still on paper: kept in the page, shown only when printing. */}
+      {collapsed && printOpen && <div className={`mt-2 section-print-only ${bodyClassName}`}>{children}</div>}
     </section>
   );
 }
