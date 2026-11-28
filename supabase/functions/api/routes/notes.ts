@@ -138,7 +138,7 @@ async function projectNotes(db: Db, id: string): Promise<Note[]> {
   }
   for (const d of days.filter((x: Row) => x.note)) {
     out.push({ key: `shoot_day_title:${d.id}`, source: 'shoot_day', note_id: null, body: d.note, author: titleWriter(d), at: d.title_note_at ?? d.updated_at, edited: false,
-      item: { kind: 'shoot_day', id: d.id, label: dayLabel(d), detail: 'Title Note' } });
+      item: { kind: 'shoot_day', id: d.id, label: dayLabel(d), detail: 'Title note' } });
   }
   for (const d of days.filter((x: Row) => x.notes)) {
     out.push({ key: `shoot_day:${d.id}`, source: 'shoot_day', note_id: null, body: d.notes, author: writer(d), at: d.note_at ?? d.updated_at, edited: false,

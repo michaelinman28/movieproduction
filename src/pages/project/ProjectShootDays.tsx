@@ -120,7 +120,7 @@ export function ProjectShootDays() {
       { field: 'date', header: 'Date', type: 'date', width: 130, editable: true, render: ({ value }: { value: string }) => gridEsc(value ? shortDate(value) : '') },
       { field: 'open', header: '', width: 110, sortable: false, filter: false, render: ({ data }: { data: DayRow }) => gridLink('Call sheet', `/projects/${projectId}/shoot-days/${data.id}`) },
       { field: 'title', header: 'Title', width: 160, editable: true },
-      { field: 'note', header: 'Title Note', width: 220, editable: true, editor: 'textarea', wrap: true },
+      { field: 'note', header: 'Title note', width: 220, editable: true, editor: 'textarea', wrap: true },
       {
         // The same list as the Locations box in the day's form; the first is the main one.
         field: 'locations', header: 'Locations', width: 220,
@@ -322,7 +322,7 @@ function DayDetails({ day, locations, run }: { day: ShootDay; locations: Locatio
         <label className="label">Title
           <input className="field" value={draft.title} maxLength={120} placeholder="Diner nights" onChange={set('title')} />
         </label>
-        <label className="label md:col-span-2">Title Note
+        <label className="label md:col-span-2">Title note
           <textarea className="field" rows={3} value={draft.note} maxLength={2000} placeholder="Night shoot; company move after lunch" onChange={set('note')} />
         </label>
         <div className="md:col-span-2">

@@ -245,8 +245,9 @@ day to day.
   `20261127000000_shoot_day_locations.sql`. The API returns them as `location_ids` on
   each day (in order) and takes `location_ids` to replace the list; the call sheet and
   both link functions return `locations` (an array, main first). A scene's location is
-  added to that list when the scene is scheduled, or when the scene's location changes,
-  if the day doesn't already have it. Crew change them;
+  added to that list when the scene is scheduled, or when crew change the scene's location,
+  if the day doesn't already have it (`20261128000000_scene_location_crew_only.sql`: a
+  cast member's change to a scene doesn't touch the days). Crew change them;
   everyone on the project sees them. Deleting a location takes it off its days; each
   change is logged on the day's History.
 - **Cast and crew:** on each project a person is crew (a company admin, or a role

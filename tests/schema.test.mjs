@@ -525,8 +525,14 @@ await expect('a scene location already on the day is not added twice', async () 
 const [sdLoc4] = await as(U.b, `insert into project_locations (project_id,name) values ($1,'Beach') returning id`, [lp.id]);
 await as(U.a, `insert into company_members (company_id,user_id) values ($1,$2)`, [cc.id, U.c]);
 await as(U.a, `insert into project_members (project_id,user_id) values ($1,$2)`, [lp.id, U.c]);
-await expect('cast changing a scene location still adds it to the day', async () => {
+await expect('cast changing a scene location does not add it to the day', async () => {
   await as(U.c, `update scenes set location_id=$2 where id=$1`, [scA.id, sdLoc4.id]);
+  return as(U.b, `select location_id from shoot_day_locations where shoot_day_id=$1 and location_id=$2`, [day.id, sdLoc4.id]);
+}, len(0));
+await expect('the scene still takes the cast member\'s change', () => as(U.b, `select location_id from scenes where id=$1`, [scA.id]), r => r[0]?.location_id === sdLoc4.id);
+await expect('crew changing it adds it to the day once', async () => {
+  await as(U.b, `update scenes set location_id=null where id=$1`, [scA.id]);
+  await as(U.b, `update scenes set location_id=$2 where id=$1`, [scA.id, sdLoc4.id]);
   return as(U.b, `select location_id from shoot_day_locations where shoot_day_id=$1 order by sort_order`, [day.id]);
 }, r => r.at(-1).location_id === sdLoc4.id && r.filter((x) => x.location_id === sdLoc4.id).length === 1);
 await as(U.a, `delete from project_members where project_id=$1 and user_id=$2`, [lp.id, U.c]);
