@@ -22,7 +22,7 @@ On **Shoot days**, select a day and tap **Open call sheet**. The Overview's next
 - Dietary needs for catering, allergies first.
 - Notes, and the next day's advance schedule.
 
-The times, locations, weather, hospital and key contacts sit together under **Day details**. Like every other part of the sheet, tap its heading to fold it; it then shows the shooting call, the location and the weather in one line. Each device remembers what's folded.
+The times, locations, weather, hospital and key contacts sit together under **Day details**. Like every other part of the sheet, tap its heading to fold it; its heading shows the shooting call and how many locations. Each device remembers what's folded.
 
 ## Send it
 

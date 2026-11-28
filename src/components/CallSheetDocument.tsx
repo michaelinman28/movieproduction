@@ -161,12 +161,11 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
     ['Shooting call', day.shooting_call], ['Lunch', day.lunch], ['Est. wrap', day.wrap], ['Sunrise', day.sunrise], ['Sunset', day.sunset],
   ] as const).filter(([, t]) => t);
 
-  // Shown beside "Day details" when it's closed: the shooting call, where, and the weather's first words.
+  // Shown beside "Day details": the shooting call and how many locations.
   const topSummary = [
-    day.shooting_call && `Shooting ${clockLabel(day.shooting_call)}`,
-    locations.length > 1 ? `${locations.length} locations` : locations[0]?.name,
-    day.weather?.split(',')[0].trim(),
-  ].filter(Boolean).join(' · ') || undefined;
+    day.shooting_call && `Shooting call ${clockLabel(day.shooting_call)}`,
+    `${locations.length} ${locations.length === 1 ? 'location' : 'locations'}`,
+  ].filter(Boolean).join(' · ');
 
   const person = (c: SheetCall, sub: ReactNode, times: ReactNode) => (
     <li key={c.user_id} className={`cs-person ${isMe(c) ? 'cs-me' : ''}`}>
