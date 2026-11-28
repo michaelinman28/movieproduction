@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { SheetElement } from '../lib/api';
 import { SHOOT_ITEM_KINDS, clockLabel, labelOf, longDate, pagesLabel, shortDate } from '../lib/format';
 import type { SheetData } from './CallSheetDocument';
@@ -40,7 +41,13 @@ const short = (t: string | null | undefined) => clockLabel(t) || '—';
  * tables, and the elements, notes and next day along the bottom. A project chooses it
  * (or the modern layout, or both) under Call sheet print on its details.
  */
-export function CallSheetOnePage({ parts }: { parts: OnePageParts }) {
+export function CallSheetOnePage({ parts, variant = 'one_page', modernTop }: {
+  parts: OnePageParts;
+  /** one_page: the whole day on one page. modern: the modern layout's top with these tables below, over as many pages as it takes. */
+  variant?: 'one_page' | 'modern';
+  /** The modern layout's header band, your call, times and cards. */
+  modernTop?: ReactNode;
+}) {
   const { sheet, own, mine, hospitals, keys, cast, crew, food, elementGroups, totalPages, nameOf, callOf, roleNames, castRank, castLabel, sceneChars, numberOf, sceneLine, placeOf } = parts;
   const { day, locations, project } = sheet;
   const times = ([
@@ -56,8 +63,8 @@ export function CallSheetOnePage({ parts }: { parts: OnePageParts }) {
   for (let n = 0; split < crew.length && n + rowsOf(crew[split][1]) / 2 <= totalRows / 2; split++) n += rowsOf(crew[split][1]);
   const crewHalves = [crew.slice(0, Math.max(split, 1)), crew.slice(Math.max(split, 1))].filter((h) => h.length);
 
-  return (
-    <article className="cs1" aria-hidden="true">
+  const head = (
+    <>
       <header className="cs1-head">
         <div className="cs1-title">
           <p className="cs1-eyebrow">{project.company_name} · Call sheet</p>
@@ -124,6 +131,10 @@ export function CallSheetOnePage({ parts }: { parts: OnePageParts }) {
         )}
       </section>
 
+    </>
+  );
+  const body = (
+    <div className="cs1-body">
       <section>
         <h2 className="cs1-bar">Schedule<span>{sheet.scenes.length} {sheet.scenes.length === 1 ? 'scene' : 'scenes'} · {pagesLabel(totalPages)} pages</span></h2>
         {sheet.items.length ? (
@@ -250,10 +261,38 @@ export function CallSheetOnePage({ parts }: { parts: OnePageParts }) {
         </section>
       </div>
 
+    </div>
+  );
+  const footer = (
       <footer className="cs1-foot">
         <span>{project.name} · Day {day.day_number} · {longDate(day.shoot_date)}{day.version ? ` · Version ${day.version}` : ''}</span>
         <span>Confidential: for cast and crew only</span>
       </footer>
+  );
+
+  if (variant === 'modern') {
+    // The modern layout's own top (header band, times and cards), then the same schedule,
+    // cast, crew and notes as the one-page sheet at a larger size. The table's header and
+    // footer rows repeat on every page, so each page keeps its top and bottom space.
+    return (
+      <article className="cs1 cs1-modern" aria-hidden="true">
+        <table className="cs1-pages">
+          <thead><tr><td><div className="cs1-space-top" /></td></tr></thead>
+          <tfoot><tr><td><div className="cs1-space-bottom" /></td></tr></tfoot>
+          <tbody><tr><td>
+            <div className="cs cs1-modern-top">{modernTop}</div>
+            {body}
+          </td></tr></tbody>
+        </table>
+        {footer}
+      </article>
+    );
+  }
+  return (
+    <article className="cs1 cs1-one" aria-hidden="true">
+      {head}
+      {body}
+      {footer}
     </article>
   );
 }

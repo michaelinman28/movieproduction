@@ -191,20 +191,8 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
     </li>
   );
 
-  // The one-page sheet lives straight under <body>, outside the app, so it prints on its own
-  // (the app is hidden then) at the paper's size, whatever the screen around it looks like.
-  const onePage = layoutsOf(layout ?? sheet.project.call_sheet_layout).includes('one_page') && createPortal(
-    <CallSheetOnePage parts={{
-      sheet, own, mine: printYou ? mine : null, versionNote, hospitals, keys, cast, crew, food, elementGroups, totalPages,
-      nameOf, callOf, roleNames, castRank, castLabel, sceneChars, numberOf, sceneLine, placeOf,
-    }} />,
-    document.body,
-  );
-
-  return (
+  const hero = (
     <>
-    {onePage}
-    <article className="cs">
       <header className="cs-hero">
         <div className="cs-hero-main">
           <p className="cs-eyebrow">{project.company_name} · Call sheet</p>
@@ -223,6 +211,10 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         </div>
       </header>
 
+    </>
+  );
+  const you = (
+    <>
       {own && !mine && <p className="cs-you cs-muted">You're not called on this day.</p>}
 
       {mine && (
@@ -245,7 +237,10 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
         </section>
       )}
 
-      <Section printOpen className="cs-top" bodyClassName="cs-top-body" id={`${sectionPrefix}.top`} title="Day details" summary={topSummary}>
+    </>
+  );
+  const details = (
+    <>
         {times.length > 0 && (
           <dl className="cs-times">
             {times.map(([label, t]) => <div key={label} className="cs-time"><dt>{label}</dt><dd>{clockLabel(t)}</dd></div>)}
@@ -300,6 +295,37 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
             ) : <p className="cs-muted cs-small">None listed</p>}
           </Card>}
         </div>
+    </>
+  );
+
+  // The printed sheets live straight under <body>, outside the app, so they print on their own
+  // (the app is hidden then) at the paper's size, whatever the screen around them looks like.
+  // Modern: this sheet's top, then the one-page tables at a larger size; One page: everything on one page.
+  const layouts = layoutsOf(layout ?? sheet.project.call_sheet_layout);
+  const parts = {
+    sheet, own, mine: printYou ? mine : null, versionNote, hospitals, keys, cast, crew, food, elementGroups, totalPages,
+    nameOf, callOf, roleNames, castRank, castLabel, sceneChars, numberOf, sceneLine, placeOf,
+  };
+  const printed = createPortal(
+    <div className="cs-print">
+      {layouts.includes('modern') && (
+        <CallSheetOnePage variant="modern" parts={parts} modernTop={<>{hero}{printYou && you}<div className="cs-top-body">{details}</div></>} />
+      )}
+      {layouts.includes('one_page') && <CallSheetOnePage parts={parts} />}
+    </div>,
+    document.body,
+  );
+
+  return (
+    <>
+    {printed}
+    <article className="cs">
+      {hero}
+
+      {you}
+
+      <Section printOpen className="cs-top" bodyClassName="cs-top-body" id={`${sectionPrefix}.top`} title="Day details" summary={topSummary}>
+        {details}
       </Section>
 
       <div className="cs-body">

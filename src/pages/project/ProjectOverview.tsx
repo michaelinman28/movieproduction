@@ -107,7 +107,7 @@ export function ProjectOverview() {
               <select className="field" value={draft.call_sheet_layout} onChange={(e) => setDraft({ ...draft, call_sheet_layout: e.target.value as CallSheetLayout })}>
                 {CALL_SHEET_LAYOUTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
-              <span className="hint">Modern is the full design (usually two pages). One page fits the whole day on one sheet. Both gives a print button for each.</span>
+              <span className="hint">Modern has the full header and cards (usually two pages). One page fits the whole day on one sheet. Both gives a print button for each.</span>
             </label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <button type="submit" className="btn" disabled={!changed} data-pin="2">Save</button>

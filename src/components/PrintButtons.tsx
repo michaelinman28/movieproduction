@@ -3,13 +3,13 @@ import type { CallSheetLayout } from '../lib/api';
 
 type Which = 'modern' | 'one_page';
 
-// The one-page sheet prints with no page margin at all, so the browser has no room to add its
-// own header and footer (date, page title, web address); the sheet's own padding gives it
-// 0.3in top and bottom and 0.4in at the sides (styles.css). Its height on a Letter page at
-// 96px per inch, with a little to spare; .cs1 is 7.7in wide to match.
+// Both printed sheets print with no page margin at all, so the browser has no room to add its
+// own header and footer (date, page title, web address); the sheets keep their own space
+// (styles.css). The one-page sheet's height on a Letter page at 96px per inch, with a
+// little to spare; .cs1 is 7.7in wide to match (8.5in less 0.4in each side).
 const PAGE_HEIGHT = (11 - 0.6) * 96 * 0.97;
 
-/** Choose which layout goes to paper, with the one-page sheet's narrow margins when it's that one. */
+/** Choose which layout goes to paper, on a page with no margin (each sheet keeps its own space). */
 function setPrintLayout(which: Which) {
   document.documentElement.dataset.print = which;
   let style = document.getElementById('cs1-page');
@@ -18,7 +18,7 @@ function setPrintLayout(which: Which) {
     style.id = 'cs1-page';
     document.head.appendChild(style);
   }
-  style.textContent = which === 'one_page' ? '@page { margin: 0; }' : '';
+  style.textContent = '@page { margin: 0; }';
 }
 
 /** Which layouts a project prints (missing means modern). */
@@ -38,7 +38,7 @@ export function printSheet(which: Which) {
 
 /** Shrink the one-page sheet when a long day would run onto a second page (or undo it for the modern layout). */
 function fitOnePage() {
-  const one = document.querySelector<HTMLElement>('.cs1');
+  const one = document.querySelector<HTMLElement>('.cs1-one');
   if (!one) return;
   one.style.removeProperty('zoom');
   if (document.documentElement.dataset.print !== 'one_page') return;

@@ -368,7 +368,9 @@
 
 /* The one-page call sheet (src/components/CallSheetOnePage.tsx): print only, always light, sized in points
    for US Letter. On screen it sits off the page (measured before printing, to shrink a long day to fit). */
-.cs1 { position: absolute; left: -10000px; top: 0; width: 7.7in; visibility: hidden; pointer-events: none;
+/* The printed sheets sit under <body>, off the page on screen (so the one-pager can be measured). */
+.cs-print { position: absolute; left: -10000px; top: 0; visibility: hidden; pointer-events: none; }
+.cs1 { width: 7.7in;
   --c1-ink: #18201a; --c1-muted: #5f6b62; --c1-line: #dce4dd; --c1-soft: #f1f6f2; --c1-accent: #15803d; --c1-deep: #14532d; --c1-alert: #b42318;
   /* Room at the bottom for the footer, which prints fixed to the foot of the page. */
   padding-bottom: 16pt;
@@ -437,16 +439,33 @@
 .cs1-bottom { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10pt; align-items: start; }
 .cs1-line + .cs1-line { margin-top: 1.5pt; }
 .cs1-pre { white-space: pre-line; }
+.cs1-modern { padding-bottom: 0; font-size: 9pt; }
+.cs1-pages { width: 100%; border-collapse: collapse; }
+.cs1-pages > * > tr > td { padding: 0; }
+/* Repeated on every printed page: the space above the sheet, and below it for the footer. */
+.cs1-space-top { height: 0.35in; }
+.cs1-space-bottom { height: calc(0.3in + 18pt); }
+.cs1-modern-top { margin-bottom: 8pt; }
+.cs1-modern .cs1-body { zoom: 1.1; }
+.cs1-modern .cs1-w-role { width: 29%; } .cs1-modern .cs1-w-name { width: 25%; } .cs1-modern .cs1-w-phone { width: 26%; } .cs1-modern .cs1-w-call { width: 20%; }
+/* Over several pages: keep a department's heading with its first person, and a section's heading with its table. */
+.cs1-dept, .cs1-bar { break-after: avoid; page-break-after: avoid; }
+.cs1-bottom { break-inside: avoid; }
+.cs1-body { display: flex; flex-direction: column; gap: 5pt; }
 .cs1-foot { display: flex; justify-content: space-between; gap: 8pt; padding-top: 2pt; border-top: 0.75pt solid var(--c1-line); font-size: 6.5pt; color: var(--c1-muted); }
 
 @media print {
-  html[data-print='one_page'] .cs { display: none !important; }
-  /* Only the one-page sheet goes to paper (it sits outside #root), exactly a Letter page wide. */
-  html[data-print='one_page'] #root { display: none !important; }
-  html[data-print='one_page'], html[data-print='one_page'] body { width: 8.5in; min-width: 0; margin: 0; padding: 0; }
-  html[data-print='one_page'] .cs1 { position: static; left: auto; width: 8.5in; box-sizing: border-box; margin: 0; visibility: visible; padding: 0.3in 0.4in calc(0.3in + 16pt); }
-  /* The footer always sits at the bottom of the page, however much is on it. */
-  html[data-print='one_page'] .cs1-foot { position: fixed; left: 0.4in; right: 0.4in; bottom: 0.3in; background: #fff; }
+  /* Only the chosen printed sheet goes to paper (it sits outside #root), exactly a Letter page
+     wide. The page has no margin (PrintButtons), so the browser adds no header or footer. */
+  html[data-print] #root { display: none !important; }
+  html[data-print], html[data-print] body { width: 8.5in; min-width: 0; margin: 0; padding: 0; }
+  html[data-print] .cs-print { position: static; left: auto; visibility: visible; }
+  html[data-print='one_page'] .cs1-modern, html[data-print='modern'] .cs1-one { display: none !important; }
+  .cs1 { width: 8.5in; box-sizing: border-box; margin: 0; }
+  .cs1-one { padding: 0.3in 0.4in calc(0.3in + 16pt); }
+  .cs1-modern { padding: 0 0.4in; }
+  /* The footer always sits at the bottom of the page, however much is on it (on every page of the modern layout). */
+  .cs1-foot { position: fixed; left: 0.4in; right: 0.4in; bottom: 0.3in; background: #fff; }
 }
 
 /* Printing (or saving as PDF): the call sheet on white paper, US Letter, in the same design. */
