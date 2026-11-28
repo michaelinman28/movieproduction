@@ -441,11 +441,12 @@
 
 @media print {
   html[data-print='one_page'] .cs { display: none !important; }
-  html[data-print='one_page'] .cs1 { position: static; left: auto; width: auto; visibility: visible; padding: 0.3in 0.4in calc(0.3in + 16pt); }
+  /* Only the one-page sheet goes to paper (it sits outside #root), exactly a Letter page wide. */
+  html[data-print='one_page'] #root { display: none !important; }
+  html[data-print='one_page'], html[data-print='one_page'] body { width: 8.5in; min-width: 0; margin: 0; padding: 0; }
+  html[data-print='one_page'] .cs1 { position: static; left: auto; width: 8.5in; box-sizing: border-box; margin: 0; visibility: visible; padding: 0.3in 0.4in calc(0.3in + 16pt); }
   /* The footer always sits at the bottom of the page, however much is on it. */
   html[data-print='one_page'] .cs1-foot { position: fixed; left: 0.4in; right: 0.4in; bottom: 0.3in; background: #fff; }
-  /* The project's own sheet prints for everyone: no "your call" for whoever printed it. */
-  .cs-shared .cs1-you { display: none; }
 }
 
 /* Printing (or saving as PDF): the call sheet on white paper, US Letter, in the same design. */

@@ -222,7 +222,7 @@ export function CallSheetPage() {
       </Section>
       </div>}
 
-      {shown && <CallSheetDocument sheet={shown} me={mode === 'mine' ? me : null} own={mode === 'mine'} sectionPrefix="callSheet" layout={project.call_sheet_layout} status={(id) => { const c = sheet.calls.find((x) => x.user_id === id); return c ? callStatus(day, c) : ''; }}
+      {shown && <CallSheetDocument sheet={shown} me={mode === 'mine' ? me : null} own={mode === 'mine'} sectionPrefix="callSheet" layout={project.call_sheet_layout} printYou={false} status={(id) => { const c = sheet.calls.find((x) => x.user_id === id); return c ? callStatus(day, c) : ''; }}
         versionNote={day.version ? `Version ${day.version}` : 'Draft, not sent'} links={links} roster={roster} />}
     </div>
   );

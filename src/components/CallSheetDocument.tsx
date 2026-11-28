@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import type { CallSheetLayout, LinkedCallSheet, SheetElement } from '../lib/api';
 import { SCENE_INT_EXT, SCENE_TIMES, SHOOT_ITEM_KINDS, castLabel, castNumberValue, castNumbersByName, clockLabel, compareCastNumbers, labelOf, longDate, orderCastNames, pagesLabel, shortDate } from '../lib/format';
@@ -67,7 +68,7 @@ function Card({ title, tone, children }: { title: string; tone?: 'alert'; childr
  * clean one- or two-page PDF (see the .cs rules in styles.css). Used by the project's
  * call sheet page and by each person's private link.
  */
-export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links, roster, layout }: {
+export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versionNote, youAction, links, roster, layout, printYou = true }: {
   sheet: SheetData;
   /** The person reading it, on My call only: their call is shown at the top and their rows are marked. The full sheet passes none. */
   me?: string | null;
@@ -87,6 +88,8 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
   roster?: { name: string; cast_number: number | null }[];
   /** The project's print layouts; with one_page (or both) the one-page sheet is on the page too, for printing. */
   layout?: CallSheetLayout | null;
+  /** Whether the one-page sheet shows the reader's own call. The project's page prints for everyone, so it passes false. */
+  printYou?: boolean;
 }) {
   const { day, locations, project } = sheet;
   // Each distinct nearest hospital, with the locations it's nearest to.
@@ -188,11 +191,14 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
     </li>
   );
 
-  const onePage = layoutsOf(layout ?? sheet.project.call_sheet_layout).includes('one_page') && (
+  // The one-page sheet lives straight under <body>, outside the app, so it prints on its own
+  // (the app is hidden then) at the paper's size, whatever the screen around it looks like.
+  const onePage = layoutsOf(layout ?? sheet.project.call_sheet_layout).includes('one_page') && createPortal(
     <CallSheetOnePage parts={{
-      sheet, own, mine, versionNote, hospitals, keys, cast, crew, food, elementGroups, totalPages,
+      sheet, own, mine: printYou ? mine : null, versionNote, hospitals, keys, cast, crew, food, elementGroups, totalPages,
       nameOf, callOf, roleNames, castRank, castLabel, sceneChars, numberOf, sceneLine, placeOf,
-    }} />
+    }} />,
+    document.body,
   );
 
   return (
