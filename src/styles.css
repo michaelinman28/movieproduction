@@ -441,9 +441,9 @@
 
 @media print {
   html[data-print='one_page'] .cs { display: none !important; }
-  html[data-print='one_page'] .cs1 { position: static; left: auto; width: auto; visibility: visible; }
+  html[data-print='one_page'] .cs1 { position: static; left: auto; width: auto; visibility: visible; padding: 0.3in 0.4in calc(0.3in + 16pt); }
   /* The footer always sits at the bottom of the page, however much is on it. */
-  html[data-print='one_page'] .cs1-foot { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; }
+  html[data-print='one_page'] .cs1-foot { position: fixed; left: 0.4in; right: 0.4in; bottom: 0.3in; background: #fff; }
   /* The project's own sheet prints for everyone: no "your call" for whoever printed it. */
   .cs-shared .cs1-you { display: none; }
 }

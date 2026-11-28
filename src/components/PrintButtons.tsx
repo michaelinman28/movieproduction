@@ -3,10 +3,10 @@ import type { CallSheetLayout } from '../lib/api';
 
 type Which = 'modern' | 'one_page';
 
-// The one-page sheet prints with narrow margins (0.3in top and bottom, 0.4in sides; the modern
-// layout keeps the wider @page margins in styles.css). Its height on a Letter page at 96px per
-// inch, with a little to spare; .cs1 is 7.7in wide to match.
-const ONE_PAGE_MARGINS = '0.3in 0.4in';
+// The one-page sheet prints with no page margin at all, so the browser has no room to add its
+// own header and footer (date, page title, web address); the sheet's own padding gives it
+// 0.3in top and bottom and 0.4in at the sides (styles.css). Its height on a Letter page at
+// 96px per inch, with a little to spare; .cs1 is 7.7in wide to match.
 const PAGE_HEIGHT = (11 - 0.6) * 96 * 0.97;
 
 /** Choose which layout goes to paper, with the one-page sheet's narrow margins when it's that one. */
@@ -18,7 +18,7 @@ function setPrintLayout(which: Which) {
     style.id = 'cs1-page';
     document.head.appendChild(style);
   }
-  style.textContent = which === 'one_page' ? `@page { margin: ${ONE_PAGE_MARGINS}; }` : '';
+  style.textContent = which === 'one_page' ? '@page { margin: 0; }' : '';
 }
 
 /** Which layouts a project prints (missing means modern). */
