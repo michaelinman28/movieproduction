@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CallSheetDocument } from '../components/CallSheetDocument';
 import { SheetViewSwitch, ownSheet, useSheetMode } from '../components/SheetViewSwitch';
 import { ThemeSwitch } from '../components/ThemeSwitch';
+import { helpUrl } from '../components/HelpLink';
 import { api, type LinkedCallSheet } from '../lib/api';
 import { errorText, shortDate } from '../lib/format';
 
@@ -48,6 +49,7 @@ export function SheetLinkPage({ token }: { token: string }) {
       <div className="sheet-link-bar">
         <a href={home} className="mr-auto inline-flex min-h-11 items-center font-bold text-fg no-underline">Movie Production</a>
         {sheet && <button type="button" className="btn btn-secondary w-auto min-h-10 px-3 text-sm" onClick={() => window.print()}>Print or PDF</button>}
+        <a href={helpUrl('getting-started/your-call-sheet-link')} target="_blank" rel="noopener" className="btn-link shrink-0 whitespace-nowrap text-sm">What is this?</a>
         <ThemeSwitch />
       </div>
       <main className="mx-auto w-full max-w-5xl px-4 py-4 md:py-8">

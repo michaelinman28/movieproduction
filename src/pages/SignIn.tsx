@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { emailProblem, formatPhone, phoneOrThrow } from '../lib/contact';
 import { ThemeSwitch } from '../components/ThemeSwitch';
+import { helpUrl } from '../components/HelpLink';
 import { PasswordField } from '../components/PasswordField';
 import { readInvite } from '../lib/invite';
 
@@ -86,6 +87,9 @@ export function SignIn() {
         >
           {mode === 'sign-in' ? 'New here? Create an account' : 'Already have an account? Sign in'}
         </button>
+        <a href={helpUrl(invite ? 'getting-started/joining-a-production' : '')} target="_blank" rel="noopener" className="btn-link justify-center text-sm">
+          {invite ? 'How joining a production works' : 'See how Movie Production works'}
+        </a>
       </form>
     </main>
   );

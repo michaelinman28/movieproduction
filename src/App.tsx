@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
 import { useAuth } from './lib/auth';
 import { supabase, supabaseConfigured } from './lib/supabase';
@@ -27,11 +28,20 @@ import { FormScroller } from './components/FormScroller';
 import { UnsavedGuard } from './components/UnsavedGuard';
 import { PreviewBanner } from './components/PreviewBanner';
 import { BackLink, LinkOutTracker } from './components/BackLink';
+import { HelpLink } from './components/HelpLink';
+
+// The Help pages load only when someone opens them.
+const HelpApp = lazy(() => import('./help/HelpApp'));
+
+/** The path inside the app, without the base the site is served under. */
+const appPath = () => window.location.pathname.slice(import.meta.env.BASE_URL.replace(/\/$/, '').length);
+
+/** Help (/help and its pages) is public: it opens with or without signing in. */
+const isHelp = () => /^\/help(\/|$)/.test(appPath());
 
 /** Call sheet links open on their own page, with no sign-in: personal (/sheet/:token) or shared (/call-sheet/:token). */
 function sheetToken() {
-  const path = window.location.pathname.slice(import.meta.env.BASE_URL.replace(/\/$/, '').length);
-  const m = path.match(/^\/(sheet|call-sheet)\/([0-9a-f-]{36})\/?$/i);
+  const m = appPath().match(/^\/(sheet|call-sheet)\/([0-9a-f-]{36})\/?$/i);
   return m ? { shared: m[1].toLowerCase() === 'call-sheet', token: m[2] } : null;
 }
 
@@ -49,6 +59,12 @@ export function App() {
       </main>
     );
   if (token) return token.shared ? <SharedSheetPage token={token.token} /> : <SheetLinkPage token={token.token} />;
+  if (isHelp())
+    return (
+      <Suspense fallback={<main className="grid flex-1 place-items-center p-4"><p className="text-muted">Loading help…</p></main>}>
+        <HelpApp signedIn={!!session} />
+      </Suspense>
+    );
   if (loading) return <main className="grid flex-1 place-items-center p-4"><p className="text-muted">Loading…</p></main>;
   if (!session) return <><PreviewBanner /><SignIn /></>;
 
@@ -57,6 +73,7 @@ export function App() {
       <PreviewBanner />
       <header className="no-print sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-surface px-4 py-1">
         <Link to="/" className="mr-auto shrink-0 font-bold text-fg no-underline">Movie Production</Link>
+        <HelpLink />
         <HeaderAccount email={session.user.email} />
         <ThemeSwitch />
         <button className="btn-link shrink-0 whitespace-nowrap text-sm" onClick={() => supabase.auth.signOut()}>Sign out</button>
