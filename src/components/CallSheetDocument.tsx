@@ -163,7 +163,7 @@ export function CallSheetDocument({ sheet, me, own, sectionPrefix, status, versi
 
   // Shown beside "Day details": the shooting call and how many locations.
   const topSummary = [
-    day.shooting_call && `Shooting call ${clockLabel(day.shooting_call)}`,
+    day.shooting_call && `Shooting ${clockLabel(day.shooting_call)}`,
     `${locations.length} ${locations.length === 1 ? 'location' : 'locations'}`,
   ].filter(Boolean).join(' · ');
 
