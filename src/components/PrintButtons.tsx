@@ -3,8 +3,23 @@ import type { CallSheetLayout } from '../lib/api';
 
 type Which = 'modern' | 'one_page';
 
-// A Letter page at 96px per inch, less the print margins (@page in styles.css), with a little to spare.
-const PAGE_HEIGHT = (11 - 0.9) * 96 * 0.97;
+// The one-page sheet prints with narrow margins (0.3in top and bottom, 0.4in sides; the modern
+// layout keeps the wider @page margins in styles.css). Its height on a Letter page at 96px per
+// inch, with a little to spare; .cs1 is 7.7in wide to match.
+const ONE_PAGE_MARGINS = '0.3in 0.4in';
+const PAGE_HEIGHT = (11 - 0.6) * 96 * 0.97;
+
+/** Choose which layout goes to paper, with the one-page sheet's narrow margins when it's that one. */
+function setPrintLayout(which: Which) {
+  document.documentElement.dataset.print = which;
+  let style = document.getElementById('cs1-page');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'cs1-page';
+    document.head.appendChild(style);
+  }
+  style.textContent = which === 'one_page' ? `@page { margin: ${ONE_PAGE_MARGINS}; }` : '';
+}
 
 /** Which layouts a project prints (missing means modern). */
 export const layoutsOf = (layout: CallSheetLayout | null | undefined): Which[] =>
@@ -16,7 +31,7 @@ export const layoutsOf = (layout: CallSheetLayout | null | undefined): Which[] =
  * when a long day would run onto a second page.
  */
 export function printSheet(which: Which) {
-  document.documentElement.dataset.print = which;
+  setPrintLayout(which);
   fitOnePage();
   window.print();
 }
@@ -44,7 +59,7 @@ export function PrintButtons({ layout, short, className = 'btn btn-secondary sm:
   const which = layoutsOf(layout);
   // The browser's own Print (Ctrl+P / ⌘P) uses the project's first layout.
   useEffect(() => {
-    const reset = () => { document.documentElement.dataset.print = which[0]; };
+    const reset = () => setPrintLayout(which[0]);
     reset();
     window.addEventListener('beforeprint', fitOnePage);
     window.addEventListener('afterprint', reset);
@@ -52,6 +67,7 @@ export function PrintButtons({ layout, short, className = 'btn btn-secondary sm:
       window.removeEventListener('beforeprint', fitOnePage);
       window.removeEventListener('afterprint', reset);
       delete document.documentElement.dataset.print;
+      document.getElementById('cs1-page')?.remove();
     };
   }, [which[0]]); // eslint-disable-line react-hooks/exhaustive-deps
 

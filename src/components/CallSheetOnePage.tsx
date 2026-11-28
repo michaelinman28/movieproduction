@@ -49,6 +49,12 @@ export function CallSheetOnePage({ parts }: { parts: OnePageParts }) {
   // A scene's cast as cast numbers ("1, 3, 6"), with names for anyone without one.
   const castNos = (text: string | null) => sceneChars(text).map((n) => numberOf.get(n.toLowerCase())?.toString() ?? n).join(', ');
   const crewCount = sheet.calls.length - cast.length;
+  // The crew in two side-by-side halves, departments kept whole, split where the rows (a heading counts as one) are closest to even.
+  const rowsOf = (list: SheetCall[]) => list.length + 1;
+  const totalRows = crew.reduce((n, [, list]) => n + rowsOf(list), 0);
+  let split = 0;
+  for (let n = 0; split < crew.length && n + rowsOf(crew[split][1]) / 2 <= totalRows / 2; split++) n += rowsOf(crew[split][1]);
+  const crewHalves = [crew.slice(0, Math.max(split, 1)), crew.slice(Math.max(split, 1))].filter((h) => h.length);
 
   return (
     <article className="cs1" aria-hidden="true">
@@ -158,48 +164,55 @@ export function CallSheetOnePage({ parts }: { parts: OnePageParts }) {
       </section>
 
       {!own && (
-        <div className="cs1-people">
-          <section>
-            <h2 className="cs1-bar">Cast<span>{cast.length}</span></h2>
-            {cast.length ? (
-              <table className="cs1-table">
-                <thead><tr><th>#</th><th>Cast</th><th>Character</th><th className="cs1-num">Pickup</th><th className="cs1-num">MU</th><th className="cs1-num">On set</th></tr></thead>
-                <tbody>
-                  {cast.map((c) => (
-                    <tr key={c.user_id}>
-                      <td><b>{castRank(c) ?? ''}</b></td>
-                      <td>{nameOf(c)}{c.note && <span className="cs1-syn cs1-muted">{c.note}</span>}</td>
-                      <td>{castLabel(c).replace(/ \(#\d+\)/g, '')}</td>
-                      <td className="cs1-num">{clockLabel(c.pickup_time)}</td>
-                      <td className="cs1-num">{clockLabel(c.makeup_time)}</td>
-                      <td className="cs1-num"><b>{callOf(c) || '—'}</b></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : <p className="cs1-muted">No cast called</p>}
-          </section>
-          <section>
-            <h2 className="cs1-bar">Crew<span>{crewCount}</span></h2>
-            {crew.length ? (
-              <table className="cs1-table cs1-crew">
-                <tbody>
-                  {crew.map(([dept, list]) => [
-                    <tr key={dept} className="cs1-dept"><td colSpan={4}>{dept}</td></tr>,
-                    ...list.map((c) => (
-                      <tr key={c.user_id}>
-                        <td>{roleNames(c) || 'Crew'}</td>
-                        <td>{nameOf(c)}</td>
-                        <td className="cs1-num">{c.profile.phone ?? ''}</td>
-                        <td className="cs1-num"><b>{callOf(c) || '—'}</b></td>
-                      </tr>
-                    )),
-                  ])}
-                </tbody>
-              </table>
-            ) : <p className="cs1-muted">No crew called yet</p>}
-          </section>
-        </div>
+        <section>
+          <h2 className="cs1-bar">Cast<span>{cast.length}</span></h2>
+          {cast.length ? (
+            <table className="cs1-table cs1-cast">
+              <thead><tr><th>#</th><th>Cast</th><th>Character</th><th className="cs1-num">Pickup</th><th className="cs1-num">Makeup</th><th className="cs1-num">On set</th><th>Notes</th></tr></thead>
+              <tbody>
+                {cast.map((c) => (
+                  <tr key={c.user_id}>
+                    <td><b>{castRank(c) ?? ''}</b></td>
+                    <td>{nameOf(c)}</td>
+                    <td>{castLabel(c).replace(/ \(#\d+\)/g, '')}</td>
+                    <td className="cs1-num">{clockLabel(c.pickup_time)}</td>
+                    <td className="cs1-num">{clockLabel(c.makeup_time)}</td>
+                    <td className="cs1-num"><b>{callOf(c) || '—'}</b></td>
+                    <td className="cs1-muted">{c.note ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <p className="cs1-muted">No cast called</p>}
+        </section>
+      )}
+
+      {!own && (
+        <section>
+          <h2 className="cs1-bar">Crew<span>{crewCount}</span></h2>
+          {crew.length ? (
+            <div className="cs1-crew-cols">
+              {crewHalves.map((half, k) => (
+                <table key={k} className="cs1-table cs1-crew">
+                  <colgroup><col className="cs1-w-role" /><col className="cs1-w-name" /><col className="cs1-w-phone" /><col className="cs1-w-call" /></colgroup>
+                  <tbody>
+                    {half.map(([dept, list]) => [
+                      <tr key={dept} className="cs1-dept"><td colSpan={4}>{dept}</td></tr>,
+                      ...list.map((c) => (
+                        <tr key={c.user_id}>
+                          <td>{roleNames(c) || 'Crew'}</td>
+                          <td>{nameOf(c)}</td>
+                          <td className="cs1-num">{c.profile.phone ?? ''}</td>
+                          <td className="cs1-num"><b>{callOf(c) || '—'}</b></td>
+                        </tr>
+                      )),
+                    ])}
+                  </tbody>
+                </table>
+              ))}
+            </div>
+          ) : <p className="cs1-muted">No crew called yet</p>}
+        </section>
       )}
 
       <div className="cs1-bottom">
